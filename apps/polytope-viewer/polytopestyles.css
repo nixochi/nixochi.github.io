@@ -296,20 +296,20 @@ polytope-viewer {
 /* Polytope grid - now inside scrollable area */
 .polytope-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
 }
 
 .polytope-card {
     background: var(--bg-secondary);
     border: 2px solid var(--border);
-    border-radius: 8px;
-    padding: 20px;
+    border-radius: 6px;
+    padding: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
     text-align: center;
     /* Ensure cards have consistent height */
-    min-height: 120px;
+    min-height: 60px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -326,23 +326,17 @@ polytope-viewer {
     background: color-mix(in srgb, var(--bg-secondary) 95%, var(--fg-secondary) 5%);
 }
 
-.polytope-icon {
-    font-size: 28px;
-    margin-bottom: 12px;
-    display: block;
-}
-
 .polytope-name {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--fg-primary);
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .polytope-description {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--fg-secondary);
-    line-height: 1.4;
+    line-height: 1.3;
 }
 
 /* Options button (top left) */
@@ -441,17 +435,12 @@ polytope-viewer {
 
     .polytope-grid {
         grid-template-columns: 1fr;
-        gap: 12px;
+        gap: 8px;
     }
 
     .polytope-card {
-        min-height: 100px;
-        padding: 16px;
-    }
-
-    .polytope-icon {
-        font-size: 24px;
-        margin-bottom: 8px;
+        min-height: 50px;
+        padding: 10px;
     }
 }
 

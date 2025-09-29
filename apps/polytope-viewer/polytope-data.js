@@ -3,80 +3,67 @@ export const polytopeOptions = [
     {
         id: 'permutahedron',
         name: 'Permutahedron',
-        icon: '🔄',
         description: 'Convex hull of permutations of [1,2,3,4]',
         active: true
     },
     {
         id: 'cube',
         name: 'Cube',
-        icon: '🧊',
         description: '3D hypercube with 8 vertices'
     },
     {
         id: 'tetrahedron',
         name: 'Tetrahedron',
-        icon: '🔺',
         description: 'Simplest 3D polytope with 4 vertices'
     },
     {
         id: 'octahedron',
         name: 'Octahedron',
-        icon: '💎',
         description: '8-faced regular solid'
     },
     {
         id: 'dodecahedron',
         name: 'Dodecahedron',
-        icon: '⚽',
         description: '12 pentagonal faces'
     },
     {
         id: 'icosahedron',
         name: 'Icosahedron',
-        icon: '🔮',
         description: '20 triangular faces'
     },
     {
         id: 'tesseract',
         name: 'Tesseract',
-        icon: '📦',
         description: '4D hypercube projection'
     },
     {
         id: 'truncated_tetrahedron',
         name: 'Truncated Tetrahedron',
-        icon: '🔶',
         description: '4 triangular and 4 hexagonal faces'
     },
     {
         id: 'cuboctahedron',
         name: 'Cuboctahedron',
-        icon: '🔹',
         description: '8 triangular and 6 square faces'
     },
     {
         id: 'truncated_cube',
         name: 'Truncated Cube',
-        icon: '🟫',
         description: '8 triangular and 6 octagonal faces'
     },
     {
         id: 'snub_cube',
         name: 'Snub Cube',
-        icon: '🎲',
         description: '32 triangular and 6 square faces'
     },
     {
         id: 'rhombicuboctahedron',
         name: 'Rhombicuboctahedron',
-        icon: '💠',
         description: '8 triangular and 18 square faces'
     },
     {
         id: 'pentagonal_prism',
         name: 'Pentagonal Prism',
-        icon: '🏛️',
         description: '2 pentagonal and 5 rectangular faces'
     }
 ];

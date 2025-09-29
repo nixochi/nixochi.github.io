@@ -36,7 +36,8 @@ class GaussianPeriodsViewer extends HTMLElement {
         
         // Auto-zoom state
         this.computedScaleFactor = 0.1;
-        
+        this.dataCenter = { x: 0, y: 0 };
+
         // Animation and resize
         this.animationId = null;
         this._ro = null;
@@ -209,30 +210,30 @@ class GaussianPeriodsViewer extends HTMLElement {
     setupScene() {
         const THREE = this.THREE;
         const canvas = this.querySelector('#gaussianCanvas');
-        
+
         // Scene
         this.scene = new THREE.Scene();
-        
+
         // Camera - 2D-like viewing as in tezcatli
         this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
         this.camera.position.set(0, 0, 10);
         this.camera.lookAt(0, 0, 0);
-        
+
         // Renderer
-        this.renderer = new THREE.WebGLRenderer({ 
-            canvas: canvas, 
-            antialias: true, 
-            alpha: true 
+        this.renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true,
+            alpha: true
         });
         this.renderer.setClearColor(0x000000, 0);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-        
+
         // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
         directionalLight.position.set(0, 0, 10);
         this.scene.add(ambientLight, directionalLight);
-        
+
         // Controls - 2D-like as in tezcatli
         this.controls = new this.OrbitControls(this.camera, canvas);
         this.controls.enableRotate = false;
@@ -240,7 +241,9 @@ class GaussianPeriodsViewer extends HTMLElement {
         this.controls.enableZoom = true;
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.08;
-        
+        this.controls.minDistance = 1;
+        this.controls.maxDistance = 200;
+
         console.log('🎬 3D scene setup complete');
     }
     
@@ -414,27 +417,71 @@ class GaussianPeriodsViewer extends HTMLElement {
     }
     
     calculateAutoZoom(points) {
-        if (!points || points.length === 0) return 0.1;
-        
+        if (!points || points.length === 0) {
+            // Reset camera to default position
+            this.camera.position.set(0, 0, 10);
+            this.dataCenter = { x: 0, y: 0 };
+            return 1.0;
+        }
+
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
-        
+
         for (const point of points) {
             minX = Math.min(minX, point.x);
             maxX = Math.max(maxX, point.x);
             minY = Math.min(minY, point.y);
             maxY = Math.max(maxY, point.y);
         }
-        
+
         const dataWidth = maxX - minX;
         const dataHeight = maxY - minY;
         const maxDataSize = Math.max(dataWidth, dataHeight);
-        
-        const viewportSize = 10;
-        const usableViewportSize = viewportSize * 0.9;
-        const scaleFactor = maxDataSize > 0 ? usableViewportSize / maxDataSize : 0.1;
-        
-        return Math.max(0.01, Math.min(0.5, scaleFactor));
+
+        // Calculate and store data center for centering
+        this.dataCenter = {
+            x: (minX + maxX) / 2,
+            y: (minY + maxY) / 2
+        };
+
+        if (maxDataSize === 0) {
+            this.camera.position.set(0, 0, 10);
+            return 1.0;
+        }
+
+        // Get actual container dimensions
+        const { width, height } = this.getBoundingClientRect();
+        if (!width || !height) {
+            this.camera.position.set(0, 0, 10);
+            return 1.0;
+        }
+
+        // Calculate the center square size based on window dimensions
+        const minWindowDimension = Math.min(width, height);
+
+        // Use 80% of the center square for usable space (10% smaller than before)
+        const usableSquarePixels = minWindowDimension * 0.8;
+
+        // Calculate required camera distance to fit data in the center square
+        // For perspective camera: visibleHeight = 2 * tan(fov/2) * distance
+        // We want: maxDataSize = (usableSquarePixels / minWindowDimension) * visibleHeight
+        const fov = 60; // degrees
+        const fovRadians = (fov / 2) * (Math.PI / 180);
+
+        // Solve for distance: distance = (maxDataSize / 2) / tan(fov/2) * (minWindowDimension / usableSquarePixels)
+        const requiredDistance = (maxDataSize / 2) / Math.tan(fovRadians) * (minWindowDimension / usableSquarePixels);
+
+        // Clamp distance to reasonable bounds
+        const clampedDistance = Math.max(5, Math.min(100, requiredDistance));
+
+        // Move camera to calculated distance
+        this.camera.position.set(0, 0, clampedDistance);
+        this.camera.lookAt(0, 0, 0);
+
+        console.log(`Auto-zoom: data size=${maxDataSize.toFixed(2)}, center=(${this.dataCenter.x.toFixed(2)}, ${this.dataCenter.y.toFixed(2)}), camera distance=${clampedDistance.toFixed(2)}`);
+
+        // Return scale factor of 1.0 since we're moving the camera instead of scaling data
+        return 1.0;
     }
     
     // Point cloud creation - EXACT from tezcatli
@@ -447,15 +494,16 @@ class GaussianPeriodsViewer extends HTMLElement {
         if (!this.positionArray || !this.colorArray) return;
 
         const scaleFactor = this.computedScaleFactor;
-        
+
         for (let i = 0; i < this.computedPoints.length; i++) {
             const point = this.computedPoints[i];
             const i3 = i * 3;
-            
-            this.positionArray[i3] = point.x * scaleFactor;
-            this.positionArray[i3 + 1] = point.y * scaleFactor;
+
+            // Center the data by subtracting the data center
+            this.positionArray[i3] = (point.x - this.dataCenter.x) * scaleFactor;
+            this.positionArray[i3 + 1] = (point.y - this.dataCenter.y) * scaleFactor;
             this.positionArray[i3 + 2] = 0;
-            
+
             const color = this.getPointColorAsRGB(point, i);
             this.colorArray[i3] = color.r;
             this.colorArray[i3 + 1] = color.g;

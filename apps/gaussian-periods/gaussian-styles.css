@@ -57,14 +57,15 @@ gaussian-periods-viewer {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    padding: 8px 16px;
+    padding: 12px 20px;
     z-index: 1001;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     color: var(--fg-primary);
     cursor: pointer;
     transition: all 0.2s ease;
     user-select: none;
+    min-width: 150px;
 }
 
 .options-button:hover {
@@ -81,10 +82,10 @@ gaussian-periods-viewer {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    padding: 12px;
+    padding: 20px;
     z-index: 1000;
-    min-width: 200px;
-    max-height: 75vh;
+    min-width: 260px;
+    max-height: 80vh;
     overflow-y: auto;
     transition: all 0.3s ease;
     opacity: 0;
@@ -101,7 +102,7 @@ gaussian-periods-viewer {
 .controls-panel {
     top: 60px;
     left: 20px;
-    min-width: 220px;
+    min-width: 260px;
 }
 
 /* Control groups */
@@ -114,8 +115,8 @@ gaussian-periods-viewer {
 }
 
 .control-label {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 500;
     color: var(--fg-primary);
     margin-bottom: 8px;
     display: block;
@@ -125,22 +126,22 @@ gaussian-periods-viewer {
 .toggle-wrapper {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
+    gap: 12px;
+    margin-bottom: 12px;
 }
 
 .toggle {
     position: relative;
-    width: 40px;
-    height: 22px;
+    width: 44px;
+    height: 24px;
     background-color: var(--border);
-    border-radius: 11px;
+    border-radius: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .toggle.active {
-    background-color: var(--blue);
+    background-color: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
 }
 
 .toggle::after {
@@ -148,8 +149,8 @@ gaussian-periods-viewer {
     position: absolute;
     top: 2px;
     left: 2px;
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     background: white;
     border-radius: 50%;
     transition: all 0.2s ease;
@@ -157,11 +158,11 @@ gaussian-periods-viewer {
 }
 
 .toggle.active::after {
-    transform: translateX(18px);
+    transform: translateX(20px);
 }
 
 .toggle-label {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--fg-secondary);
     cursor: pointer;
     user-select: none;
@@ -169,11 +170,11 @@ gaussian-periods-viewer {
 
 /* Input fields */
 .input-wrapper {
-    margin-bottom: 12px;
+    margin-bottom: 16px;
 }
 
 .input-label {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--fg-secondary);
     margin-bottom: 4px;
     display: block;
@@ -181,12 +182,12 @@ gaussian-periods-viewer {
 
 .input-field {
     width: 100%;
-    padding: 6px 8px;
+    padding: 8px 10px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--fg-primary);
-    font-size: 13px;
+    font-size: 14px;
     font-family: 'Courier New', monospace;
 }
 
@@ -197,11 +198,11 @@ gaussian-periods-viewer {
 
 /* Sliders */
 .slider-wrapper {
-    margin-bottom: 12px;
+    margin-bottom: 16px;
 }
 
 .slider-label {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--fg-secondary);
     margin-bottom: 4px;
     display: block;
@@ -209,9 +210,9 @@ gaussian-periods-viewer {
 
 .slider {
     width: 100%;
-    height: 5px;
+    height: 6px;
     background: var(--border);
-    border-radius: 2.5px;
+    border-radius: 3px;
     outline: none;
     appearance: none;
     cursor: pointer;
@@ -219,9 +220,9 @@ gaussian-periods-viewer {
 
 .slider::-webkit-slider-thumb {
     appearance: none;
-    width: 16px;
-    height: 16px;
-    background: var(--blue);
+    width: 18px;
+    height: 18px;
+    background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
     border-radius: 50%;
     cursor: pointer;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -229,14 +230,14 @@ gaussian-periods-viewer {
 }
 
 .slider::-webkit-slider-thumb:hover {
-    background: var(--blue-hover);
+    background: color-mix(in srgb, var(--fg-secondary) 80%, var(--bg-secondary) 20%);
     transform: scale(1.1);
 }
 
 .slider::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
-    background: var(--blue);
+    width: 18px;
+    height: 18px;
+    background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
     border-radius: 50%;
     cursor: pointer;
     border: none;
@@ -244,25 +245,25 @@ gaussian-periods-viewer {
 }
 
 .slider-value {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--fg-secondary);
     text-align: right;
-    margin-top: 3px;
+    margin-top: 4px;
 }
 
 /* Select dropdown */
 .select-wrapper {
-    margin-bottom: 12px;
+    margin-bottom: 16px;
 }
 
 .select-field {
     width: 100%;
-    padding: 6px 8px;
+    padding: 8px 10px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--fg-primary);
-    font-size: 12px;
+    font-size: 14px;
     cursor: pointer;
 }
 
@@ -299,13 +300,13 @@ gaussian-periods-viewer {
 /* Action buttons */
 .action-btn {
     width: 100%;
-    padding: 7px 10px;
-    margin-bottom: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--fg-primary);
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -328,11 +329,11 @@ gaussian-periods-viewer {
 
 /* Help text */
 .help-text {
-    font-size: 10px;
+    font-size: 12px;
     color: var(--fg-secondary);
     line-height: 1.4;
     margin-top: 8px;
-    padding: 6px;
+    padding: 8px;
     background: var(--bg-secondary);
     border-radius: 6px;
     border: 1px solid var(--border);

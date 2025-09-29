@@ -354,8 +354,8 @@ polytope-viewer {
     backdrop-filter: blur(16px);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 8px 16px;
-    font-size: 13px;
+    padding: 12px 20px;
+    font-size: 14px;
     font-weight: 500;
     color: var(--fg-primary);
     cursor: pointer;
@@ -363,6 +363,7 @@ polytope-viewer {
     box-shadow: var(--shadow);
     transition: all 0.2s ease;
     user-select: none;
+    min-width: 150px;
 }
 
 .options-button:hover {
@@ -387,6 +388,7 @@ polytope-viewer {
     z-index: 1001;
     box-shadow: var(--shadow);
     transition: all 0.2s ease;
+    min-width: 150px;
 }
 
 .select-polytope-btn:hover {
@@ -411,8 +413,8 @@ polytope-viewer {
     .options-button {
         top: 15px;
         left: 15px;
-        padding: 6px 12px;
-        font-size: 12px;
+        padding: 10px 16px;
+        font-size: 13px;
     }
 
     .select-polytope-btn {

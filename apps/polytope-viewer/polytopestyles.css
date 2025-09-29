@@ -38,6 +38,7 @@
 
 html, body {
     height: 100vh;
+    height: 100svh;
     overflow: hidden; /* Prevent page scrolling */
     touch-action: none; /* Prevent zoom gestures */
     -ms-touch-action: none;
@@ -47,11 +48,15 @@ body {
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg-primary);
     color: var(--fg-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 polytope-viewer {
     width: 100vw;
+    width: 100svw;
     height: 100vh;
+    height: 100svh;
     display: block;
 }
 
@@ -67,6 +72,7 @@ polytope-viewer {
     z-index: 1000;
     min-width: 280px;
     max-height: 80vh;
+    max-height: 80svh;
     overflow-y: auto;
     transition: all 0.3s ease;
     opacity: 0;
@@ -121,7 +127,11 @@ polytope-viewer {
 
 /* Toggle switch styles */
 .toggle-wrapper {
+    display: -webkit-box;
+    display: -webkit-flex;
     display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
     align-items: center;
     gap: 12px;
     margin-bottom: 12px;
@@ -219,11 +229,19 @@ polytope-viewer {
     top: 0;
     left: 0;
     width: 100vw;
+    width: 100svw;
     height: 100vh;
+    height: 100svh;
     background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(8px);
+    display: -webkit-box;
+    display: -webkit-flex;
     display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
     align-items: center;
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
     justify-content: center;
     z-index: 2000;
     opacity: 0;
@@ -248,8 +266,14 @@ polytope-viewer {
     width: 90%;
     /* Fixed height with scrolling */
     height: 80vh;
+    height: 80svh;
     max-height: 600px;
+    display: -webkit-box;
+    display: -webkit-flex;
     display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -webkit-flex-direction: column;
     flex-direction: column;
     transform: scale(0.9) translateY(20px);
     transition: all 0.3s ease;
@@ -262,8 +286,14 @@ polytope-viewer {
 }
 
 .modal-header {
+    display: -webkit-box;
+    display: -webkit-flex;
     display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
     align-items: center;
+    -webkit-box-pack: justify;
+    -webkit-justify-content: space-between;
     justify-content: space-between;
     padding: 24px 24px 16px 24px;
     border-bottom: 1px solid var(--border);
@@ -295,6 +325,8 @@ polytope-viewer {
 
 /* Scrollable modal body */
 .modal-body {
+    -webkit-box-flex: 1;
+    -webkit-flex: 1;
     flex: 1;
     overflow-y: auto;
     padding: 20px 24px 24px 24px;
@@ -302,6 +334,7 @@ polytope-viewer {
 
 /* Polytope grid - now inside scrollable area */
 .polytope-grid {
+    display: -webkit-grid;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 10px;
@@ -317,8 +350,15 @@ polytope-viewer {
     text-align: center;
     /* Ensure cards have consistent height */
     min-height: 60px;
+    display: -webkit-box;
+    display: -webkit-flex;
     display: flex;
+    -webkit-box-orient: vertical;
+    -webkit-box-direction: normal;
+    -webkit-flex-direction: column;
     flex-direction: column;
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
     justify-content: center;
 }
 
@@ -429,6 +469,7 @@ polytope-viewer {
         margin: 20px;
         width: calc(100% - 40px);
         height: calc(100vh - 40px);
+        height: calc(100svh - 40px);
         max-height: none;
     }
 

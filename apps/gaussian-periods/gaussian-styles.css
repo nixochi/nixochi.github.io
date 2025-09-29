@@ -32,6 +32,7 @@
 
 html, body {
     height: 100vh;
+    height: 100svh;
     overflow: hidden;
 }
 
@@ -39,11 +40,15 @@ body {
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg-primary);
     color: var(--fg-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 gaussian-periods-viewer {
     width: 100vw;
+    width: 100svw;
     height: 100vh;
+    height: 100svh;
     display: block;
 }
 
@@ -86,6 +91,7 @@ gaussian-periods-viewer {
     z-index: 1000;
     min-width: 260px;
     max-height: 80vh;
+    max-height: 80svh;
     overflow-y: auto;
     transition: all 0.3s ease;
     opacity: 0;
@@ -124,7 +130,11 @@ gaussian-periods-viewer {
 
 /* Toggle switch */
 .toggle-wrapper {
+    display: -webkit-box;
+    display: -webkit-flex;
     display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
     align-items: center;
     gap: 12px;
     margin-bottom: 12px;
@@ -274,6 +284,8 @@ gaussian-periods-viewer {
 
 /* Color picker */
 .color-picker-wrapper {
+    display: -webkit-box;
+    display: -webkit-flex;
     display: flex;
     gap: 8px;
     margin-bottom: 12px;

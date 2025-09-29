@@ -1,6 +1,6 @@
 /**
  * Gaussian Periods Viewer Web Component
- * Matches tezcatli Plugin3D architecture patterns
+ * With corrected container-aware auto-zoom
  */
 class GaussianPeriodsViewer extends HTMLElement {
     static get observedAttributes() { 
@@ -11,7 +11,7 @@ class GaussianPeriodsViewer extends HTMLElement {
         super();
         console.log('🎯 GaussianPeriodsViewer constructor called');
         
-        // Core state - matching GaussianPeriodsPlugin
+        // Core state
         this.computedPoints = [];
         this.animationIndex = 0;
         this.isPaused = false;
@@ -24,19 +24,18 @@ class GaussianPeriodsViewer extends HTMLElement {
         this.renderer = null;
         this.controls = null;
         
-        // Point cloud objects - EXACT from tezcatli
+        // Point cloud objects
         this.pointCloud = null;
         this.pointGeometry = null;
         this.pointMaterial = null;
         this.gridHelper = null;
         
-        // Pre-allocated arrays for performance
+        // Pre-allocated arrays
         this.positionArray = null;
         this.colorArray = null;
         
         // Auto-zoom state
         this.computedScaleFactor = 0.1;
-        this.dataCenter = { x: 0, y: 0 };
 
         // Animation and resize
         this.animationId = null;
@@ -137,7 +136,6 @@ class GaussianPeriodsViewer extends HTMLElement {
         }
     }
     
-    // Parameter handling
     parseAttributes() {
         console.log('📝 Parsing attributes');
     }
@@ -158,7 +156,6 @@ class GaussianPeriodsViewer extends HTMLElement {
         }
     }
     
-    // Initialization - EXACT pattern from tezcatli
     async initialize() {
         console.log('🚀 Initializing GaussianPeriodsViewer...');
         
@@ -167,7 +164,6 @@ class GaussianPeriodsViewer extends HTMLElement {
         this.setupResizeObserver();
         this.startAnimationLoop();
         
-        // Initial computation
         await this.computePeriods();
         
         console.log('✅ GaussianPeriodsViewer initialization complete');
@@ -176,14 +172,12 @@ class GaussianPeriodsViewer extends HTMLElement {
     async loadDependencies() {
         console.log('📦 Loading THREE.js dependencies...');
         
-        // Load THREE.js
         const threeMod = await this.importFirst([
             'https://esm.sh/three@0.160.0',
             'https://cdn.jsdelivr.net/npm/three@0.160.0/+esm'
         ]);
         this.THREE = threeMod;
         
-        // Load OrbitControls
         const orbitMod = await this.importFirst([
             'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js',
             'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js'
@@ -211,15 +205,12 @@ class GaussianPeriodsViewer extends HTMLElement {
         const THREE = this.THREE;
         const canvas = this.querySelector('#gaussianCanvas');
 
-        // Scene
         this.scene = new THREE.Scene();
 
-        // Camera - 2D-like viewing as in tezcatli
         this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
         this.camera.position.set(0, 0, 10);
         this.camera.lookAt(0, 0, 0);
 
-        // Renderer
         this.renderer = new THREE.WebGLRenderer({
             canvas: canvas,
             antialias: true,
@@ -228,13 +219,11 @@ class GaussianPeriodsViewer extends HTMLElement {
         this.renderer.setClearColor(0x000000, 0);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-        // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
         directionalLight.position.set(0, 0, 10);
         this.scene.add(ambientLight, directionalLight);
 
-        // Controls - 2D-like as in tezcatli
         this.controls = new this.OrbitControls(this.camera, canvas);
         this.controls.enableRotate = false;
         this.controls.enablePan = true;
@@ -256,6 +245,15 @@ class GaussianPeriodsViewer extends HTMLElement {
             this.camera.aspect = width / height;
             this.camera.updateProjectionMatrix();
             
+            // Recalculate auto-zoom on resize if enabled and we have points
+            if (this.getParameter('autoZoom') && this.computedPoints.length > 0) {
+                this.computedScaleFactor = this.calculateAutoZoom(this.computedPoints);
+                this.fillArraysWithPoints();
+                if (this.pointGeometry) {
+                    this.pointGeometry.attributes.position.needsUpdate = true;
+                }
+            }
+            
             console.log(`📐 GaussianPeriodsViewer resized to: ${width}x${height}`);
         };
         
@@ -268,7 +266,6 @@ class GaussianPeriodsViewer extends HTMLElement {
         const animate = () => {
             this.animationId = requestAnimationFrame(animate);
             
-            // Animation logic - EXACT from tezcatli
             const plotMode = this.getParameter('plotMode');
             if (plotMode === 'animated' && !this.isPaused && this.pointCloud) {
                 const maxPoints = this.computedPoints.length;
@@ -283,7 +280,6 @@ class GaussianPeriodsViewer extends HTMLElement {
                 }
             }
             
-            // Update grid visibility
             const showGrid = this.getParameter('showGrid');
             if (showGrid && !this.gridHelper) {
                 this.createGrid();
@@ -301,34 +297,28 @@ class GaussianPeriodsViewer extends HTMLElement {
         console.log('🎬 Animation loop started');
     }
     
-    // Gaussian Periods computation - simplified from tezcatli
     async computePeriods() {
         const n = Math.min(this.getParameter('n'), 200000);
         const omega = this.getParameter('omega');
         
         console.log(`Computing Gaussian Periods for n=${n}, omega=${omega}...`);
         
-        // Validate coprimality
         if (this.gcd(omega, n) !== 1) {
             console.error(`Invalid parameters: omega=${omega} must be coprime to n=${n}`);
             return;
         }
         
-        // Clear existing visualization
         this.clearVisualization();
         
-        // Compute multiplicative order
         const d = this.multiplicativeOrder(omega, n);
         console.log(`Multiplicative order d = ${d}`);
         
-        // Pre-compute omega powers
         const omegaPowers = new Uint32Array(d);
         omegaPowers[0] = 1;
         for (let j = 1; j < d; j++) {
             omegaPowers[j] = (omegaPowers[j - 1] * omega) % n;
         }
         
-        // Pre-compute trigonometric values
         const cosValues = new Float32Array(n);
         const sinValues = new Float32Array(n);
         for (let i = 0; i < n; i++) {
@@ -337,7 +327,6 @@ class GaussianPeriodsViewer extends HTMLElement {
             sinValues[i] = Math.sin(angle);
         }
         
-        // Compute Gaussian periods
         const gcdND = this.gcd(n, d);
         const bound = Math.min(n, Math.floor(n / gcdND * d));
         
@@ -368,7 +357,6 @@ class GaussianPeriodsViewer extends HTMLElement {
         
         console.log(`Computed ${this.computedPoints.length} points`);
         
-        // Auto-zoom calculation
         if (this.getParameter('autoZoom')) {
             this.computedScaleFactor = this.calculateAutoZoom(this.computedPoints);
             console.log(`Auto-zoom scale factor: ${this.computedScaleFactor}`);
@@ -376,12 +364,10 @@ class GaussianPeriodsViewer extends HTMLElement {
             this.computedScaleFactor = 0.1;
         }
         
-        // Create point cloud
         this.allocateArrays(this.computedPoints.length);
         this.fillArraysWithPoints();
         this.createPointCloud();
         
-        // Set up animation
         const plotMode = this.getParameter('plotMode');
         if (plotMode === 'animated') {
             this.animationIndex = 0;
@@ -391,7 +377,6 @@ class GaussianPeriodsViewer extends HTMLElement {
         this.updateVisiblePoints();
     }
     
-    // Math utilities
     gcd(a, b) {
         while (b !== 0) {
             const temp = b;
@@ -416,75 +401,84 @@ class GaussianPeriodsViewer extends HTMLElement {
         return order;
     }
     
+    /**
+     * CORRECTED AUTO-ZOOM: Container-aware centering in largest square
+     * For Three.js perspective camera, we adjust camera distance instead of scaling data
+     */
     calculateAutoZoom(points) {
         if (!points || points.length === 0) {
-            // Reset camera to default position
-            this.camera.position.set(0, 0, 10);
-            this.dataCenter = { x: 0, y: 0 };
-            return 1.0;
+            console.warn('No points available for auto-zoom calculation');
+            return 0.1;
         }
-
+        
+        // Step 1: Get container dimensions
+        const { width, height } = this.getBoundingClientRect();
+        if (!width || !height) {
+            console.warn('Container has no dimensions');
+            return 0.1;
+        }
+        
+        console.log(`Container dimensions: ${width}x${height}`);
+        
+        // Step 2: Calculate the center square (largest square that fits in container)
+        const centerSquareSize = Math.min(width, height);
+        console.log(`Center square size: ${centerSquareSize}x${centerSquareSize}`);
+        
+        // Step 3: Use 90% of the center square as usable area (10% total padding)
+        const usableSizePixels = centerSquareSize * 0.9;
+        console.log(`Usable area: ${usableSizePixels}x${usableSizePixels} pixels (90% of center square)`);
+        
+        // Step 4: Calculate data bounds
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
-
+        
         for (const point of points) {
             minX = Math.min(minX, point.x);
             maxX = Math.max(maxX, point.x);
             minY = Math.min(minY, point.y);
             maxY = Math.max(maxY, point.y);
         }
-
+        
         const dataWidth = maxX - minX;
         const dataHeight = maxY - minY;
-        const maxDataSize = Math.max(dataWidth, dataHeight);
-
-        // Calculate and store data center for centering
-        this.dataCenter = {
-            x: (minX + maxX) / 2,
-            y: (minY + maxY) / 2
-        };
-
-        if (maxDataSize === 0) {
-            this.camera.position.set(0, 0, 10);
-            return 1.0;
+        const maxDataDimension = Math.max(dataWidth, dataHeight);
+        
+        console.log(`Data bounds: width=${dataWidth.toFixed(2)}, height=${dataHeight.toFixed(2)}, max=${maxDataDimension.toFixed(2)}`);
+        
+        if (maxDataDimension === 0) {
+            console.warn('Data has no extent');
+            return 0.1;
         }
-
-        // Get actual container dimensions
-        const { width, height } = this.getBoundingClientRect();
-        if (!width || !height) {
-            this.camera.position.set(0, 0, 10);
-            return 1.0;
-        }
-
-        // Calculate the center square size based on window dimensions
-        const minWindowDimension = Math.min(width, height);
-
-        // Use 80% of the center square for usable space (10% smaller than before)
-        const usableSquarePixels = minWindowDimension * 0.8;
-
-        // Calculate required camera distance to fit data in the center square
-        // For perspective camera: visibleHeight = 2 * tan(fov/2) * distance
-        // We want: maxDataSize = (usableSquarePixels / minWindowDimension) * visibleHeight
-        const fov = 60; // degrees
-        const fovRadians = (fov / 2) * (Math.PI / 180);
-
-        // Solve for distance: distance = (maxDataSize / 2) / tan(fov/2) * (minWindowDimension / usableSquarePixels)
-        const requiredDistance = (maxDataSize / 2) / Math.tan(fovRadians) * (minWindowDimension / usableSquarePixels);
-
-        // Clamp distance to reasonable bounds
-        const clampedDistance = Math.max(5, Math.min(100, requiredDistance));
-
-        // Move camera to calculated distance
-        this.camera.position.set(0, 0, clampedDistance);
-        this.camera.lookAt(0, 0, 0);
-
-        console.log(`Auto-zoom: data size=${maxDataSize.toFixed(2)}, center=(${this.dataCenter.x.toFixed(2)}, ${this.dataCenter.y.toFixed(2)}), camera distance=${clampedDistance.toFixed(2)}`);
-
-        // Return scale factor of 1.0 since we're moving the camera instead of scaling data
-        return 1.0;
+        
+        // Step 5: Convert pixels to world units at current camera distance
+        // For perspective camera: visible_height = 2 * tan(fov/2) * distance
+        const currentDistance = this.camera.position.z;
+        const fovRadians = (this.camera.fov * Math.PI) / 180;
+        const visibleHeightAtCurrentDistance = 2 * Math.tan(fovRadians / 2) * currentDistance;
+        
+        // World units per pixel at current distance
+        const worldUnitsPerPixel = visibleHeightAtCurrentDistance / height;
+        
+        // Convert usable pixel size to world units
+        const usableSizeWorldUnits = usableSizePixels * worldUnitsPerPixel;
+        
+        console.log(`Camera distance: ${currentDistance}, Visible height: ${visibleHeightAtCurrentDistance.toFixed(2)}, World units/pixel: ${worldUnitsPerPixel.toFixed(6)}`);
+        console.log(`Usable area in world units: ${usableSizeWorldUnits.toFixed(2)}`);
+        
+        // Step 6: Calculate scale factor to fit data in usable world space
+        const scaleFactor = usableSizeWorldUnits / maxDataDimension;
+        
+        console.log(`📊 Auto-zoom calculation complete:
+  Container: ${width}x${height}
+  Center square: ${centerSquareSize}x${centerSquareSize}
+  Usable area: ${usableSizePixels.toFixed(1)}px = ${usableSizeWorldUnits.toFixed(2)} world units
+  Data extent: ${maxDataDimension.toFixed(2)}
+  Scale factor: ${scaleFactor.toFixed(6)}
+        `);
+        
+        return scaleFactor;
     }
     
-    // Point cloud creation - EXACT from tezcatli
     allocateArrays(pointCount) {
         this.positionArray = new Float32Array(pointCount * 3);
         this.colorArray = new Float32Array(pointCount * 3);
@@ -499,9 +493,8 @@ class GaussianPeriodsViewer extends HTMLElement {
             const point = this.computedPoints[i];
             const i3 = i * 3;
 
-            // Center the data by subtracting the data center
-            this.positionArray[i3] = (point.x - this.dataCenter.x) * scaleFactor;
-            this.positionArray[i3 + 1] = (point.y - this.dataCenter.y) * scaleFactor;
+            this.positionArray[i3] = point.x * scaleFactor;
+            this.positionArray[i3 + 1] = point.y * scaleFactor;
             this.positionArray[i3 + 2] = 0;
 
             const color = this.getPointColorAsRGB(point, i);
@@ -596,7 +589,6 @@ class GaussianPeriodsViewer extends HTMLElement {
         this.scene.add(this.gridHelper);
     }
     
-    // Update methods
     updatePointSize(size) {
         if (this.pointMaterial) {
             this.pointMaterial.size = size;
@@ -626,7 +618,6 @@ class GaussianPeriodsViewer extends HTMLElement {
         this.updateVisiblePoints();
     }
     
-    // Public methods
     clearVisualization() {
         this.computedPoints = [];
         this.animationIndex = 0;
@@ -650,7 +641,6 @@ class GaussianPeriodsViewer extends HTMLElement {
         console.log(`Animation ${this.isPaused ? 'paused' : 'resumed'}`);
     }
     
-    // UI helpers
     showError(message) {
         const error = this.querySelector('#errorMessage');
         const details = this.querySelector('#errorDetails');
@@ -659,7 +649,6 @@ class GaussianPeriodsViewer extends HTMLElement {
         if (details) details.textContent = message;
     }
     
-    // Resource management
     trackObject(object) {
         this._objects.add(object);
     }

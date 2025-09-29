@@ -1,0 +1,98 @@
+
+
+
+
+
+
+
+
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>xochi — writings</title>
+  <meta name="description" content="Notes and essays." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a href="#main" class="skip">skip to content</a>
+
+  <header class="header">
+    <div class="wrapper nav" role="navigation" aria-label="primary">
+      <a href="index.html" class="brand" data-nav><span class="xochi-word">xochi</span></a>
+      <nav class="links">
+        <a href="projects.html" data-nav>projects</a>
+        <a href="applets.html" data-nav>applets</a>
+        <a href="scrapbook.html" data-nav>scrapbook</a>
+        <a href="writings.html" data-nav>writings</a>        
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="wrapper">
+      <h1 class="prose">writings</h1>
+      <ul class="prose" style="list-style:none; padding-left:0; margin: 12px 0 0;">
+        <li style="padding: 12px 0; border-bottom: 1px solid var(--line);">
+          <div class="nav" style="justify-content:space-between; height:auto;">
+            <a href="articles/on-leaving-academia.html">on leaving academia</a>
+            <time class="muted">2025-03-12</time>
+          </div>
+          <p class="muted">how waiting became habit, and why i stopped.</p>
+        </li>
+        <li style="padding: 12px 0; border-bottom: 1px solid var(--line);">
+          <div class="nav" style="justify-content:space-between; height:auto;">
+            <a href="#">when data hides more than it shows</a>
+            <time class="muted">2025-01-28</time>
+          </div>
+          <p class="muted">notes on uncertainty, framing, and the stories we don't measure.</p>
+        </li>
+        <li style="padding: 12px 0; border-bottom: 1px solid var(--line);">
+          <div class="nav" style="justify-content:space-between; height:auto;">
+            <a href="#">neighborhoods as archives</a>
+            <time class="muted">2024-11-09</time>
+          </div>
+          <p class="muted">listening to walls, flyers, and small conversations as a method.</p>
+        </li>
+      </ul>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrapper">
+      <small>by <span class="xochi-word">xochi</span></small>
+    </div>
+  </footer>
+
+  <script src="" defer></script>
+</body><script>
+document.addEventListener('DOMContentLoaded', function() {
+    const vibrantColors = [
+        '#0066ff', '#ff6b35', '#4ecdc4', '#ff0080', '#00ff80', '#8000ff',
+        '#ff4040', '#00bfff', '#ff8c00', '#32cd32', '#ff1493', '#00ced1',
+        '#ff6347', '#9370db', '#ff69b4', '#00ff7f', '#ffd700', '#ff4500',
+        '#7fff00', '#dc143c', '#00ffff', '#ff00ff', '#adff2f', '#ff7f50',
+        '#da70d6', '#40e0d0', '#ee82ee', '#ffa500', '#1e90ff', '#ff20b2',
+        '#39ff14', '#bf00ff', '#ff073a', '#ffff00', '#00e6ff'
+    ];
+    
+    const xochiWords = document.querySelectorAll('.xochi-word');
+    const usedColors = [];
+    
+    xochiWords.forEach(word => {
+        // Pick a random color avoiding recent ones
+        let availableColors = vibrantColors.filter(c => !usedColors.slice(-5).includes(c));
+        if (availableColors.length < 3) {
+            usedColors.length = 0; // Reset if we've used most colors
+            availableColors = vibrantColors;
+        }
+        
+        const color = availableColors[Math.floor(Math.random() * availableColors.length)];
+        usedColors.push(color);
+        word.style.color = color;
+    });
+});
+</script>
+</html>

@@ -1,0 +1,100 @@
+/*Quiet*/
+:root{
+  --bg: #fafafa;
+  --fg: #161616;
+  --muted: #5e5e5e;
+  --line: #e7e7e7;
+  --card: #ffffff;
+  --radius: 12px;
+  --shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
+  --maxw: 68ch;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg: #0d0d0e;
+    --fg: #f3f3f3;
+    --muted: #b9b9b9;
+    --line: #1a1a1a;
+    --card: #121214;
+    --shadow: none;
+  }
+}
+
+html, body { height: 100%; }
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.wrapper{ max-width: 980px; margin: 0 auto; padding: 0 20px; }
+.prose{ max-width: var(--maxw); }
+
+h1, h2, h3{
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  letter-spacing: -0.01em; line-height: 1.15; margin: 0 0 .5rem;
+}
+h1{ font-size: clamp(28px, 3.6vw, 40px); }
+h2{ font-size: clamp(20px, 2.4vw, 28px); margin-top: 2rem; }
+h3{ font-size: 18px; }
+
+p{ margin: .6rem 0; }
+.muted{ color: var(--muted); }
+a{ color: inherit; text-underline-offset: 3px; }
+
+hr{ border:0; border-top: 1px solid var(--line); margin: 2rem 0; }
+
+.header{
+  position: sticky; top: 0; z-index: 10;
+  backdrop-filter: blur(6px);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+.nav{ display:flex; align-items:center; justify-content:space-between; height:64px; }
+.brand{ 
+  font-family: ui-serif, Georgia, serif; 
+  font-size: 18px; 
+  letter-spacing:.2px; 
+  text-decoration: none; 
+}
+.links{ display:flex; gap: 18px; }
+.links a{ font-size: 14px; opacity:.85; text-decoration:none; }
+.links a:hover{ opacity:1; text-decoration: underline; }
+.links a[aria-current="page"]{ opacity:1; text-decoration: underline; }
+
+main{ 
+  padding: 48px 0; 
+  flex: 1; /* This makes main take up available space, pushing footer down */
+}
+
+.card{
+  border:1px solid var(--line); background: var(--card);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 14px 16px 16px;
+}
+.grid{ display:grid; gap: 16px; }
+@media (min-width: 720px){ .grid.cols-2{ grid-template-columns: 1fr 1fr; } }
+
+footer { 
+  border-top: 1px solid var(--line); 
+  padding: 28px 0;
+}
+
+footer .wrapper {
+  max-width: 980px;
+  margin: 0 20px 0 auto; /* Right align: left margin auto, right margin 20px */
+  padding: 0; /* Remove any inherited padding */
+  text-align: right;
+}
+
+footer small { 
+  color: var(--muted); 
+}
+
+/* accessibility */
+.skip{ position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
+.skip:focus{ position:static; width:auto; height:auto; padding:8px; background:var(--card); border:1px solid var(--line); border-radius:8px; }

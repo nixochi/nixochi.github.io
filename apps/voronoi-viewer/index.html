@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voronoi Diagram Viewer</title>
+    <link rel="stylesheet" href="voronoi-styles.css?v=1.0.1">
+</head>
+<body>
+    <!-- Options Button -->
+    <button class="options-button" id="optionsBtn">options</button>
+
+    <!-- Fullscreen voronoi viewer -->
+    <voronoi-viewer id="viewer"></voronoi-viewer>
+    
+    <!-- Compact Controls Panel (Starts hidden in HTML, no CSS required) -->
+    <div class="floating-panel controls-panel" id="controlsPanel" style="display: none;">
+        <div class="control-group">
+            <label class="control-label">Display</label>
+            <div class="toggle-wrapper">
+                <div class="toggle active" id="cellsToggle"></div>
+                <span class="toggle-label">Show Cells</span>
+            </div>
+            <div class="toggle-wrapper">
+                <div class="toggle active" id="edgesToggle"></div>
+                <span class="toggle-label">Show Edges</span>
+            </div>
+            <div class="toggle-wrapper">
+                <div class="toggle active" id="sitesToggle"></div>
+                <span class="toggle-label">Show Sites</span>
+            </div>
+            <div class="toggle-wrapper">
+                <div class="toggle" id="delaunayToggle"></div>
+                <span class="toggle-label">Show Delaunay</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Colors</label>
+            <div class="color-grid" id="colorGrid">
+                <div class="color-option active" data-palette="default" style="background: linear-gradient(45deg, #FF6B6B, #4ECDC4, #45B7D1, #96CEB4);"></div>
+                <div class="color-option" data-palette="warm" style="background: linear-gradient(45deg, #ff6b35, #f7931e, #ffb700, #c5d86d);"></div>
+                <div class="color-option" data-palette="cool" style="background: linear-gradient(45deg, #667eea, #764ba2, #6b73ff, #9bafd9);"></div>
+                <div class="color-option" data-palette="nature" style="background: linear-gradient(45deg, #56ab2f, #a8e6cf, #7fcdcd, #c8e6c9);"></div>
+                <div class="color-option" data-palette="sunset" style="background: linear-gradient(45deg, #fa709a, #fee140, #ffa726, #ff7043);"></div>
+                <div class="color-option" data-palette="ocean" style="background: linear-gradient(45deg, #2196F3, #21CBF3, #00BCD4, #009688);"></div>
+                <div class="color-option" data-palette="purple" style="background: linear-gradient(45deg, #8b5cf6, #a855f7, #9333ea, #7c3aed);"></div>
+                <div class="color-option" data-palette="mono" style="background: linear-gradient(45deg, #6b7280, #9ca3af, #d1d5db, #f3f4f6);"></div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Styling</label>
+            <div class="slider-wrapper">
+                <label class="slider-label">Cell Opacity</label>
+                <input type="range" class="slider" id="opacitySlider" 
+                       min="0" max="1" step="0.1" value="0.9">
+                <div class="slider-value" id="opacityValue">90%</div>
+            </div>
+            <div class="slider-wrapper">
+                <label class="slider-label">Edge Thickness</label>
+                <input type="range" class="slider" id="thicknessSlider" 
+                       min="0.5" max="8" step="0.5" value="2">
+                <div class="slider-value" id="thicknessValue">2px</div>
+            </div>
+            <div class="slider-wrapper">
+                <label class="slider-label">Site Radius</label>
+                <input type="range" class="slider" id="radiusSlider" 
+                       min="2" max="20" step="1" value="6">
+                <div class="slider-value" id="radiusValue">6px</div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Actions</label>
+            <button class="action-btn" id="clearBtn">Clear All</button>
+            <button class="action-btn" id="randomBtn">Add Random Points</button>
+            <button class="action-btn" id="gridBtn">Generate Grid</button>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Interaction</label>
+            <div class="toggle-wrapper">
+                <div class="toggle active" id="draggingToggle"></div>
+                <span class="toggle-label">Allow Dragging</span>
+            </div>
+            <div class="toggle-wrapper">
+                <div class="toggle active" id="removeToggle"></div>
+                <span class="toggle-label">Remove on Right Click</span>
+            </div>
+            <div class="help-text">
+                Click to add points<br>
+                Right-click to remove<br>
+                Drag to move points
+            </div>
+        </div>
+    </div>
+
+    <script src="voronoi-math.js?v=1.0.0"></script>
+    <script src="voronoi-viewer.js?v=1.0.0"></script>
+    <script>
+        // Control setup
+        const viewer = document.getElementById('viewer');
+        const optionsBtn = document.getElementById('optionsBtn');
+        const controlsPanel = document.getElementById('controlsPanel');
+        
+        // Initialize panel state - starts hidden in HTML
+        let panelVisible = false;
+        
+        // Panel starts hidden via inline style, so no jitter possible
+        optionsBtn.textContent = 'options';
+        
+        // Options panel toggle
+        optionsBtn.addEventListener('click', () => {
+            panelVisible = !panelVisible;
+            if (panelVisible) {
+                controlsPanel.style.display = 'block';
+                // Force reflow before adding class for smooth animation
+                controlsPanel.offsetHeight;
+                controlsPanel.classList.add('expanded');
+                optionsBtn.textContent = 'close';
+            } else {
+                controlsPanel.classList.remove('expanded');
+                // Wait for animation to complete before hiding
+                setTimeout(() => {
+                    if (!panelVisible) { // Check again in case user clicked during animation
+                        controlsPanel.style.display = 'none';
+                    }
+                }, 300); // Match CSS transition duration
+                optionsBtn.textContent = 'options';
+            }
+        });
+        
+        // Toggle elements
+        const cellsToggle = document.getElementById('cellsToggle');
+        const edgesToggle = document.getElementById('edgesToggle');
+        const sitesToggle = document.getElementById('sitesToggle');
+        const delaunayToggle = document.getElementById('delaunayToggle');
+        const draggingToggle = document.getElementById('draggingToggle');
+        const removeToggle = document.getElementById('removeToggle');
+        
+        // Slider elements
+        const opacitySlider = document.getElementById('opacitySlider');
+        const opacityValue = document.getElementById('opacityValue');
+        const thicknessSlider = document.getElementById('thicknessSlider');
+        const thicknessValue = document.getElementById('thicknessValue');
+        const radiusSlider = document.getElementById('radiusSlider');
+        const radiusValue = document.getElementById('radiusValue');
+        
+        // Color options
+        const colorGrid = document.getElementById('colorGrid');
+        
+        // Action buttons
+        const clearBtn = document.getElementById('clearBtn');
+        const randomBtn = document.getElementById('randomBtn');
+        const gridBtn = document.getElementById('gridBtn');
+
+        // Toggle functionality
+        function setupToggle(toggle, attribute, defaultValue = false) {
+            if (defaultValue) toggle.classList.add('active');
+            
+            toggle.addEventListener('click', () => {
+                toggle.classList.toggle('active');
+                const isActive = toggle.classList.contains('active');
+                viewer.setAttribute(attribute, isActive ? 'true' : 'false');
+            });
+        }
+
+        // Setup all toggles
+        setupToggle(cellsToggle, 'show-cells', true);
+        setupToggle(edgesToggle, 'show-edges', true);
+        setupToggle(sitesToggle, 'show-sites', true);
+        setupToggle(delaunayToggle, 'show-delaunay', false);
+        setupToggle(draggingToggle, 'allow-dragging', true);
+        setupToggle(removeToggle, 'remove-on-right-click', true);
+
+        // Color palette selection
+        colorGrid.addEventListener('click', (e) => {
+            const colorOption = e.target.closest('.color-option');
+            if (!colorOption) return;
+            
+            // Update active state
+            colorGrid.querySelectorAll('.color-option').forEach(option => {
+                option.classList.remove('active');
+            });
+            colorOption.classList.add('active');
+            
+            // Update viewer
+            const palette = colorOption.dataset.palette;
+            viewer.setAttribute('color-palette', palette);
+        });
+
+        // Opacity slider
+        opacitySlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            const percentage = Math.round(value * 100);
+            opacityValue.textContent = `${percentage}%`;
+            viewer.setAttribute('cell-opacity', value.toString());
+        });
+
+        // Thickness slider
+        thicknessSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            thicknessValue.textContent = `${value}px`;
+            viewer.setAttribute('edge-thickness', value.toString());
+        });
+
+        // Radius slider
+        radiusSlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            radiusValue.textContent = `${value}px`;
+            viewer.setAttribute('site-radius', value.toString());
+        });
+
+        // Action buttons
+        clearBtn.addEventListener('click', () => {
+            viewer.clearAll();
+        });
+
+        randomBtn.addEventListener('click', () => {
+            viewer.addRandomPoints(5);
+        });
+
+        gridBtn.addEventListener('click', () => {
+            viewer.generateGrid();
+        });
+
+        // Initial setup
+        document.addEventListener('DOMContentLoaded', () => {
+            opacityValue.textContent = '90%';
+            thicknessValue.textContent = '2px';
+            radiusValue.textContent = '6px';
+        });
+    </script>
+</body><script>
+document.addEventListener('DOMContentLoaded', function() {
+    const vibrantColors = [
+        '#0066ff', '#ff6b35', '#4ecdc4', '#ff0080', '#00ff80', '#8000ff',
+        '#ff4040', '#00bfff', '#ff8c00', '#32cd32', '#ff1493', '#00ced1',
+        '#ff6347', '#9370db', '#ff69b4', '#00ff7f', '#ffd700', '#ff4500',
+        '#7fff00', '#dc143c', '#00ffff', '#ff00ff', '#adff2f', '#ff7f50',
+        '#da70d6', '#40e0d0', '#ee82ee', '#ffa500', '#1e90ff', '#ff20b2',
+        '#39ff14', '#bf00ff', '#ff073a', '#ffff00', '#00e6ff'
+    ];
+    
+    const xochiWords = document.querySelectorAll('.xochi-word');
+    const usedColors = [];
+    
+    xochiWords.forEach(word => {
+        // Pick a random color avoiding recent ones
+        let availableColors = vibrantColors.filter(c => !usedColors.slice(-5).includes(c));
+        if (availableColors.length < 3) {
+            usedColors.length = 0; // Reset if we've used most colors
+            availableColors = vibrantColors;
+        }
+        
+        const color = availableColors[Math.floor(Math.random() * availableColors.length)];
+        usedColors.push(color);
+        word.style.color = color;
+    });
+});
+</script>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polytope Viewer</title>
+    <link rel="stylesheet" href="polytopestyles.css">
+    <script src="polytope-viewer.js"></script>
+    <script type="module" src="polytope-data.js"></script>
+</head>
+<body>
+    <!-- Options Button -->
+    <button class="options-button" id="optionsBtn">options</button>
+
+    <!-- Top Right Select Button -->
+    <button class="select-polytope-btn" id="selectPolytopeBtn">
+        Select Polytope
+    </button>
+
+    <!-- Fullscreen polytope viewer -->
+    <polytope-viewer id="viewer" vertices='[
+  [-2.121320343559642, -0.408248290463863,  0.577350269189626],
+  [-2.121320343559642,  0.408248290463863, -0.577350269189626],
+  [-1.414213562373095, -1.632993161855452,  0.577350269189626],
+  [-1.414213562373095,  0.000000000000000, -1.732050807568877],
+  [-1.414213562373095,  0.000000000000000,  1.732050807568877],
+  [-1.414213562373095,  1.632993161855452, -0.577350269189626],
+  [-0.707106781186548, -2.041241452319315, -0.577350269189626],
+  [-0.707106781186548, -1.224744871391589, -1.732050807568877],
+  [-0.707106781186548, -1.224744871391589,  1.732050807568877],
+  [-0.707106781186548,  1.224744871391589, -1.732050807568877],
+  [-0.707106781186548,  1.224744871391589,  1.732050807568877],
+  [-0.707106781186548,  2.041241452319315,  0.577350269189626],
+  [ 0.707106781186548, -2.041241452319315, -0.577350269189626],
+  [ 0.707106781186548, -1.224744871391589, -1.732050807568877],
+  [ 0.707106781186548, -1.224744871391589,  1.732050807568877],
+  [ 0.707106781186548,  1.224744871391589, -1.732050807568877],
+  [ 0.707106781186548,  1.224744871391589,  1.732050807568877],
+  [ 0.707106781186548,  2.041241452319315,  0.577350269189626],
+  [ 1.414213562373095, -1.632993161855452,  0.577350269189626],
+  [ 1.414213562373095,  0.000000000000000, -1.732050807568877],
+  [ 1.414213562373095,  0.000000000000000,  1.732050807568877],
+  [ 1.414213562373095,  1.632993161855452, -0.577350269189626],
+  [ 2.121320343559642, -0.408248290463863,  0.577350269189626],
+  [ 2.121320343559642,  0.408248290463863, -0.577350269189626]
+]'></polytope-viewer>
+    
+    <!-- Left Controls Panel (Starts hidden) -->
+    <div class="floating-panel controls-panel" id="controlsPanel" style="display: none;">
+        <div class="control-group">
+            <label class="control-label">Display Mode</label>
+            <div class="toggle-wrapper">
+                <div class="toggle" id="wireframeToggle"></div>
+                <span class="toggle-label">Wireframe</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Opacity</label>
+            <div class="slider-wrapper">
+                <input type="range" class="slider" id="opacitySlider"
+                       min="0" max="1" step="0.1" value="0.9">
+                <div class="slider-value" id="opacityValue">90%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Polytope Selector Modal with Scrolling -->
+    <div class="modal-overlay" id="polytopeModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Select Polytope</h2>
+                <button class="close-button" id="closeModal">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="polytope-grid" id="polytopeGrid">
+                    <!-- Polytope cards will be dynamically generated from polytope-data.js -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { polytopeOptions, getPolytopeVertices } from './polytope-data.js';
+
+        const viewer = document.getElementById('viewer');
+        const wireframeToggle = document.getElementById('wireframeToggle');
+        const opacitySlider = document.getElementById('opacitySlider');
+        const opacityValue = document.getElementById('opacityValue');
+        const selectPolytopeBtn = document.getElementById('selectPolytopeBtn');
+        const polytopeModal = document.getElementById('polytopeModal');
+        const closeModal = document.getElementById('closeModal');
+        const polytopeGrid = document.getElementById('polytopeGrid');
+        const optionsBtn = document.getElementById('optionsBtn');
+        const controlsPanel = document.getElementById('controlsPanel');
+
+        // Generate polytope cards from data
+        function generatePolytopeCards() {
+            polytopeGrid.innerHTML = '';
+            polytopeOptions.forEach(polytope => {
+                const card = document.createElement('div');
+                card.className = 'polytope-card';
+                if (polytope.active) {
+                    card.classList.add('active');
+                }
+                card.dataset.polytope = polytope.id;
+
+                card.innerHTML = `
+                    <span class="polytope-icon">${polytope.icon}</span>
+                    <div class="polytope-name">${polytope.name}</div>
+                    <div class="polytope-description">${polytope.description}</div>
+                `;
+
+                polytopeGrid.appendChild(card);
+            });
+        }
+
+        // Modal functionality with body scroll prevention
+        function openModal() {
+            polytopeModal.classList.add('active');
+            document.body.classList.add('modal-open');
+        }
+
+        function closeModalFunc() {
+            polytopeModal.classList.remove('active');
+            document.body.classList.remove('modal-open');
+        }
+
+        selectPolytopeBtn.addEventListener('click', openModal);
+        closeModal.addEventListener('click', closeModalFunc);
+
+        // Close modal when clicking outside
+        polytopeModal.addEventListener('click', (e) => {
+            if (e.target === polytopeModal) {
+                closeModalFunc();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && polytopeModal.classList.contains('active')) {
+                closeModalFunc();
+            }
+        });
+
+        // Options panel toggle functionality
+        let panelVisible = false;
+
+        optionsBtn.addEventListener('click', () => {
+            panelVisible = !panelVisible;
+            if (panelVisible) {
+                controlsPanel.style.display = 'block';
+                // Force reflow before adding class for smooth animation
+                controlsPanel.offsetHeight;
+                controlsPanel.classList.add('expanded');
+                optionsBtn.textContent = 'close';
+            } else {
+                controlsPanel.classList.remove('expanded');
+                // Wait for animation to complete before hiding
+                setTimeout(() => {
+                    if (!panelVisible) { // Check again in case user clicked during animation
+                        controlsPanel.style.display = 'none';
+                    }
+                }, 300); // Match CSS transition duration
+                optionsBtn.textContent = 'options';
+            }
+        });
+
+        // Wireframe toggle functionality
+        wireframeToggle.addEventListener('click', () => {
+            wireframeToggle.classList.toggle('active');
+            const isWireframe = wireframeToggle.classList.contains('active');
+            viewer.setAttribute('wireframe', isWireframe ? 'true' : 'false');
+        });
+
+        // Opacity slider functionality
+        opacitySlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            const percentage = Math.round(value * 100);
+            opacityValue.textContent = `${percentage}%`;
+            viewer.setAttribute('opacity', value.toString());
+        });
+
+        // Polytope selection functionality
+        function setupPolytopeSelection() {
+            polytopeGrid.addEventListener('click', (e) => {
+                const card = e.target.closest('.polytope-card');
+                if (!card) return;
+
+                // Update active state
+                const polytopeCards = polytopeGrid.querySelectorAll('.polytope-card');
+                polytopeCards.forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+
+                // Get polytope type and set vertices
+                const polytopeType = card.dataset.polytope;
+                const vertices = getPolytopeVertices(polytopeType);
+                viewer.setAttribute('vertices', JSON.stringify(vertices));
+
+                // Close modal
+                closeModalFunc();
+            });
+        }
+
+        // Initial setup
+        document.addEventListener('DOMContentLoaded', () => {
+            opacityValue.textContent = '90%';
+            generatePolytopeCards();
+            setupPolytopeSelection();
+        });
+    </script>
+</body><script>
+document.addEventListener('DOMContentLoaded', function() {
+    const vibrantColors = [
+        '#0066ff', '#ff6b35', '#4ecdc4', '#ff0080', '#00ff80', '#8000ff',
+        '#ff4040', '#00bfff', '#ff8c00', '#32cd32', '#ff1493', '#00ced1',
+        '#ff6347', '#9370db', '#ff69b4', '#00ff7f', '#ffd700', '#ff4500',
+        '#7fff00', '#dc143c', '#00ffff', '#ff00ff', '#adff2f', '#ff7f50',
+        '#da70d6', '#40e0d0', '#ee82ee', '#ffa500', '#1e90ff', '#ff20b2',
+        '#39ff14', '#bf00ff', '#ff073a', '#ffff00', '#00e6ff'
+    ];
+    
+    const xochiWords = document.querySelectorAll('.xochi-word');
+    const usedColors = [];
+    
+    xochiWords.forEach(word => {
+        // Pick a random color avoiding recent ones
+        let availableColors = vibrantColors.filter(c => !usedColors.slice(-5).includes(c));
+        if (availableColors.length < 3) {
+            usedColors.length = 0; // Reset if we've used most colors
+            availableColors = vibrantColors;
+        }
+        
+        const color = availableColors[Math.floor(Math.random() * availableColors.length)];
+        usedColors.push(color);
+        word.style.color = color;
+    });
+});
+</script>
+</html>

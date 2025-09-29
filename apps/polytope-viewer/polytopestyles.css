@@ -1,0 +1,511 @@
+/* CSS Variables for theming */
+:root {
+    --bg-primary: #fafafa;
+    --bg-secondary: #ffffff;
+    --fg-primary: #161616;
+    --fg-secondary: #5e5e5e;
+    --border: #e7e7e7;
+    --shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
+    --backdrop-blur: rgba(255, 255, 255, 0.9);
+    --blue: #3b82f6;
+    --blue-hover: #2563eb;
+    --radius: 12px;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #0d0d0e;
+        --bg-secondary: #121214;
+        --fg-primary: #f3f3f3;
+        --fg-secondary: #b9b9b9;
+        --border: #1a1a1a;
+        --shadow: none;
+        --backdrop-blur: rgba(18, 18, 20, 0.9);
+    }
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100vh;
+    overflow: hidden; /* Prevent page scrolling */
+}
+
+body {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-primary);
+    color: var(--fg-primary);
+}
+
+polytope-viewer {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+}
+
+/* Floating panel base styles */
+.floating-panel {
+    position: fixed;
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    z-index: 1000;
+    min-width: 280px;
+    max-height: 80vh;
+    overflow-y: auto;
+    transition: all 0.3s ease;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+}
+
+.floating-panel.expanded {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.floating-panel:hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* Left panel - Controls */
+.controls-panel {
+    top: 60px;
+    left: 20px;
+    min-width: 220px;
+    padding: 16px;
+}
+
+/* Panel headers */
+.panel-header {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--fg-primary);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+/* Control groups */
+.control-group {
+    margin-bottom: 20px;
+}
+
+.control-group:last-child {
+    margin-bottom: 0;
+}
+
+.control-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg-primary);
+    margin-bottom: 8px;
+    display: block;
+}
+
+/* Toggle switch styles */
+.toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background-color: var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toggle.active {
+    background-color: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+}
+
+.toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.toggle.active::after {
+    transform: translateX(20px);
+}
+
+.toggle-label {
+    font-size: 13px;
+    color: var(--fg-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Slider styles */
+.slider-wrapper {
+    margin-bottom: 16px;
+}
+
+.slider {
+    width: 100%;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.1s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+    background: color-mix(in srgb, var(--fg-secondary) 80%, var(--bg-secondary) 20%);
+    transform: scale(1.1);
+}
+
+.slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.slider-value {
+    font-size: 12px;
+    color: var(--fg-secondary);
+    text-align: right;
+    margin-top: 4px;
+}
+
+/* Modal styles - Updated for scrolling */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    /* Prevent scrolling on the overlay itself */
+    overflow: hidden;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    max-width: 600px;
+    width: 90%;
+    /* Fixed height with scrolling */
+    height: 80vh;
+    max-height: 600px;
+    display: flex;
+    flex-direction: column;
+    transform: scale(0.9) translateY(20px);
+    transition: all 0.3s ease;
+    /* Prevent the modal from overflowing */
+    overflow: hidden;
+}
+
+.modal-overlay.active .modal-content {
+    transform: scale(1) translateY(0);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 24px 16px 24px;
+    border-bottom: 1px solid var(--border);
+    /* Fixed header - doesn't scroll */
+    flex-shrink: 0;
+}
+
+.modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--fg-primary);
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--fg-secondary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.close-button:hover {
+    background: var(--border);
+    color: var(--fg-primary);
+}
+
+/* Scrollable modal body */
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px 24px 24px;
+}
+
+/* Polytope grid - now inside scrollable area */
+.polytope-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+}
+
+.polytope-card {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    /* Ensure cards have consistent height */
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.polytope-card:hover {
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    transform: translateY(-1px);
+}
+
+.polytope-card.active {
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+    background: color-mix(in srgb, var(--bg-secondary) 95%, var(--fg-secondary) 5%);
+}
+
+.polytope-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+    display: block;
+}
+
+.polytope-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--fg-primary);
+    margin-bottom: 6px;
+}
+
+.polytope-description {
+    font-size: 12px;
+    color: var(--fg-secondary);
+    line-height: 1.4;
+}
+
+/* Options button (top left) */
+.options-button {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-primary);
+    cursor: pointer;
+    z-index: 1001;
+    box-shadow: var(--shadow);
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.options-button:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+/* Top right button */
+.select-polytope-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--fg-primary);
+    cursor: pointer;
+    z-index: 1001;
+    box-shadow: var(--shadow);
+    transition: all 0.2s ease;
+}
+
+.select-polytope-btn:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .floating-panel {
+        min-width: 200px;
+        max-height: 60vh;
+    }
+
+    .controls-panel {
+        top: 55px;
+        left: 15px;
+        padding: 12px;
+        min-width: 180px;
+    }
+
+    .options-button {
+        top: 15px;
+        left: 15px;
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .select-polytope-btn {
+        top: 15px;
+        right: 15px;
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+
+    .modal-content {
+        margin: 20px;
+        width: calc(100% - 40px);
+        height: calc(100vh - 40px);
+        max-height: none;
+    }
+
+    .modal-header {
+        padding: 20px 20px 12px 20px;
+    }
+
+    .modal-body {
+        padding: 16px 20px 20px 20px;
+    }
+
+    .polytope-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .polytope-card {
+        min-height: 100px;
+        padding: 16px;
+    }
+
+    .polytope-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+    }
+}
+
+/* Custom scrollbar for modal */
+.modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+    background: var(--fg-secondary);
+}
+
+/* Custom scrollbar for floating panels */
+.floating-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.floating-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.floating-panel::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+.floating-panel::-webkit-scrollbar-thumb:hover {
+    background: var(--fg-secondary);
+}
+
+/* Animation keyframes for smooth interactions */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.floating-panel {
+    animation: slideIn 0.3s ease;
+}
+
+/* Prevent body scrolling when modal is open */
+body.modal-open {
+    overflow: hidden;
+}

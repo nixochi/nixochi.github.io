@@ -1,0 +1,394 @@
+/* CSS Variables for theming - xochi style */
+:root {
+    --bg-primary: #fafafa;
+    --bg-secondary: #ffffff;
+    --fg-primary: #161616;
+    --fg-secondary: #5e5e5e;
+    --border: #e7e7e7;
+    --shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
+    --backdrop-blur: rgba(255, 255, 255, 0.9);
+    --blue: #3b82f6;
+    --blue-hover: #2563eb;
+    --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #0d0d0e;
+        --bg-secondary: #121214;
+        --fg-primary: #f3f3f3;
+        --fg-secondary: #b9b9b9;
+        --border: #1a1a1a;
+        --shadow: none;
+        --backdrop-blur: rgba(18, 18, 20, 0.9);
+    }
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100vh;
+    overflow: hidden;
+}
+
+body {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-primary);
+    color: var(--fg-primary);
+}
+
+gaussian-periods-viewer {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+}
+
+/* Options button */
+.options-button {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 8px 16px;
+    z-index: 1001;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.options-button:hover {
+    background: var(--blue);
+    color: white;
+    border-color: var(--blue);
+}
+
+/* Floating panel */
+.floating-panel {
+    position: fixed;
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 12px;
+    z-index: 1000;
+    min-width: 200px;
+    max-height: 75vh;
+    overflow-y: auto;
+    transition: all 0.3s ease;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+}
+
+.floating-panel.expanded {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.controls-panel {
+    top: 60px;
+    left: 20px;
+    min-width: 220px;
+}
+
+/* Control groups */
+.control-group {
+    margin-bottom: 16px;
+}
+
+.control-group:last-child {
+    margin-bottom: 0;
+}
+
+.control-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--fg-primary);
+    margin-bottom: 8px;
+    display: block;
+}
+
+/* Toggle switch */
+.toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.toggle {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    background-color: var(--border);
+    border-radius: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toggle.active {
+    background-color: var(--blue);
+}
+
+.toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.toggle.active::after {
+    transform: translateX(18px);
+}
+
+.toggle-label {
+    font-size: 12px;
+    color: var(--fg-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Input fields */
+.input-wrapper {
+    margin-bottom: 12px;
+}
+
+.input-label {
+    font-size: 11px;
+    color: var(--fg-secondary);
+    margin-bottom: 4px;
+    display: block;
+}
+
+.input-field {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg-primary);
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+}
+
+.input-field:focus {
+    outline: none;
+    border-color: var(--blue);
+}
+
+/* Sliders */
+.slider-wrapper {
+    margin-bottom: 12px;
+}
+
+.slider-label {
+    font-size: 11px;
+    color: var(--fg-secondary);
+    margin-bottom: 4px;
+    display: block;
+}
+
+.slider {
+    width: 100%;
+    height: 5px;
+    background: var(--border);
+    border-radius: 2.5px;
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--blue);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.1s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+    background: var(--blue-hover);
+    transform: scale(1.1);
+}
+
+.slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: var(--blue);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.slider-value {
+    font-size: 11px;
+    color: var(--fg-secondary);
+    text-align: right;
+    margin-top: 3px;
+}
+
+/* Select dropdown */
+.select-wrapper {
+    margin-bottom: 12px;
+}
+
+.select-field {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg-primary);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.select-field:focus {
+    outline: none;
+    border-color: var(--blue);
+}
+
+/* Color picker */
+.color-picker-wrapper {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.color-input {
+    width: 50px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 2px;
+}
+
+.color-input::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.color-input::-webkit-color-swatch {
+    border: none;
+    border-radius: 4px;
+}
+
+/* Action buttons */
+.action-btn {
+    width: 100%;
+    padding: 7px 10px;
+    margin-bottom: 6px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg-primary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+    background: var(--blue);
+    color: white;
+    border-color: var(--blue);
+}
+
+.action-btn:last-child {
+    margin-bottom: 0;
+}
+
+.action-btn.danger:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+}
+
+/* Help text */
+.help-text {
+    font-size: 10px;
+    color: var(--fg-secondary);
+    line-height: 1.4;
+    margin-top: 8px;
+    padding: 6px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+/* Custom scrollbar */
+.floating-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.floating-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.floating-panel::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+.floating-panel::-webkit-scrollbar-thumb:hover {
+    background: var(--fg-secondary);
+}
+
+/* Animation */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.floating-panel {
+    animation: slideIn 0.3s ease;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .floating-panel {
+        min-width: 180px;
+        max-height: 60vh;
+    }
+
+    .controls-panel {
+        top: 55px;
+        left: 15px;
+        min-width: 180px;
+    }
+
+    .options-button {
+        top: 15px;
+        left: 15px;
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+}

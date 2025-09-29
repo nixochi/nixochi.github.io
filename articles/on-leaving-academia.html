@@ -1,0 +1,211 @@
+
+
+
+
+
+
+
+
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>xochi — on leaving academia</title>
+  <meta name="description" content="how waiting became habit, and why i stopped." />
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+  <a href="#main" class="skip">skip to content</a>
+
+  <header class="header">
+    <div class="wrapper nav" role="navigation" aria-label="primary">
+      <a href="../index.html" class="brand" data-nav><span class="xochi-word">xochi</span></a>
+      <nav class="links">
+        <a href="../projects.html" data-nav>projects</a>
+        <a href="../applets.html" data-nav>applets</a>
+        <a href="../scrapbook.html" data-nav>scrapbook</a>
+        <a href="../writings.html" data-nav>writings</a>        
+      </nav>
+    </div>
+  </header>
+
+<main id="main">
+  <div class="wrapper prose">
+    <h1>on leaving academia</h1>
+    <time class="muted">2025-03-12</time>
+
+<div style="margin: 1.5rem 0; padding: 0.75rem; border: 1px solid var(--line); border-radius: 6px; background: color-mix(in srgb, var(--card) 80%, var(--line) 20%); font-size: 13px; color: var(--muted);">
+  i wanted to have a simple test page for this website but not use the cliché lorem ipsum text. instead, i created a character sheet for <span class="xochi-word">xochi</span> that describes their every quirk and personality trait. then, i had an ai create filler text for this article. this is the result.
+</div>
+    <hr />
+    <hr />
+    <p>there's a rhythm to academic life. submit, wait, revise, wait. the waiting becomes muscle memory. you learn to expect delays, deferrals, the long silences. years pass between idea and publication. sometimes decades.</p>
+    
+    <p>i got good at waiting. too good.</p>
+    
+    <p>the problem isn't just the time—though that matters when people need answers now, not in three years after peer review. the problem is how waiting changes what you're willing to see.</p>
+    
+    <hr />
+    
+    <p>in my second year of graduate school, there was a housing crisis in the neighborhood where i lived. rents doubled in eighteen months. families were displaced weekly. it was immediate, visible, happening outside my window.</p>
+    
+    <p>i had data. i had skills. i could have mapped the displacement, shown the patterns, made the mechanisms clear. but that would have been "activism," not research. real research required distance, objectivity, the proper channels.</p>
+    
+    <p>so i waited. applied for grants to study housing policy in the abstract. wrote proposals that might be funded in a year, maybe two. by then, the displacement was complete.</p>
+    
+    <p>this is how you learn to look away. not through malice, but through process.</p>
+    
+    <hr />
+    
+    <p>leaving wasn't dramatic. no confrontation, no burned bridges. i just stopped applying for the next thing. stopped waiting for permission to work on what mattered.</p>
+    
+    <p>the first project i did outside was simple: a small interactive map showing which landlords owned the most properties in the neighborhood. took two weeks. people used it at tenant meetings. it wasn't peer-reviewed. it didn't need to be.</p>
+    
+    <p>the difference wasn't the technology or even the timeline. it was working <em>with</em> urgency instead of against it.</p>
+    
+    <hr />
+    
+    <p>academia taught me valuable things. how to read closely, how to think systemically, how to be precise with language. but it also taught me to wait when waiting serves no one.</p>
+    
+    <p>now i make tools. small ones, mostly. visualizations that help people see patterns in their own neighborhoods. interfaces that make complicated data simple enough to use in a meeting. things that can be built quickly, shared freely, modified by anyone who needs them.</p>
+    
+    <p>some colleagues ask what i'm "contributing to the field." the question assumes the field is where contribution happens. but fields have boundaries, gatekeepers, the luxury of distance.</p>
+    
+    <p>the work happens at the edges. in community centers, at kitchen tables, in the spaces where people are already trying to solve problems. the best tools don't create new knowledge—they make existing knowledge more shareable.</p>
+    
+    <hr />
+    
+    <p>there's still rhythm to this work, but it's different. make something, share it, see how it gets used. listen to what breaks, what's missing, what people actually need. iterate quickly. stay close to the ground.</p>
+    
+    <p>sometimes i miss the rigor of academic work. the careful methodology, the thorough literature reviews. but i don't miss waiting for permission to care about what's happening outside the window.</p>
+    
+    <p>the world is moving too fast for that now. maybe it always was.</p>
+    
+    <!-- Interactive element demonstrating the point -->
+    <div style="margin: 2rem 0; padding: 1rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card);">
+      <h3 style="margin-top: 0; font-size: 16px;">waiting vs. making</h3>
+      <div id="timeline" style="margin: 1rem 0;"></div>
+      <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+        <button id="academicBtn" style="padding: 0.5rem 1rem; border: 1px solid var(--line); background: var(--bg); border-radius: 4px; cursor: pointer;">academic timeline</button>
+        <button id="independentBtn" style="padding: 0.5rem 1rem; border: 1px solid var(--line); background: var(--bg); border-radius: 4px; cursor: pointer;">independent timeline</button>
+      </div>
+    </div>
+    
+    <script>
+      // Simple timeline visualization
+      const timeline = document.getElementById('timeline');
+      const academicBtn = document.getElementById('academicBtn');
+      const independentBtn = document.getElementById('independentBtn');
+      
+      const academicSteps = [
+        { time: '0-6 months', task: 'literature review', color: '#e7e7e7' },
+        { time: '6-12 months', task: 'grant writing', color: '#e7e7e7' },
+        { time: '12-18 months', task: 'waiting for funding', color: '#ff6b6b' },
+        { time: '18-30 months', task: 'data collection', color: '#e7e7e7' },
+        { time: '30-36 months', task: 'analysis', color: '#e7e7e7' },
+        { time: '36-42 months', task: 'writing', color: '#e7e7e7' },
+        { time: '42-48 months', task: 'peer review', color: '#ff6b6b' },
+        { time: '48+ months', task: 'publication', color: '#4ecdc4' }
+      ];
+      
+      const independentSteps = [
+        { time: '0-1 weeks', task: 'identify need', color: '#e7e7e7' },
+        { time: '1-2 weeks', task: 'build prototype', color: '#e7e7e7' },
+        { time: '2-3 weeks', task: 'test with users', color: '#4ecdc4' },
+        { time: '3-4 weeks', task: 'iterate', color: '#e7e7e7' },
+        { time: '1 month', task: 'share publicly', color: '#4ecdc4' },
+        { time: 'ongoing', task: 'respond to feedback', color: '#4ecdc4' }
+      ];
+      
+      function renderTimeline(steps) {
+        timeline.innerHTML = steps.map(step => `
+          <div style="
+            display: flex; 
+            align-items: center; 
+            margin: 0.5rem 0; 
+            gap: 1rem;
+            padding: 0.5rem;
+            border-radius: 4px;
+            background: ${step.color === '#ff6b6b' ? 'rgba(255, 107, 107, 0.1)' : 
+                       step.color === '#4ecdc4' ? 'rgba(78, 205, 196, 0.1)' : 'transparent'};
+          ">
+            <div style="
+              min-width: 120px; 
+              font-size: 12px; 
+              color: var(--muted);
+              font-weight: 500;
+            ">${step.time}</div>
+            <div style="
+              height: 8px; 
+              width: 8px; 
+              background: ${step.color}; 
+              border-radius: 50%;
+              flex-shrink: 0;
+            "></div>
+            <div style="font-size: 14px;">${step.task}</div>
+          </div>
+        `).join('');
+      }
+      
+      academicBtn.addEventListener('click', () => {
+        renderTimeline(academicSteps);
+        academicBtn.style.background = 'var(--muted)';
+        academicBtn.style.color = 'white';
+        independentBtn.style.background = 'var(--bg)';
+        independentBtn.style.color = 'var(--fg)';
+      });
+      
+      independentBtn.addEventListener('click', () => {
+        renderTimeline(independentSteps);
+        independentBtn.style.background = 'var(--muted)';
+        independentBtn.style.color = 'white';
+        academicBtn.style.background = 'var(--bg)';
+        academicBtn.style.color = 'var(--fg)';
+      });
+      
+      // Start with academic timeline
+      renderTimeline(academicSteps);
+      academicBtn.style.background = 'var(--muted)';
+      academicBtn.style.color = 'white';
+    </script>
+  </div>
+</main>
+
+  <footer>
+    <div class="wrapper">
+      <small>by <span class="xochi-word">xochi</span></small>
+    </div>
+  </footer>
+
+  <script src="" defer></script>
+</body><script>
+document.addEventListener('DOMContentLoaded', function() {
+    const vibrantColors = [
+        '#0066ff', '#ff6b35', '#4ecdc4', '#ff0080', '#00ff80', '#8000ff',
+        '#ff4040', '#00bfff', '#ff8c00', '#32cd32', '#ff1493', '#00ced1',
+        '#ff6347', '#9370db', '#ff69b4', '#00ff7f', '#ffd700', '#ff4500',
+        '#7fff00', '#dc143c', '#00ffff', '#ff00ff', '#adff2f', '#ff7f50',
+        '#da70d6', '#40e0d0', '#ee82ee', '#ffa500', '#1e90ff', '#ff20b2',
+        '#39ff14', '#bf00ff', '#ff073a', '#ffff00', '#00e6ff'
+    ];
+    
+    const xochiWords = document.querySelectorAll('.xochi-word');
+    const usedColors = [];
+    
+    xochiWords.forEach(word => {
+        // Pick a random color avoiding recent ones
+        let availableColors = vibrantColors.filter(c => !usedColors.slice(-5).includes(c));
+        if (availableColors.length < 3) {
+            usedColors.length = 0; // Reset if we've used most colors
+            availableColors = vibrantColors;
+        }
+        
+        const color = availableColors[Math.floor(Math.random() * availableColors.length)];
+        usedColors.push(color);
+        word.style.color = color;
+    });
+});
+</script>
+</html>

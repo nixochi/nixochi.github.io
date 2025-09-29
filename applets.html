@@ -1,0 +1,134 @@
+
+
+
+
+
+
+
+
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>xochi — applets</title>
+  <meta name="description" content="Selected tools and visualizations." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a href="#main" class="skip">skip to content</a>
+
+  <header class="header">
+    <div class="wrapper nav" role="navigation" aria-label="primary">
+      <a href="index.html" class="brand" data-nav><span class="xochi-word">xochi</span></a>
+      <nav class="links">
+        <a href="projects.html" data-nav>projects</a>
+        <a href="applets.html" data-nav>applets</a>
+        <a href="scrapbook.html" data-nav>scrapbook</a>
+        <a href="writings.html" data-nav>writings</a>        
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="wrapper">
+      <h1 class="prose">applets</h1>
+      <p class="prose muted">here are some small math apps.</p>
+
+      <div class="grid cols-2" style="margin-top: 16px;">
+        <article class="card" data-href="apps/polytope-viewer">
+          <h3>polytope viewer</h3>
+          <p class="muted">explore the 3d polytopes that appear in math.</p>
+          <p><a href="apps/polytope-viewer/">read more</a></p>
+        </article>
+
+        <article class="card" data-href="apps/voronoi-viewer">
+          <h3>voronoi cells</h3>
+          <p class="muted">small, reusable components for charts and tables with careful defaults for accessibility.</p>
+          <p><a href="index.html">read more</a></p>
+        </article>
+
+        <article class="card" data-href="apps/mirror-curves">
+          <h3>mirror curves</h3>
+          <p class="muted">explore the math that has appeared in many cultures around the world.</p>
+          <p><a href ="index.html">read more</a></p>
+        </article>
+
+        <article class="card" data-href="apps/gaussian-periods">
+          <h3>gaussian periods</h3>
+          <p class="muted">see the beauty of gaussian periods.</p>
+          <p><a href="index.html">read more</a></p>
+
+      </div>
+    </div>
+  </main>
+
+  <script>
+document.addEventListener('DOMContentLoaded', function() {
+  const cards = document.querySelectorAll('.card[data-href]');
+
+  cards.forEach(card => {
+    card.style.cursor = 'pointer';
+
+    card.addEventListener('click', function(e) {
+      // Don't trigger if clicking on a link inside the card
+      if (e.target.tagName === 'A') return;
+
+      const href = this.getAttribute('data-href');
+      if (href) {
+        window.location.href = href;
+      }
+    });
+
+    card.addEventListener('mouseenter', function() {
+      this.style.transform = 'translateY(-1px)';
+      this.style.boxShadow = '0 1px 0 rgba(0,0,0,.02), 0 12px 28px rgba(0,0,0,.08)';
+      this.style.borderColor = 'color-mix(in srgb, var(--line) 80%, var(--fg) 20%)';
+    });
+
+    card.addEventListener('mouseleave', function() {
+      this.style.transform = 'translateY(0)';
+      this.style.boxShadow = 'var(--shadow)';
+      this.style.borderColor = 'var(--line)';
+    });
+  });
+});
+  </script>
+
+  <footer>
+    <div class="wrapper">
+      <small>by <span class="xochi-word">xochi</span></small>
+    </div>
+  </footer>
+
+  <script src="" defer></script>
+</body><script>
+document.addEventListener('DOMContentLoaded', function() {
+    const vibrantColors = [
+        '#0066ff', '#ff6b35', '#4ecdc4', '#ff0080', '#00ff80', '#8000ff',
+        '#ff4040', '#00bfff', '#ff8c00', '#32cd32', '#ff1493', '#00ced1',
+        '#ff6347', '#9370db', '#ff69b4', '#00ff7f', '#ffd700', '#ff4500',
+        '#7fff00', '#dc143c', '#00ffff', '#ff00ff', '#adff2f', '#ff7f50',
+        '#da70d6', '#40e0d0', '#ee82ee', '#ffa500', '#1e90ff', '#ff20b2',
+        '#39ff14', '#bf00ff', '#ff073a', '#ffff00', '#00e6ff'
+    ];
+    
+    const xochiWords = document.querySelectorAll('.xochi-word');
+    const usedColors = [];
+    
+    xochiWords.forEach(word => {
+        // Pick a random color avoiding recent ones
+        let availableColors = vibrantColors.filter(c => !usedColors.slice(-5).includes(c));
+        if (availableColors.length < 3) {
+            usedColors.length = 0; // Reset if we've used most colors
+            availableColors = vibrantColors;
+        }
+        
+        const color = availableColors[Math.floor(Math.random() * availableColors.length)];
+        usedColors.push(color);
+        word.style.color = color;
+    });
+});
+</script>
+</html>

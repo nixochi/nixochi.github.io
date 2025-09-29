@@ -163,7 +163,7 @@
             transform: translate(-50%, -50%);
             width: calc(100% - 40px);
             max-width: 300px;
-            max-height: 45vh;
+            max-height: 55vh;
             display: none;
         }
 
@@ -181,7 +181,6 @@
             top: 60px;
             right: 20px;
             min-width: 350px;
-            padding-bottom: 12px;
         }
 
         /* Control groups */
@@ -551,6 +550,7 @@
         animation-speed="1000"
         time-first-color="#0000ff"
         time-last-color="#00ff00"
+        lutz-c="12"
         auto-zoom="true"
         style="width: 100vw; height: 100vh; display: block;">
     </gaussian-periods-viewer>
@@ -584,6 +584,7 @@
             <div class="select-wrapper">
                 <select class="select-field" id="colorSchemeSelect">
                     <option value="time-based">Time-Based</option>
+                    <option value="lutz">Lutz Coloring</option>
                     <option value="monochrome">Monochrome</option>
                 </select>
             </div>
@@ -596,6 +597,12 @@
                     <label class="input-label">Last Color</label>
                     <input type="color" class="color-input" id="lastColorInput" value="#00ff00">
                 </div>
+            </div>
+            <div class="slider-wrapper" id="lutzSliderWrapper" style="display: none;">
+                <label class="slider-label">Lutz Parameter (c)</label>
+                <input type="range" class="slider" id="lutzCSlider"
+                       min="2" max="50" step="1" value="12">
+                <div class="slider-value" id="lutzCValue">12</div>
             </div>
         </div>
 
@@ -651,6 +658,7 @@
             <div class="select-wrapper">
                 <select class="select-field" id="colorSchemeSelectDesktop">
                     <option value="time-based">Time-Based</option>
+                    <option value="lutz">Lutz Coloring</option>
                     <option value="monochrome">Monochrome</option>
                 </select>
             </div>
@@ -663,6 +671,12 @@
                     <label class="input-label">Last Color</label>
                     <input type="color" class="color-input" id="lastColorInputDesktop" value="#00ff00">
                 </div>
+            </div>
+            <div class="slider-wrapper" id="lutzSliderWrapperDesktop" style="display: none;">
+                <label class="slider-label">Lutz Parameter (c)</label>
+                <input type="range" class="slider" id="lutzCSliderDesktop"
+                       min="2" max="50" step="1" value="12">
+                <div class="slider-value" id="lutzCValueDesktop">12</div>
             </div>
         </div>
 
@@ -945,15 +959,49 @@
                 });
             });
 
+            // Lutz C slider for both panels
+            ['lutzCSlider', 'lutzCSliderDesktop'].forEach(sliderId => {
+                const slider = document.getElementById(sliderId);
+                const valueId = sliderId.replace('Slider', 'Value');
+                slider?.addEventListener('input', (e) => {
+                    const value = parseInt(e.target.value);
+                    document.getElementById(valueId).textContent = value;
+                    viewer.setAttribute('lutz-c', value.toString());
+
+                    // Sync sliders
+                    ['lutzCSlider', 'lutzCSliderDesktop'].forEach(id => {
+                        const otherSlider = document.getElementById(id);
+                        if (otherSlider && id !== sliderId) {
+                            otherSlider.value = value;
+                            document.getElementById(id.replace('Slider', 'Value')).textContent = value;
+                        }
+                    });
+                });
+            });
+
             // Color scheme for both panels
             ['colorSchemeSelect', 'colorSchemeSelectDesktop'].forEach(selectId => {
                 const select = document.getElementById(selectId);
                 const pickersId = selectId.replace('Select', 's').replace('Scheme', 'Picker');
+                const lutzWrapperId = selectId.includes('Desktop') ? 'lutzSliderWrapperDesktop' : 'lutzSliderWrapper';
+                
                 select?.addEventListener('change', (e) => {
                     const colorPickers = document.getElementById(pickersId);
-                    if (colorPickers) {
-                        colorPickers.style.display = e.target.value === 'time-based' ? 'flex' : 'none';
+                    const lutzWrapper = document.getElementById(lutzWrapperId);
+                    
+                    if (colorPickers && lutzWrapper) {
+                        if (e.target.value === 'time-based') {
+                            colorPickers.style.display = 'flex';
+                            lutzWrapper.style.display = 'none';
+                        } else if (e.target.value === 'lutz') {
+                            colorPickers.style.display = 'none';
+                            lutzWrapper.style.display = 'block';
+                        } else {
+                            colorPickers.style.display = 'none';
+                            lutzWrapper.style.display = 'none';
+                        }
                     }
+                    
                     viewer.setAttribute('color-scheme', e.target.value);
 
                     // Sync selects
@@ -961,10 +1009,23 @@
                         const otherSelect = document.getElementById(id);
                         if (otherSelect && id !== selectId) {
                             otherSelect.value = e.target.value;
+                            
                             const otherPickersId = id.replace('Select', 's').replace('Scheme', 'Picker');
+                            const otherLutzWrapperId = id.includes('Desktop') ? 'lutzSliderWrapperDesktop' : 'lutzSliderWrapper';
                             const otherPickers = document.getElementById(otherPickersId);
-                            if (otherPickers) {
-                                otherPickers.style.display = e.target.value === 'time-based' ? 'flex' : 'none';
+                            const otherLutzWrapper = document.getElementById(otherLutzWrapperId);
+                            
+                            if (otherPickers && otherLutzWrapper) {
+                                if (e.target.value === 'time-based') {
+                                    otherPickers.style.display = 'flex';
+                                    otherLutzWrapper.style.display = 'none';
+                                } else if (e.target.value === 'lutz') {
+                                    otherPickers.style.display = 'none';
+                                    otherLutzWrapper.style.display = 'block';
+                                } else {
+                                    otherPickers.style.display = 'none';
+                                    otherLutzWrapper.style.display = 'none';
+                                }
                             }
                         }
                     });
@@ -1046,7 +1107,6 @@
                         }
                     }
                 });
-
             });
         });
     </script>

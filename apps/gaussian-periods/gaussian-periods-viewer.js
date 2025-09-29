@@ -4,7 +4,7 @@
  */
 class GaussianPeriodsViewer extends HTMLElement {
     static get observedAttributes() { 
-        return ['n', 'omega', 'point-size', 'show-grid', 'color-scheme', 'plot-mode']; 
+        return ['n', 'omega', 'point-size', 'show-grid', 'color-scheme', 'plot-mode', 'lutz-c', 'time-first-color', 'time-last-color']; 
     }
 
     constructor() {
@@ -36,6 +36,9 @@ class GaussianPeriodsViewer extends HTMLElement {
         
         // Auto-zoom state
         this.computedScaleFactor = 0.1;
+        
+        // Lutz coloring data
+        this.lutzColoring = null;
 
         // Animation and resize
         this.animationId = null;
@@ -131,6 +134,14 @@ class GaussianPeriodsViewer extends HTMLElement {
             this.updateGridVisibility(newValue === 'true');
         } else if (name === 'color-scheme') {
             this.updateColors();
+        } else if (name === 'lutz-c') {
+            if (this.getParameter('colorScheme') === 'lutz') {
+                this.updateColors();
+            }
+        } else if (name === 'time-first-color' || name === 'time-last-color') {
+            if (this.getParameter('colorScheme') === 'time-based') {
+                this.updateColors();
+            }
         } else if (name === 'plot-mode') {
             this.updatePlotMode(newValue);
         }
@@ -152,6 +163,7 @@ class GaussianPeriodsViewer extends HTMLElement {
             case 'timeFirstColor': return this.getAttribute('time-first-color') || '#0000ff';
             case 'timeLastColor': return this.getAttribute('time-last-color') || '#00ff00';
             case 'autoZoom': return this.getAttribute('auto-zoom') !== 'false';
+            case 'lutzC': return parseInt(this.getAttribute('lutz-c')) || 12;
             default: return defaultValue;
         }
     }
@@ -488,6 +500,12 @@ class GaussianPeriodsViewer extends HTMLElement {
         if (!this.positionArray || !this.colorArray) return;
 
         const scaleFactor = this.computedScaleFactor;
+        
+        // Compute Lutz coloring if needed
+        const colorScheme = this.getParameter('colorScheme');
+        if (colorScheme === 'lutz') {
+            this.computeLutzColoring();
+        }
 
         for (let i = 0; i < this.computedPoints.length; i++) {
             const point = this.computedPoints[i];
@@ -550,6 +568,9 @@ class GaussianPeriodsViewer extends HTMLElement {
             case 'time-based':
                 hexColor = this.getTimeBasedColor(index);
                 break;
+            case 'lutz':
+                hexColor = this.getLutzColor(index);
+                break;
             case 'monochrome':
                 hexColor = '#ffffff';
                 break;
@@ -582,6 +603,192 @@ class GaussianPeriodsViewer extends HTMLElement {
         return `#${red.toString(16).padStart(2, '0')}${green.toString(16).padStart(2, '0')}${blue.toString(16).padStart(2, '0')}`;
     }
     
+    /**
+     * Compute mathematical Lutz coloring
+     * Colors points based on their exponent class modulo c
+     */
+    computeLutzColoring() {
+        const c = this.getParameter('lutzC');
+        const omega = this.getParameter('omega');
+        const n = this.getParameter('n');
+        
+        if (!this.computedPoints || this.computedPoints.length === 0) {
+            this.lutzColoring = null;
+            return;
+        }
+
+        console.log(`Computing mathematical Lutz coloring with c=${c}...`);
+        
+        const d = this.multiplicativeOrder(omega, n);
+        
+        // Group points by their canonical representative
+        const representativeGroups = new Map();
+        
+        for (let i = 0; i < this.computedPoints.length; i++) {
+            const k = this.computedPoints[i].k;
+            
+            const representative = this.findCanonicalRepresentative(k, omega, n, d);
+            
+            if (!representativeGroups.has(representative)) {
+                representativeGroups.set(representative, []);
+            }
+            representativeGroups.get(representative).push({ k: k, index: i });
+        }
+        
+        // Resolve collisions using union-find
+        const { colors, stats } = this.resolveModCCollisions(representativeGroups, c);
+        
+        console.log(`✅ Mathematical Lutz coloring: ${representativeGroups.size} distinct representatives, ${stats.collisions} collisions, ${stats.numColors} final colors`);
+        
+        this.lutzColoring = {
+            colors: colors,
+            numDistinctColors: stats.numColors,
+            totalCollisions: stats.collisions,
+            numExponentGroups: representativeGroups.size,
+            c: c
+        };
+    }
+    
+    /**
+     * Find the canonical (minimum) representative in the orbit under multiplication by omega
+     */
+    findCanonicalRepresentative(k, omega, n, d) {
+        let minElement = k % n;
+        let current = k % n;
+        
+        for (let j = 0; j < d; j++) {
+            if (current < minElement) {
+                minElement = current;
+            }
+            current = (current * omega) % n;
+        }
+        
+        return minElement;
+    }
+    
+    /**
+     * Resolve collisions when multiple representatives map to the same class mod c
+     * Uses union-find to group colliding classes
+     */
+    resolveModCCollisions(representativeGroups, c) {
+        // Union-find data structure
+        const parent = new Array(c);
+        for (let i = 0; i < c; i++) {
+            parent[i] = i;
+        }
+        
+        function find(x) {
+            if (parent[x] !== x) {
+                parent[x] = find(parent[x]);
+            }
+            return parent[x];
+        }
+        
+        function union(x, y) {
+            const px = find(x);
+            const py = find(y);
+            if (px !== py) {
+                parent[px] = py;
+            }
+        }
+        
+        let collisions = 0;
+        
+        // For each representative group, union all their mod c classes
+        for (const [_representative, entries] of representativeGroups) {
+            const modClasses = [...new Set(entries.map(entry => entry.k % c))];
+            
+            if (modClasses.length > 1) {
+                collisions++;
+                for (let i = 1; i < modClasses.length; i++) {
+                    union(modClasses[0], modClasses[i]);
+                }
+            }
+        }
+        
+        // Assign color indices to each equivalence class
+        const colorMapping = new Map();
+        let colorIndex = 0;
+        
+        for (let i = 0; i < c; i++) {
+            const rep = find(i);
+            if (!colorMapping.has(rep)) {
+                colorMapping.set(rep, colorIndex++);
+            }
+        }
+        
+        // Assign colors to all points
+        const colors = new Array(this.computedPoints.length);
+        for (let i = 0; i < this.computedPoints.length; i++) {
+            const k = this.computedPoints[i].k;
+            const modClass = k % c;
+            const finalRep = find(modClass);
+            colors[i] = colorMapping.get(finalRep);
+        }
+        
+        return {
+            colors: colors,
+            stats: {
+                collisions: collisions,
+                numColors: colorIndex
+            }
+        };
+    }
+    
+    /**
+     * Get Lutz color for a point by index
+     */
+    getLutzColor(index) {
+        if (!this.lutzColoring || this.lutzColoring.c !== this.getParameter('lutzC')) {
+            this.computeLutzColoring();
+        }
+        
+        if (!this.lutzColoring || index >= this.lutzColoring.colors.length) {
+            return '#ffffff';
+        }
+        
+        const colorIndex = this.lutzColoring.colors[index];
+        const numColors = this.lutzColoring.numDistinctColors;
+        
+        // Distribute hues evenly across the color spectrum
+        const hue = (colorIndex / numColors) * 360;
+        const saturation = 0.8;
+        const value = 0.9;
+        
+        return this.hsvToHex(hue, saturation, value);
+    }
+    
+    /**
+     * Convert HSV to hex color
+     */
+    hsvToHex(h, s, v) {
+        const c = v * s;
+        const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+        const m = v - c;
+        
+        let r, g, b;
+        
+        if (h >= 0 && h < 60) {
+            r = c; g = x; b = 0;
+        } else if (h >= 60 && h < 120) {
+            r = x; g = c; b = 0;
+        } else if (h >= 120 && h < 180) {
+            r = 0; g = c; b = x;
+        } else if (h >= 180 && h < 240) {
+            r = 0; g = x; b = c;
+        } else if (h >= 240 && h < 300) {
+            r = x; g = 0; b = c;
+        } else {
+            r = c; g = 0; b = x;
+        }
+        
+        r = Math.round((r + m) * 255);
+        g = Math.round((g + m) * 255);
+        b = Math.round((b + m) * 255);
+        
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    }
+    
     createGrid() {
         const gridSize = 10;
         this.gridHelper = new this.THREE.GridHelper(gridSize, gridSize, 0x444444, 0x222222);
@@ -602,6 +809,12 @@ class GaussianPeriodsViewer extends HTMLElement {
     
     updateColors() {
         if (this.computedPoints.length > 0) {
+            // Clear Lutz coloring cache when color scheme changes
+            const scheme = this.getParameter('colorScheme');
+            if (scheme !== 'lutz') {
+                this.lutzColoring = null;
+            }
+            
             this.fillArraysWithPoints();
             if (this.pointGeometry) {
                 this.pointGeometry.attributes.color.needsUpdate = true;
@@ -622,6 +835,7 @@ class GaussianPeriodsViewer extends HTMLElement {
         this.computedPoints = [];
         this.animationIndex = 0;
         this.isPaused = false;
+        this.lutzColoring = null;
         
         if (this.pointCloud) {
             this.scene.remove(this.pointCloud);

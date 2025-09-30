@@ -133,10 +133,9 @@ export class CanvasManager {
 
         // Update snap preview while dragging a point
         if (this.isInteracting && this.draggingPointIndex !== null) {
-            const point = this.points[this.draggingPointIndex];
             const oldSnap = this.snapManager.getSnapPreview();
             const newSnap = this.snapManager.updateDragSnapPreview(
-                worldX, worldY, this.intersections, this.lines, point.onLines || []
+                worldX, worldY, this.intersections, this.lines
             );
 
             // Only redraw if snap changed
@@ -200,6 +199,7 @@ export class CanvasManager {
                 this.addLine(this.lineStartX, this.lineStartY, worldX, worldY);
             }
             this.isDrawingLine = false;
+            this.draw(); // Clear the preview line immediately
         } else if (!this.hasMoved && this.mode === 'point') {
             // Click in point mode - use snap preview if available
             const snapPreview = this.snapManager.getSnapPreview();

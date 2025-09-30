@@ -119,8 +119,8 @@ export class Renderer {
                 }
             }
 
-            this.ctx.strokeStyle = shouldHighlight ? '#f4a460' : fgColor;
-            this.ctx.lineWidth = shouldHighlight ? 3 : 2;
+            this.ctx.strokeStyle = shouldHighlight ? '#f9a826' : '#957fef';
+            this.ctx.lineWidth = shouldHighlight ? 2.1 : 1.4;
 
             // Calculate line endpoints that extend to canvas boundaries
             const bounds = this.getCanvasBounds(offsetX, offsetY);
@@ -145,9 +145,6 @@ export class Renderer {
      * @param {number} offsetY - Pan offset Y
      */
     drawPreviewLine(startX, startY, currentX, currentY, offsetX, offsetY) {
-        const fgColor = getComputedStyle(document.documentElement)
-            .getPropertyValue('--fg-secondary').trim();
-
         // Calculate angle from start to current position
         const dx = currentX - startX;
         const dy = currentY - startY;
@@ -158,8 +155,8 @@ export class Renderer {
 
         if (!endpoints) return;
 
-        this.ctx.strokeStyle = fgColor;
-        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = '#c9b3ff';
+        this.ctx.lineWidth = 1.4;
         this.ctx.setLineDash([5, 5]);
 
         this.ctx.beginPath();

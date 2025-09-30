@@ -10,6 +10,9 @@ export class PointLineMatroid {
         // Compute which points are on which lines (reverse mapping)
         this.linesWithPoints = this._computeLinesWithPoints();
         
+        // Group points by position (for multipoint detection)
+        this.pointsByPosition = this._groupPointsByPosition();
+        
         // Compute rank
         this.rank = this._computeRank();
     }
@@ -28,6 +31,24 @@ export class PointLineMatroid {
         });
         
         return linesWithPoints;
+    }
+    
+    /**
+     * Group points by their position (for multipoint detection)
+     * @returns {Map} Map from position key to array of point indices
+     */
+    _groupPointsByPosition() {
+        const groups = new Map();
+        
+        this.points.forEach((point, index) => {
+            const key = `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+            if (!groups.has(key)) {
+                groups.set(key, []);
+            }
+            groups.get(key).push(index);
+        });
+        
+        return groups;
     }
     
     /**
@@ -58,6 +79,18 @@ export class PointLineMatroid {
      */
     isIndependent(pointIndices) {
         if (pointIndices.length === 0) return true;
+        
+        // Check for multipoints (any two points at same position = dependent)
+        for (let i = 0; i < pointIndices.length; i++) {
+            for (let j = i + 1; j < pointIndices.length; j++) {
+                const p1 = this.points[pointIndices[i]];
+                const p2 = this.points[pointIndices[j]];
+                if (Math.abs(p1.x - p2.x) < 0.01 && Math.abs(p1.y - p2.y) < 0.01) {
+                    return false; // Multipoint = dependent
+                }
+            }
+        }
+        
         return !this.areCollinear(pointIndices);
     }
     
@@ -194,18 +227,45 @@ export class PointLineMatroid {
     getAllCircuits() {
         const circuits = [];
         
-        // Circuits in a rank-3 matroid are either:
-        // 1. Sets of 3+ collinear points
-        // 2. For each line with k points, we get C(k,3) circuits of size 3
+        // 1. Size-2 circuits: multipoints (points at same location)
+        this.pointsByPosition.forEach((pointIndices, positionKey) => {
+            if (pointIndices.length >= 2) {
+                // All pairs at this position are circuits
+                const pairs = this._subsetsOfSizeFromArray(pointIndices, 2);
+                circuits.push(...pairs);
+            }
+        });
         
-        // Check all lines
+        // 2. Size-3 circuits: collinear triples (excluding multipoints)
         for (let lineIndex = 0; lineIndex < this.lines.length; lineIndex++) {
             const pointsOnLine = this._pointsOnLine(lineIndex);
             
             if (pointsOnLine.length >= 3) {
-                // All triples on this line are circuits
+                // Generate all triples
                 const triples = this._subsetsOfSizeFromArray(pointsOnLine, 3);
-                circuits.push(...triples);
+                
+                // Only include triples where no two points are at the same position
+                for (const triple of triples) {
+                    let hasMultipoint = false;
+                    
+                    // Check if any two points in the triple are at the same position
+                    for (let i = 0; i < 3; i++) {
+                        for (let j = i + 1; j < 3; j++) {
+                            const p1 = this.points[triple[i]];
+                            const p2 = this.points[triple[j]];
+                            if (Math.abs(p1.x - p2.x) < 0.01 && Math.abs(p1.y - p2.y) < 0.01) {
+                                hasMultipoint = true;
+                                break;
+                            }
+                        }
+                        if (hasMultipoint) break;
+                    }
+                    
+                    // Only add if no multipoint
+                    if (!hasMultipoint) {
+                        circuits.push(triple);
+                    }
+                }
             }
         }
         
@@ -249,23 +309,35 @@ export class PointLineMatroid {
         const flats = [];
         const seen = new Set();
         
-        // Empty set is always a flat
+        // Rank 0: empty set
         flats.push([]);
         seen.add('');
         
-        // Check all subsets
-        for (let size = 1; size <= this.groundSet.length; size++) {
-            const subsets = this._subsetsOfSize(size);
-            
-            for (const subset of subsets) {
-                const closureSet = this.closure(subset);
-                closureSet.sort((a, b) => a - b);
-                const key = closureSet.join(',');
-                
+        // Rank 1: all individual points
+        for (let i = 0; i < this.points.length; i++) {
+            flats.push([i]);
+            seen.add(i.toString());
+        }
+        
+        // Rank 2: all lines (sets of collinear points)
+        for (let lineIndex = 0; lineIndex < this.lines.length; lineIndex++) {
+            const pointsOnLine = this._pointsOnLine(lineIndex);
+            if (pointsOnLine.length >= 2) {
+                const sorted = [...pointsOnLine].sort((a, b) => a - b);
+                const key = sorted.join(',');
                 if (!seen.has(key)) {
                     seen.add(key);
-                    flats.push(closureSet);
+                    flats.push(sorted);
                 }
+            }
+        }
+        
+        // Rank 3: the entire ground set (all points)
+        if (this.groundSet.length > 0) {
+            const sorted = [...this.groundSet].sort((a, b) => a - b);
+            const key = sorted.join(',');
+            if (!seen.has(key)) {
+                flats.push(sorted);
             }
         }
         

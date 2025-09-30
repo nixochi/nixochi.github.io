@@ -52,6 +52,9 @@ export class CanvasManager {
         // Callback for state changes
         this.onStateChange = null;
 
+        // Highlighting state
+        this.highlightedPoints = new Set();
+
         // Initialize
         this.setupCanvas();
         this.setupEventListeners();
@@ -375,8 +378,8 @@ export class CanvasManager {
             this.renderer.drawSnapPreview(snapPreview);
         }
 
-        // Draw points
-        this.renderer.drawPoints(this.points);
+        // Draw points (pass highlightedPoints)
+        this.renderer.drawPoints(this.points, this.highlightedPoints);
 
         // Restore context state
         this.ctx.restore();
@@ -402,5 +405,15 @@ export class CanvasManager {
             circuits: matroid.getAllCircuits(),
             flats: matroid.getAllFlats()
         };
+    }
+
+    setHighlightedPoints(pointIndices) {
+        this.highlightedPoints = new Set(pointIndices);
+        this.draw();
+    }
+
+    clearHighlightedPoints() {
+        this.highlightedPoints.clear();
+        this.draw();
     }
 }

@@ -46,8 +46,9 @@ export class Renderer {
     /**
      * Draws all points
      * @param {Array} points - Array of point objects
+     * @param {Set} highlightedPoints - Set of point indices to highlight
      */
-    drawPoints(points) {
+    drawPoints(points, highlightedPoints = new Set()) {
         const fgColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--fg-primary').trim();
 
@@ -66,14 +67,25 @@ export class Renderer {
         positionMap.forEach((indices, key) => {
             const [x, y] = key.split(',').map(Number);
             const isMerged = indices.length > 1;
+            const isHighlighted = indices.some(idx => highlightedPoints.has(idx));
 
             const radius = isMerged ? this.pointRadius + 2 : this.pointRadius;
-            this.ctx.fillStyle = isMerged ? '#45b7d1' : '#4ecdc4';
+
+            // Change color if highlighted
+            this.ctx.fillStyle = isHighlighted ? '#f9a826' : (isMerged ? '#45b7d1' : '#4ecdc4');
+
             this.ctx.beginPath();
             this.ctx.arc(x, y, radius, 0, Math.PI * 2);
             this.ctx.fill();
 
-            if (isMerged) {
+            // Add highlight ring
+            if (isHighlighted) {
+                this.ctx.strokeStyle = '#f9a826';
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
+                this.ctx.stroke();
+            } else if (isMerged) {
                 this.ctx.strokeStyle = '#45b7d1';
                 this.ctx.lineWidth = 2;
                 this.ctx.beginPath();
@@ -86,7 +98,7 @@ export class Renderer {
             this.ctx.font = isMerged ? 'bold 14px ui-sans-serif, system-ui, sans-serif' : '14px ui-sans-serif, system-ui, sans-serif';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'bottom';
-            this.ctx.fillText(label, x, y - (radius + 6));
+            this.ctx.fillText(label, x, y - (radius + (isHighlighted ? 8 : 6)));
         });
     }
 

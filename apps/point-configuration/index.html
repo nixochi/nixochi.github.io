@@ -358,30 +358,53 @@
                 if (stats.bases.length === 0) {
                     panelContent.innerHTML = '<div class="empty-state">no bases yet</div>';
                 } else {
-                    const basesHtml = stats.bases.map(base =>
-                        `<div style="padding: 8px; border-bottom: 1px solid var(--border);">{${base.join(', ')}}</div>`
+                    const basesHtml = stats.bases.map((base, idx) =>
+                        `<div class="matroid-item" data-points="${base.join(',')}" style="padding: 8px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s ease;">{${base.join(', ')}}</div>`
                     ).join('');
                     panelContent.innerHTML = basesHtml;
+                    attachHoverListeners();
                 }
             } else if (currentView === 'circuits') {
                 if (stats.circuits.length === 0) {
                     panelContent.innerHTML = '<div class="empty-state">no circuits yet</div>';
                 } else {
-                    const circuitsHtml = stats.circuits.map(circuit =>
-                        `<div style="padding: 8px; border-bottom: 1px solid var(--border);">{${circuit.join(', ')}}</div>`
+                    const circuitsHtml = stats.circuits.map((circuit, idx) =>
+                        `<div class="matroid-item" data-points="${circuit.join(',')}" style="padding: 8px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s ease;">{${circuit.join(', ')}}</div>`
                     ).join('');
                     panelContent.innerHTML = circuitsHtml;
+                    attachHoverListeners();
                 }
             } else if (currentView === 'flats') {
                 if (stats.flats.length === 0) {
                     panelContent.innerHTML = '<div class="empty-state">no flats yet</div>';
                 } else {
-                    const flatsHtml = stats.flats.map(flat =>
-                        `<div style="padding: 8px; border-bottom: 1px solid var(--border);">{${flat.join(', ')}}</div>`
+                    const flatsHtml = stats.flats.map((flat, idx) =>
+                        `<div class="matroid-item" data-points="${flat.join(',')}" style="padding: 8px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s ease;">{${flat.join(', ')}}</div>`
                     ).join('');
                     panelContent.innerHTML = flatsHtml;
+                    attachHoverListeners();
                 }
             }
+        }
+
+        function attachHoverListeners() {
+            const items = document.querySelectorAll('.matroid-item');
+
+            items.forEach(item => {
+                item.addEventListener('mouseenter', () => {
+                    const pointsStr = item.getAttribute('data-points');
+                    if (pointsStr) {
+                        const points = pointsStr.split(',').map(Number).filter(n => !isNaN(n));
+                        canvasManager.setHighlightedPoints(points);
+                    }
+                    item.style.background = 'color-mix(in srgb, var(--bg-secondary) 90%, var(--fg-primary) 10%)';
+                });
+
+                item.addEventListener('mouseleave', () => {
+                    canvasManager.clearHighlightedPoints();
+                    item.style.background = 'transparent';
+                });
+            });
         }
 
         // Stats dropdown

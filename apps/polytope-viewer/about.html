@@ -1,0 +1,77 @@
+
+
+
+
+
+
+
+
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>xochi — Polytope Viewer</title>
+  <meta name="description" content="explore the 3d polytopes that appear in math." />
+  <link rel="stylesheet" href="../../styles.css" />
+</head>
+<body>
+  <a href="#main" class="skip">skip to content</a>
+
+  <header class="header">
+    <div class="wrapper nav" role="navigation" aria-label="primary">
+      <a href="../../index.html" class="brand" data-nav><span class="xochi-word">xochi</span></a>
+      <nav class="links">
+        <a href="../../projects.html" data-nav>projects</a>
+        <a href="../../applets.html" data-nav>applets</a>
+        <a href="../../scrapbook.html" data-nav>scrapbook</a>
+        <a href="../../writings.html" data-nav>writings</a>        
+      </nav>
+    </div>
+  </header>
+
+<main id="main">
+  <div class="wrapper prose">
+    <h1>Polytope Viewer</h1>
+    <time class="muted">2025-01-20</time>
+    <hr />
+    <h2>technical notes</h2><p>built with three.js for rendering, using orbit controls for interaction. the geometry is computed directly—no model files, just mathematical definitions of vertices and edges. this keeps the tool lightweight and lets you explore the pure mathematical structure.</p><p>the code is open. if you want to add more polytopes or change how they're displayed, the source is available. polytopes reveal their secrets slowly, and everyone sees something different in them.</p>
+  </div>
+</main>
+
+  <footer>
+    <div class="wrapper">
+      <small>by <span class="xochi-word">xochi</span></small>
+    </div>
+  </footer>
+
+  <script src="" defer></script>
+</body><script>
+document.addEventListener('DOMContentLoaded', function() {
+    const vibrantColors = [
+        '#0066ff', '#ff6b35', '#4ecdc4', '#ff0080', '#00ff80', '#8000ff',
+        '#ff4040', '#00bfff', '#ff8c00', '#32cd32', '#ff1493', '#00ced1',
+        '#ff6347', '#9370db', '#ff69b4', '#00ff7f', '#ffd700', '#ff4500',
+        '#7fff00', '#dc143c', '#00ffff', '#ff00ff', '#adff2f', '#ff7f50',
+        '#da70d6', '#40e0d0', '#ee82ee', '#ffa500', '#1e90ff', '#ff20b2',
+        '#39ff14', '#bf00ff', '#ff073a', '#ffff00', '#00e6ff'
+    ];
+
+    const xochiWords = document.querySelectorAll('.xochi-word');
+    const usedColors = [];
+
+    xochiWords.forEach(word => {
+        let availableColors = vibrantColors.filter(c => !usedColors.slice(-5).includes(c));
+        if (availableColors.length < 3) {
+            usedColors.length = 0;
+            availableColors = vibrantColors;
+        }
+
+        const color = availableColors[Math.floor(Math.random() * availableColors.length)];
+        usedColors.push(color);
+        word.style.color = color;
+    });
+});
+</script>
+</html>

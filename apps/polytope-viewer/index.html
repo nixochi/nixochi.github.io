@@ -4,9 +4,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Polytope Viewer</title>
+
+    <!-- DNS Prefetch - resolve domain names early -->
+    <link rel="dns-prefetch" href="https://esm.sh">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+
+    <!-- Preconnect - establish full connection (DNS + TLS) -->
+    <link rel="preconnect" href="https://esm.sh" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+    <!-- Module Preload - download critical modules early -->
+    <link rel="modulepreload" href="polytope-viewer.js">
+    <link rel="modulepreload" href="polytope-data.js">
+    <link rel="modulepreload" href="https://esm.sh/three@0.160.0" crossorigin>
+    <link rel="modulepreload" href="https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js" crossorigin>
+
     <link rel="stylesheet" href="polytopestyles.css">
     <script src="polytope-viewer.js"></script>
     <script type="module" src="polytope-data.js"></script>
+
+    <!-- Add to polytopestyles.css in a <style> block or external file -->
+    <style>
+        /* Loading skeleton */
+        .skeleton-loader {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            z-index: 999;
+            transition: opacity 0.3s ease;
+        }
+
+        .skeleton-loader.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .skeleton-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--fg-secondary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .skeleton-spinner {
+                animation: none;
+                border-top-color: var(--border);
+            }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .skeleton-text {
+            font-size: 14px;
+            color: var(--fg-secondary);
+        }
+    </style>
 </head>
 <body>
     <!-- Options Button -->
@@ -18,7 +80,7 @@
     </button>
 
     <!-- Fullscreen polytope viewer -->
-    <polytope-viewer id="viewer" vertices='[
+    <polytope-viewer id="viewer" style="position: relative;" vertices='[
   [-2.121320343559642, -0.408248290463863,  0.577350269189626],
   [-2.121320343559642,  0.408248290463863, -0.577350269189626],
   [-1.414213562373095, -1.632993161855452,  0.577350269189626],
@@ -43,7 +105,13 @@
   [ 1.414213562373095,  1.632993161855452, -0.577350269189626],
   [ 2.121320343559642, -0.408248290463863,  0.577350269189626],
   [ 2.121320343559642,  0.408248290463863, -0.577350269189626]
-]'></polytope-viewer>
+]'>
+        <!-- Loading skeleton - removed when component loads -->
+        <div class="skeleton-loader" aria-live="polite" aria-label="Loading polytope visualization">
+            <div class="skeleton-spinner"></div>
+            <div class="skeleton-text">constructing polytope...</div>
+        </div>
+    </polytope-viewer>
     
     <!-- Left Controls Panel (Starts hidden) -->
     <div class="floating-panel controls-panel" id="controlsPanel" style="display: none;">
@@ -85,6 +153,16 @@
         import { polytopeOptions, getPolytopeVertices } from './polytope-data.js';
 
         const viewer = document.getElementById('viewer');
+
+        // Remove loading skeleton when component is ready
+        customElements.whenDefined('polytope-viewer').then(() => {
+            const skeleton = viewer.querySelector('.skeleton-loader');
+            if (skeleton) {
+                skeleton.classList.add('fade-out');
+                setTimeout(() => skeleton.remove(), 300);
+            }
+        });
+
         const wireframeToggle = document.getElementById('wireframeToggle');
         const opacitySlider = document.getElementById('opacitySlider');
         const opacityValue = document.getElementById('opacityValue');

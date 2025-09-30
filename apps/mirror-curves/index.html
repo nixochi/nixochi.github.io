@@ -4,6 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mirror Curve Viewer</title>
+
+    <!-- DNS Prefetch - resolve domain names early -->
+    <link rel="dns-prefetch" href="https://esm.sh">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+
+    <!-- Preconnect - establish full connection (DNS + TLS) -->
+    <link rel="preconnect" href="https://esm.sh" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+    <!-- Module Preload - download critical modules early -->
+    <link rel="modulepreload" href="mirror-curve-viewer.js">
+    <link rel="modulepreload" href="https://esm.sh/konva@9.2.0" crossorigin>
+
     <style>
         /* CSS Variables */
         :root {
@@ -451,6 +464,50 @@
             border: 1px solid var(--border);
         }
 
+        /* Loading skeleton */
+        .skeleton-loader {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            z-index: 999;
+            transition: opacity 0.3s ease;
+        }
+
+        .skeleton-loader.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .skeleton-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--fg-secondary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .skeleton-spinner {
+                animation: none;
+                border-top-color: var(--border);
+            }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .skeleton-text {
+            font-size: 14px;
+            color: var(--fg-secondary);
+        }
+
         /* Mobile styles */
         @media (max-width: 768px) {
             .compute-bar {
@@ -578,7 +635,12 @@
         animate-curves="true"
         animation-speed="15"
         curve-colors="rainbow"
-        style="width: 100vw; height: 100vh; height: 100svh; display: block;">
+        style="width: 100vw; height: 100vh; height: 100svh; display: block; position: relative;">
+        <!-- Loading skeleton - removed when component loads -->
+        <div class="skeleton-loader" aria-live="polite" aria-label="Loading mirror curve visualization">
+            <div class="skeleton-spinner"></div>
+            <div class="skeleton-text">building mirror curves...</div>
+        </div>
     </mirror-curve-viewer>
 
     <!-- Mobile Options Panel (Bottom) -->
@@ -786,6 +848,13 @@
         // Wait for the component to be defined
         customElements.whenDefined('mirror-curve-viewer').then(() => {
             const viewer = document.getElementById('viewer');
+
+            // Remove loading skeleton
+            const skeleton = viewer.querySelector('.skeleton-loader');
+            if (skeleton) {
+                skeleton.classList.add('fade-out');
+                setTimeout(() => skeleton.remove(), 300);
+            }
 
             // Mobile options panel
             const optionsBtnMobile = document.getElementById('optionsBtnMobile');

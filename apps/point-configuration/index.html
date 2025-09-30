@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Point-Line Configuration</title>
+    <style>
+        /* CSS Variables for theming */
+        :root {
+            --bg-primary: #fafafa;
+            --bg-secondary: #ffffff;
+            --fg-primary: #161616;
+            --fg-secondary: #5e5e5e;
+            --border: #e7e7e7;
+            --shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
+            --backdrop-blur: rgba(255, 255, 255, 0.9);
+            --radius: 12px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-primary: #161617;
+                --bg-secondary: #1c1c1e;
+                --fg-primary: #f3f3f3;
+                --fg-secondary: #b9b9b9;
+                --border: #222224;
+                --shadow: rgba(0,0,0,0.5);
+                --backdrop-blur: rgba(28, 28, 30, 0.9);
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--fg-primary);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow: hidden;
+            height: 100vh;
+            touch-action: none;
+            -ms-touch-action: none;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Canvas Area - Left Side */
+        .canvas-container {
+            flex: 0 0 70%;
+            position: relative;
+            background: var(--bg-primary);
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* Controls Panel - Top Left */
+        .controls-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: var(--backdrop-blur);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 8px 12px;
+            z-index: 1000;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
+        }
+
+        .control-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--fg-primary);
+            margin-right: 2px;
+        }
+
+        .mode-button {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--fg-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .mode-button:hover {
+            background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+            border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+        }
+
+        .mode-button.active {
+            background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+            color: var(--bg-secondary);
+            border-color: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+        }
+
+        /* Controls Toggle Button */
+        .right-panel {
+            flex: 0 0 30%;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--fg-primary);
+        }
+
+        /* Shadcn-style dropdown */
+        .dropdown-container {
+            position: relative;
+        }
+
+        .dropdown-trigger {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--fg-primary);
+            font-size: 15px;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .dropdown-trigger:hover {
+            background: color-mix(in srgb, var(--bg-primary) 95%, var(--fg-primary) 5%);
+            border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+        }
+
+        .dropdown-trigger:focus {
+            border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+        }
+
+        .dropdown-arrow {
+            width: 0;
+            height: 0;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 4px solid var(--fg-secondary);
+            transition: transform 0.2s ease;
+        }
+
+        .dropdown-trigger.open .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-content {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            min-width: 160px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 4px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all 0.15s ease;
+        }
+
+        .dropdown-content.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: var(--fg-primary);
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.15s ease;
+        }
+
+        .dropdown-item:hover {
+            background: color-mix(in srgb, var(--bg-secondary) 90%, var(--fg-primary) 10%);
+        }
+
+        .dropdown-item.active {
+            background: color-mix(in srgb, var(--bg-secondary) 85%, var(--fg-primary) 15%);
+            font-weight: 500;
+        }
+
+        .panel-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .empty-state {
+            color: var(--fg-secondary);
+            font-size: 16px;
+            text-align: center;
+            margin-top: 40px;
+            line-height: 1.6;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .canvas-container {
+                flex: 0 0 60%;
+            }
+
+            .right-panel {
+                flex: 0 0 40%;
+                border-left: none;
+                border-top: 1px solid var(--border);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Canvas Container -->
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+            
+            <!-- Controls Panel (Always visible) -->
+            <div class="controls-panel">
+                <div class="control-row">
+                    <span class="control-label">input:</span>
+                    <button class="mode-button active" id="pointBtn">point</button>
+                    <button class="mode-button" id="lineBtn">line</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="right-panel">
+            <div class="panel-header">
+                <span class="panel-title">stats</span>
+                <div class="dropdown-container">
+                    <button class="dropdown-trigger" id="dropdownTrigger">
+                        <span id="dropdownLabel">bases</span>
+                        <div class="dropdown-arrow"></div>
+                    </button>
+                    <div class="dropdown-content" id="dropdownContent">
+                        <button class="dropdown-item active" data-value="bases">bases</button>
+                        <button class="dropdown-item" data-value="flats">flats</button>
+                        <button class="dropdown-item" data-value="circuits">circuits</button>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-content" id="panelContent">
+                <div class="empty-state">
+                    add points and lines to see matroid properties
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { CanvasManager } from './canvas-manager.js';
+
+        // Initialize canvas
+        const canvas = document.getElementById('canvas');
+        const canvasManager = new CanvasManager(canvas);
+
+        // Mode buttons
+        const pointBtn = document.getElementById('pointBtn');
+        const lineBtn = document.getElementById('lineBtn');
+
+        pointBtn.addEventListener('click', () => {
+            canvasManager.setMode('point');
+            pointBtn.classList.add('active');
+            lineBtn.classList.remove('active');
+        });
+
+        lineBtn.addEventListener('click', () => {
+            canvasManager.setMode('line');
+            lineBtn.classList.add('active');
+            pointBtn.classList.remove('active');
+        });
+
+        // Stats dropdown
+        const dropdownTrigger = document.getElementById('dropdownTrigger');
+        const dropdownContent = document.getElementById('dropdownContent');
+        const dropdownLabel = document.getElementById('dropdownLabel');
+        const dropdownItems = dropdownContent.querySelectorAll('.dropdown-item');
+        let isDropdownOpen = false;
+
+        dropdownTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            isDropdownOpen = !isDropdownOpen;
+            
+            if (isDropdownOpen) {
+                dropdownTrigger.classList.add('open');
+                dropdownContent.classList.add('open');
+            } else {
+                dropdownTrigger.classList.remove('open');
+                dropdownContent.classList.remove('open');
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!dropdownTrigger.contains(e.target) && !dropdownContent.contains(e.target)) {
+                isDropdownOpen = false;
+                dropdownTrigger.classList.remove('open');
+                dropdownContent.classList.remove('open');
+            }
+        });
+
+        dropdownItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const value = item.getAttribute('data-value');
+                
+                dropdownItems.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                
+                dropdownLabel.textContent = value;
+                
+                isDropdownOpen = false;
+                dropdownTrigger.classList.remove('open');
+                dropdownContent.classList.remove('open');
+                
+                console.log('Selected:', value);
+            });
+        });
+    </script>
+</body>
+</html>

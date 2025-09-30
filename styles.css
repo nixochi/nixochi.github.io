@@ -1,14 +1,5 @@
 /*Quiet*/
-:root{
-  --bg: #fafafa;
-  --fg: #161616;
-  --muted: #5e5e5e;
-  --line: #e7e7e7;
-  --card: #ffffff;
-  --radius: 12px;
-  --shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
-  --maxw: 68ch;
-}
+
 
 /*
 @media (prefers-color-scheme: dark){
@@ -23,16 +14,17 @@
 }
 */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg:     #161617;   /* darker background */
-    --fg:     #f3f3f3;   /* unchanged */
-    --muted:  #b9b9b9;   /* unchanged */
-    --line:   #222224;   /* darker divider */
-    --card:   #1c1c1e;   /* card slightly lighter than bg */
-    --shadow: rgba(0,0,0,0.5);
-  }
+:root {
+  --bg:     #161617;   /* darker background */
+  --fg:     #f3f3f3;   /* unchanged */
+  --muted:  #b9b9b9;   /* unchanged */
+  --line:   #222224;   /* darker divider */
+  --card:   #1c1c1e;   /* card slightly lighter than bg */
+  --shadow: rgba(0,0,0,0.5);
+  --radius: 12px;
+  --maxw: 68ch;
 }
+
 
 html, body { height: 100%; }
 body{

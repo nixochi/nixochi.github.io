@@ -10,6 +10,7 @@
   --maxw: 68ch;
 }
 
+/*
 @media (prefers-color-scheme: dark){
   :root{
     --bg: #0d0d0e;
@@ -18,6 +19,18 @@
     --line: #1a1a1a;
     --card: #121214;
     --shadow: none;
+  }
+}
+*/
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:     #161617;   /* darker background */
+    --fg:     #f3f3f3;   /* unchanged */
+    --muted:  #b9b9b9;   /* unchanged */
+    --line:   #222224;   /* darker divider */
+    --card:   #1c1c1e;   /* card slightly lighter than bg */
+    --shadow: rgba(0,0,0,0.5);
   }
 }
 

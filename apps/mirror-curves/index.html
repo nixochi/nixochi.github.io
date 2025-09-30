@@ -44,6 +44,7 @@
 
         html, body {
             height: 100vh;
+            height: 100svh;
             overflow: hidden;
             touch-action: none;
             -ms-touch-action: none;
@@ -577,7 +578,7 @@
         animate-curves="true"
         animation-speed="15"
         curve-colors="rainbow"
-        style="width: 100vw; height: 100vh; display: block;">
+        style="width: 100vw; height: 100vh; height: 100svh; display: block;">
     </mirror-curve-viewer>
 
     <!-- Mobile Options Panel (Bottom) -->
@@ -1095,32 +1096,5 @@
             });
         });
     </script>
-</body><script>
-document.addEventListener('DOMContentLoaded', function() {
-    const vibrantColors = [
-        '#0066ff', '#ff6b35', '#4ecdc4', '#ff0080', '#00ff80', '#8000ff',
-        '#ff4040', '#00bfff', '#ff8c00', '#32cd32', '#ff1493', '#00ced1',
-        '#ff6347', '#9370db', '#ff69b4', '#00ff7f', '#ffd700', '#ff4500',
-        '#7fff00', '#dc143c', '#00ffff', '#ff00ff', '#adff2f', '#ff7f50',
-        '#da70d6', '#40e0d0', '#ee82ee', '#ffa500', '#1e90ff', '#ff20b2',
-        '#39ff14', '#bf00ff', '#ff073a', '#ffff00', '#00e6ff'
-    ];
-    
-    const xochiWords = document.querySelectorAll('.xochi-word');
-    const usedColors = [];
-    
-    xochiWords.forEach(word => {
-        // Pick a random color avoiding recent ones
-        let availableColors = vibrantColors.filter(c => !usedColors.slice(-5).includes(c));
-        if (availableColors.length < 3) {
-            usedColors.length = 0; // Reset if we've used most colors
-            availableColors = vibrantColors;
-        }
-        
-        const color = availableColors[Math.floor(Math.random() * availableColors.length)];
-        usedColors.push(color);
-        word.style.color = color;
-    });
-});
-</script>
+</body>
 </html>

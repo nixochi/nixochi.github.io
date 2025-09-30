@@ -115,18 +115,17 @@ document.addEventListener('DOMContentLoaded', function() {
         '#da70d6', '#40e0d0', '#ee82ee', '#ffa500', '#1e90ff', '#ff20b2',
         '#39ff14', '#bf00ff', '#ff073a', '#ffff00', '#00e6ff'
     ];
-    
+
     const xochiWords = document.querySelectorAll('.xochi-word');
     const usedColors = [];
-    
+
     xochiWords.forEach(word => {
-        // Pick a random color avoiding recent ones
         let availableColors = vibrantColors.filter(c => !usedColors.slice(-5).includes(c));
         if (availableColors.length < 3) {
-            usedColors.length = 0; // Reset if we've used most colors
+            usedColors.length = 0;
             availableColors = vibrantColors;
         }
-        
+
         const color = availableColors[Math.floor(Math.random() * availableColors.length)];
         usedColors.push(color);
         word.style.color = color;

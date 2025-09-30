@@ -289,11 +289,12 @@
                 <span class="panel-title">stats</span>
                 <div class="dropdown-container">
                     <button class="dropdown-trigger" id="dropdownTrigger">
-                        <span id="dropdownLabel">bases</span>
+                        <span id="dropdownLabel">general</span>
                         <div class="dropdown-arrow"></div>
                     </button>
                     <div class="dropdown-content" id="dropdownContent">
-                        <button class="dropdown-item active" data-value="bases">bases</button>
+                        <button class="dropdown-item active" data-value="general">general</button>
+                        <button class="dropdown-item" data-value="bases">bases</button>
                         <button class="dropdown-item" data-value="flats">flats</button>
                         <button class="dropdown-item" data-value="circuits">circuits</button>
                     </div>
@@ -330,6 +331,59 @@
             pointBtn.classList.remove('active');
         });
 
+        // Stats panel
+        let currentView = 'general';
+
+        function updateStatsPanel() {
+            const stats = canvasManager.getMatroidStats();
+            const panelContent = document.getElementById('panelContent');
+
+            if (!stats) {
+                panelContent.innerHTML = '<div class="empty-state">add points and lines to see matroid properties</div>';
+                return;
+            }
+
+            if (currentView === 'general') {
+                panelContent.innerHTML = `
+                    <div style="font-size: 14px; line-height: 1.8;">
+                        <div><strong>rank:</strong> ${stats.rank}</div>
+                        <div><strong>points:</strong> ${stats.numPoints}</div>
+                        <div><strong>lines:</strong> ${stats.numLines}</div>
+                        <div><strong>bases:</strong> ${stats.bases.length}</div>
+                        <div><strong>circuits:</strong> ${stats.circuits.length}</div>
+                        <div><strong>flats:</strong> ${stats.flats.length}</div>
+                    </div>
+                `;
+            } else if (currentView === 'bases') {
+                if (stats.bases.length === 0) {
+                    panelContent.innerHTML = '<div class="empty-state">no bases yet</div>';
+                } else {
+                    const basesHtml = stats.bases.map(base =>
+                        `<div style="padding: 8px; border-bottom: 1px solid var(--border);">{${base.join(', ')}}</div>`
+                    ).join('');
+                    panelContent.innerHTML = basesHtml;
+                }
+            } else if (currentView === 'circuits') {
+                if (stats.circuits.length === 0) {
+                    panelContent.innerHTML = '<div class="empty-state">no circuits yet</div>';
+                } else {
+                    const circuitsHtml = stats.circuits.map(circuit =>
+                        `<div style="padding: 8px; border-bottom: 1px solid var(--border);">{${circuit.join(', ')}}</div>`
+                    ).join('');
+                    panelContent.innerHTML = circuitsHtml;
+                }
+            } else if (currentView === 'flats') {
+                if (stats.flats.length === 0) {
+                    panelContent.innerHTML = '<div class="empty-state">no flats yet</div>';
+                } else {
+                    const flatsHtml = stats.flats.map(flat =>
+                        `<div style="padding: 8px; border-bottom: 1px solid var(--border);">{${flat.join(', ')}}</div>`
+                    ).join('');
+                    panelContent.innerHTML = flatsHtml;
+                }
+            }
+        }
+
         // Stats dropdown
         const dropdownTrigger = document.getElementById('dropdownTrigger');
         const dropdownContent = document.getElementById('dropdownContent');
@@ -340,7 +394,7 @@
         dropdownTrigger.addEventListener('click', (e) => {
             e.stopPropagation();
             isDropdownOpen = !isDropdownOpen;
-            
+
             if (isDropdownOpen) {
                 dropdownTrigger.classList.add('open');
                 dropdownContent.classList.add('open');
@@ -362,19 +416,26 @@
             item.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const value = item.getAttribute('data-value');
-                
+
                 dropdownItems.forEach(i => i.classList.remove('active'));
                 item.classList.add('active');
-                
+
                 dropdownLabel.textContent = value;
-                
+                currentView = value;
+
+                updateStatsPanel();
+
                 isDropdownOpen = false;
                 dropdownTrigger.classList.remove('open');
                 dropdownContent.classList.remove('open');
-                
-                console.log('Selected:', value);
             });
         });
+
+        // Wire up state change callback
+        canvasManager.onStateChange = updateStatsPanel;
+
+        // Initial update
+        updateStatsPanel();
     </script>
 </body>
 </html>

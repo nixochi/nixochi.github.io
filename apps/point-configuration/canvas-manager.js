@@ -3,6 +3,7 @@
 import { computeAllIntersections } from './geometry-utils.js';
 import { SnapManager } from './snap-manager.js';
 import { Renderer } from './renderer.js';
+import { PointLineMatroid } from './matroid.js';
 
 export class CanvasManager {
     constructor(canvas) {
@@ -47,6 +48,9 @@ export class CanvasManager {
         // Initialize modules
         this.snapManager = new SnapManager(15, 20); // intersectionSnapThreshold, lineSnapThreshold
         this.renderer = new Renderer(canvas, this.ctx);
+
+        // Callback for state changes
+        this.onStateChange = null;
 
         // Initialize
         this.setupCanvas();
@@ -258,6 +262,10 @@ export class CanvasManager {
         this.hasMoved = false;
         this.snapManager.clearSnapPreview(); // Clear snap preview after interaction
         this.canvas.style.cursor = 'crosshair';
+
+        if (this.onStateChange) {
+            this.onStateChange();
+        }
     }
     
     handleMouseLeave(e) {
@@ -288,6 +296,9 @@ export class CanvasManager {
         this.points.push({ x, y, onLines, isIntersection });
         this.draw();
         console.log('Added point:', this.points.length - 1, 'at', x, y, 'onLines:', onLines);
+        if (this.onStateChange) {
+            this.onStateChange();
+        }
     }
     
     addPointWithSnap(snapPreview) {
@@ -314,14 +325,17 @@ export class CanvasManager {
         const dx = endX - startX;
         const dy = endY - startY;
         const angle = Math.atan2(dy, dx);
-        
+
         this.lines.push({ x: startX, y: startY, angle });
-        
+
         // Recompute all intersections
         this.computeIntersections();
-        
+
         this.draw();
         console.log('Added line:', this.lines.length - 1, 'angle:', angle);
+        if (this.onStateChange) {
+            this.onStateChange();
+        }
     }
     
     setMode(mode) {
@@ -371,5 +385,22 @@ export class CanvasManager {
     computeIntersections() {
         this.intersections = computeAllIntersections(this.lines);
         console.log('Computed', this.intersections.length, 'intersections');
+    }
+
+    getMatroidStats() {
+        if (this.points.length === 0) {
+            return null;
+        }
+
+        const matroid = new PointLineMatroid(this.points, this.lines);
+
+        return {
+            rank: matroid.rank,
+            numPoints: this.points.length,
+            numLines: this.lines.length,
+            bases: matroid.getAllBases(),
+            circuits: matroid.getAllCircuits(),
+            flats: matroid.getAllFlats()
+        };
     }
 }

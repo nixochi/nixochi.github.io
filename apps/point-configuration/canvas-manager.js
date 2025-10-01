@@ -130,7 +130,7 @@ export class CanvasManager {
         // Always update snap preview in point mode when not dragging
         if (this.mode === 'point' && !this.isInteracting) {
             const oldSnap = this.snapManager.getSnapPreview();
-            const newSnap = this.snapManager.updateSnapPreview(worldX, worldY, this.intersections, this.lines);
+            const newSnap = this.snapManager.updateSnapPreview(worldX, worldY, this.intersections, this.lines, this.points);
 
             // Only redraw if snap changed
             if (JSON.stringify(oldSnap) !== JSON.stringify(newSnap)) {
@@ -142,7 +142,7 @@ export class CanvasManager {
         if (this.isInteracting && this.draggingPointIndex !== null) {
             const oldSnap = this.snapManager.getSnapPreview();
             const newSnap = this.snapManager.updateDragSnapPreview(
-                worldX, worldY, this.intersections, this.lines
+                worldX, worldY, this.intersections, this.lines, this.points
             );
 
             // Only redraw if snap changed

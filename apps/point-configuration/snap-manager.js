@@ -16,10 +16,36 @@ export class SnapManager {
      * @param {number} worldY - Mouse y in world coordinates
      * @param {Array} intersections - Array of intersection objects
      * @param {Array} lines - Array of line objects
+     * @param {Array} points - Array of existing points
      * @returns {Object|null} Snap preview object or null
      */
-    updateSnapPreview(worldX, worldY, intersections, lines) {
-        // Priority 1: Check for nearby intersections
+    updateSnapPreview(worldX, worldY, intersections, lines, points) {
+        // Priority 1: Check for nearby existing points (for merging)
+        let closestPoint = null;
+        let minPointDist = this.intersectionSnapThreshold; // Use same threshold
+
+        points.forEach((point, index) => {
+            const dx = point.x - worldX;
+            const dy = point.y - worldY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < minPointDist) {
+                minPointDist = dist;
+                closestPoint = {
+                    x: point.x,
+                    y: point.y,
+                    type: 'point',
+                    pointIndex: index
+                };
+            }
+        });
+
+        if (closestPoint) {
+            this.snapPreview = closestPoint;
+            return closestPoint;
+        }
+
+        // Priority 2: Check for nearby intersections
         let closestIntersection = null;
         let minIntersectionDist = this.intersectionSnapThreshold;
 
@@ -44,7 +70,7 @@ export class SnapManager {
             return closestIntersection;
         }
 
-        // Priority 2: Check for nearby lines
+        // Priority 3: Check for nearby lines
         let closestLine = null;
         let minLineDist = this.lineSnapThreshold;
 
@@ -82,11 +108,12 @@ export class SnapManager {
      * @param {number} worldY - Mouse y in world coordinates
      * @param {Array} intersections - Array of intersection objects
      * @param {Array} lines - Array of line objects
+     * @param {Array} points - Array of existing points
      * @returns {Object|null} Snap preview object or null
      */
-    updateDragSnapPreview(worldX, worldY, intersections, lines) {
+    updateDragSnapPreview(worldX, worldY, intersections, lines, points) {
         // Same logic as updateSnapPreview - treat dragged point as fresh
-        return this.updateSnapPreview(worldX, worldY, intersections, lines);
+        return this.updateSnapPreview(worldX, worldY, intersections, lines, points);
     }
 
     /**

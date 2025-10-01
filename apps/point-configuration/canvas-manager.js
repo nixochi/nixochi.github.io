@@ -410,8 +410,12 @@ export class CanvasManager {
     handleMouseDown(e) {
         const { worldX, worldY, screenX, screenY } = this.getEventCoordinates(e);
 
-        // Store mouse down position
+        // Store mouse down position and current position (prevents phantom line previews)
         this.mouseDownPos = { worldX, worldY, screenX, screenY, time: Date.now() };
+        this.currentMousePos = { worldX, worldY, screenX, screenY };
+
+        // Clear UI hover highlights when interacting with canvas
+        this.hoveredPointIndices = null;
 
         if (this.mode === 'line') {
             // Check if starting from a hovered multipoint

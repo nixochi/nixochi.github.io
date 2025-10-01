@@ -502,8 +502,35 @@
                     canvasManager.clearHoveredPoints();
                     item.style.background = 'transparent';
                 });
+
+                // Clear highlighting on touch/click outside
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
             });
         }
+
+        // Clear highlighting when clicking anywhere outside matroid items
+        document.addEventListener('click', () => {
+            canvasManager.clearHoveredPoints();
+            // Also clear background from all items
+            document.querySelectorAll('.matroid-item').forEach(item => {
+                item.style.background = 'transparent';
+            });
+        });
+
+        // Clear matroid item backgrounds when touching canvas (preventDefault blocks click event)
+        canvas.addEventListener('touchstart', () => {
+            document.querySelectorAll('.matroid-item').forEach(item => {
+                item.style.background = 'transparent';
+            });
+        });
+
+        canvas.addEventListener('mousedown', () => {
+            document.querySelectorAll('.matroid-item').forEach(item => {
+                item.style.background = 'transparent';
+            });
+        });
 
         // Stats dropdown
         const dropdownTrigger = document.getElementById('dropdownTrigger');

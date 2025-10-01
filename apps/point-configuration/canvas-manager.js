@@ -1,6 +1,6 @@
 // canvas-manager.js
 
-import { computeAllIntersections } from './geometry-utils.js';
+import { getPointPosition, findIntersectionByLines, computeIntersections } from './geometry-utils.js';
 import { SnapManager } from './snap-manager.js';
 import { Renderer } from './renderer.js';
 import { PointLineMatroid } from './matroid.js';
@@ -36,9 +36,15 @@ export class CanvasManager {
         this.canvasHoveredPointIndices = null; // Points hovered on canvas (for line mode)
 
         // Settings
-        this.pointRadius = 9;
-        this.snapThreshold = 15;
-        this.clickThreshold = 5;
+        this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        this.pointRadius = this.isTouchDevice ? 14 : 9;
+        this.snapThreshold = this.isTouchDevice ? 25 : 15;
+        this.clickThreshold = this.isTouchDevice ? 8 : 5;
+
+        // Zoom state
+        this.scale = 1;
+        this.minScale = 0.1;
+        this.maxScale = 5;
 
         // Initialize modules
         this.snapManager = new SnapManager(15, 20); // intersectionSnapThreshold, lineSnapThreshold
@@ -65,10 +71,18 @@ export class CanvasManager {
     }
     
     setupEventListeners() {
+        // Mouse events
         this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
         this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
         this.canvas.addEventListener('mouseleave', (e) => this.handleMouseLeave(e));
+        this.canvas.addEventListener('wheel', (e) => this.handleWheel(e));
+
+        // Touch events
+        this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+        this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+        this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
+        this.canvas.addEventListener('touchcancel', (e) => this.handleTouchCancel(e), { passive: false });
     }
 
     /**
@@ -79,124 +93,89 @@ export class CanvasManager {
     }
 
     /**
+     * Extract coordinates from mouse or touch event
+     */
+    getEventCoordinates(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        let clientX, clientY;
+
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+            clientX = e.changedTouches[0].clientX;
+            clientY = e.changedTouches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
+        const screenX = clientX - rect.left;
+        const screenY = clientY - rect.top;
+        const worldX = (screenX - this.offsetX) / this.scale;
+        const worldY = (screenY - this.offsetY) / this.scale;
+
+        return { worldX, worldY, screenX, screenY };
+    }
+
+    /**
+     * Get distance and center point between two touches
+     */
+    getTouchGestureInfo(touches) {
+        if (touches.length < 2) return null;
+
+        const rect = this.canvas.getBoundingClientRect();
+        const touch1 = {
+            x: touches[0].clientX - rect.left,
+            y: touches[0].clientY - rect.top
+        };
+        const touch2 = {
+            x: touches[1].clientX - rect.left,
+            y: touches[1].clientY - rect.top
+        };
+
+        const distance = Math.hypot(touch2.x - touch1.x, touch2.y - touch1.y);
+        const centerX = (touch1.x + touch2.x) / 2;
+        const centerY = (touch1.y + touch2.y) / 2;
+
+        return { distance, centerX, centerY };
+    }
+
+    /**
+     * Apply zoom at a specific point (screen coordinates)
+     */
+    zoomAt(screenX, screenY, scaleFactor) {
+        const oldScale = this.scale;
+
+        // Calculate new scale with limits
+        const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.scale * scaleFactor));
+
+        // Calculate world position under cursor (stays fixed during zoom)
+        const worldX = (screenX - this.offsetX) / oldScale;
+        const worldY = (screenY - this.offsetY) / oldScale;
+
+        // Update scale
+        this.scale = newScale;
+
+        // Adjust offset so world position stays under same screen position
+        this.offsetX = screenX - worldX * newScale;
+        this.offsetY = screenY - worldY * newScale;
+
+        this.draw();
+    }
+
+    /**
      * Get viewport bounds in world coordinates
      */
     getViewportBounds() {
         return {
-            left: -this.offsetX,
-            right: this.canvas.width - this.offsetX,
-            top: -this.offsetY,
-            bottom: this.canvas.height - this.offsetY
+            left: -this.offsetX / this.scale,
+            right: (this.canvas.width - this.offsetX) / this.scale,
+            top: -this.offsetY / this.scale,
+            bottom: (this.canvas.height - this.offsetY) / this.scale
         };
     }
 
-    /**
-     * Get the actual position of a point (uses intersection if on 2+ lines)
-     */
-    getPointPosition(point) {
-        if (point.intersectionIndex !== null && point.intersectionIndex !== undefined) {
-            const intersection = this.intersections[point.intersectionIndex];
-            return { x: intersection.x, y: intersection.y };
-        }
-        return { x: point.x, y: point.y };
-    }
-
-    /**
-     * Find intersection index that matches the given lines
-     */
-    findIntersectionByLines(lineIndices) {
-        // Find an intersection that contains all these lines
-        for (let i = 0; i < this.intersections.length; i++) {
-            const intersection = this.intersections[i];
-            const hasAllLines = lineIndices.every(lineIdx =>
-                intersection.lineIndices.includes(lineIdx)
-            );
-            if (hasAllLines) {
-                return i;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Find snap targets for line preview near cursor
-     * Only snaps when cursor is NEAR existing multipoints or multi-intersections
-     */
-    findLineEndpointSnap(_startX, _startY, endX, endY, snapThreshold = 30) {
-        const viewportBounds = this.getViewportBounds();
-        const candidates = [];
-
-        // Check all existing points (including those not on any line)
-        for (let i = 0; i < this.points.length; i++) {
-            const point = this.points[i];
-            const pos = this.getPointPosition(point);
-
-            // Check if in viewport
-            if (pos.x < viewportBounds.left || pos.x > viewportBounds.right ||
-                pos.y < viewportBounds.top || pos.y > viewportBounds.bottom) {
-                continue;
-            }
-
-            // Check if cursor is near this point
-            const distToCursor = Math.hypot(pos.x - endX, pos.y - endY);
-            if (distToCursor <= snapThreshold) {
-                // Find all points at this location (multipoint)
-                const pointIndices = this.getPointsAtPosition(pos.x, pos.y);
-
-                // Check if already added
-                const alreadyAdded = candidates.some(c =>
-                    c.type === 'multipoint' &&
-                    Math.hypot(c.x - pos.x, c.y - pos.y) < 0.1
-                );
-
-                if (!alreadyAdded) {
-                    candidates.push({
-                        type: 'multipoint',
-                        x: pos.x,
-                        y: pos.y,
-                        pointIndices: pointIndices,
-                        distance: distToCursor
-                    });
-                }
-            }
-        }
-
-        // Check all multi-intersections (2+ lines)
-        for (let i = 0; i < this.intersections.length; i++) {
-            const intersection = this.intersections[i];
-
-            // Only consider multi-intersections (2+ lines)
-            if (intersection.lineIndices.length < 2) continue;
-
-            // Check if in viewport
-            if (intersection.x < viewportBounds.left || intersection.x > viewportBounds.right ||
-                intersection.y < viewportBounds.top || intersection.y > viewportBounds.bottom) {
-                continue;
-            }
-
-            // Check if cursor is near this multi-intersection
-            const distToCursor = Math.hypot(intersection.x - endX, intersection.y - endY);
-            if (distToCursor <= snapThreshold) {
-                candidates.push({
-                    type: 'intersection',
-                    x: intersection.x,
-                    y: intersection.y,
-                    lineIndices: intersection.lineIndices,
-                    distance: distToCursor
-                });
-            }
-        }
-
-        if (candidates.length === 0) return null;
-
-        // Sort by distance to cursor
-        candidates.sort((a, b) => a.distance - b.distance);
-
-        return {
-            snapTarget: candidates[0],
-            allIntersections: candidates // All nearby targets (not all line intersections)
-        };
-    }
 
     /**
      * Visual derivation layer - computes what should be visible
@@ -224,7 +203,8 @@ export class CanvasManager {
                         this.currentMousePos.worldY,
                         this.intersections,
                         this.lines,
-                        this.points
+                        this.points,
+                        this.scale
                     );
 
                     // Highlight lines involved in snap
@@ -264,7 +244,8 @@ export class CanvasManager {
                         this.currentMousePos.worldY,
                         this.intersections,
                         this.lines,
-                        this.points
+                        this.points,
+                        this.scale
                     );
 
                     // Determine ghost position from snap
@@ -302,19 +283,25 @@ export class CanvasManager {
             case 'drawing-line':
                 // Show preview line with endpoint snapping
                 if (state.data && this.currentMousePos) {
-                    const hasMoved = this.mouseDownPos &&
-                        Math.hypot(
-                            this.currentMousePos.screenX - this.mouseDownPos.screenX,
-                            this.currentMousePos.screenY - this.mouseDownPos.screenY
-                        ) > this.clickThreshold;
+                    // Use larger threshold for line preview to ensure stable angle
+                    const dragDistance = this.mouseDownPos ? Math.hypot(
+                        this.currentMousePos.screenX - this.mouseDownPos.screenX,
+                        this.currentMousePos.screenY - this.mouseDownPos.screenY
+                    ) : 0;
+                    const linePreviewThreshold = Math.max(15, this.clickThreshold * 2);
+                    const hasMoved = dragDistance > linePreviewThreshold;
 
                     if (hasMoved) {
                         // Check for endpoint snap and all intersections
-                        const snapResult = this.findLineEndpointSnap(
+                        const snapResult = this.snapManager.findLineEndpointSnap(
                             state.data.startX,
                             state.data.startY,
                             this.currentMousePos.worldX,
-                            this.currentMousePos.worldY
+                            this.currentMousePos.worldY,
+                            this.points,
+                            this.intersections,
+                            this.getViewportBounds(),
+                            this.scale
                         );
 
                         if (snapResult) {
@@ -331,7 +318,12 @@ export class CanvasManager {
                             // Highlight ALL intersections
                             snapResult.allIntersections.forEach(intersection => {
                                 if (intersection.type === 'multipoint') {
-                                    intersection.pointIndices.forEach(idx => visuals.highlightedPoints.add(idx));
+                                    intersection.pointIndices.forEach(idx => {
+                                        visuals.highlightedPoints.add(idx);
+                                        // Also highlight all lines that these points are on
+                                        const point = this.points[idx];
+                                        point.onLines.forEach(lineIdx => visuals.highlightedLines.add(lineIdx));
+                                    });
                                 } else if (intersection.type === 'intersection') {
                                     intersection.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
                                 }
@@ -350,6 +342,45 @@ export class CanvasManager {
                 // Highlight the starting points that the line is being created from
                 if (state.data.startPointIndices) {
                     state.data.startPointIndices.forEach(idx => visuals.highlightedPoints.add(idx));
+                }
+                break;
+
+            case 'dragging-new-point':
+                // Show ghost point for new point being placed (with snapping)
+                if (this.currentMousePos) {
+                    // Compute snap at current mouse position
+                    visuals.snapPreview = this.snapManager.updateSnapPreview(
+                        this.currentMousePos.worldX,
+                        this.currentMousePos.worldY,
+                        this.intersections,
+                        this.lines,
+                        this.points,
+                        this.scale
+                    );
+
+                    // Determine ghost position from snap
+                    if (visuals.snapPreview) {
+                        visuals.ghostPoint = {
+                            x: visuals.snapPreview.x,
+                            y: visuals.snapPreview.y,
+                            pointIndex: -1 // Marker for new point (not existing)
+                        };
+
+                        // Highlight lines involved in snap
+                        if (visuals.snapPreview.type === 'line') {
+                            visuals.highlightedLines.add(visuals.snapPreview.lineIndex);
+                        } else if (visuals.snapPreview.type === 'intersection') {
+                            const intersection = this.intersections[visuals.snapPreview.intersectionIndex];
+                            intersection.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
+                        }
+                    } else {
+                        // No snap, ghost at mouse position
+                        visuals.ghostPoint = {
+                            x: this.currentMousePos.worldX,
+                            y: this.currentMousePos.worldY,
+                            pointIndex: -1
+                        };
+                    }
                 }
                 break;
 
@@ -377,11 +408,7 @@ export class CanvasManager {
     }
     
     handleMouseDown(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const screenX = e.clientX - rect.left;
-        const screenY = e.clientY - rect.top;
-        const worldX = screenX - this.offsetX;
-        const worldY = screenY - this.offsetY;
+        const { worldX, worldY, screenX, screenY } = this.getEventCoordinates(e);
 
         // Store mouse down position
         this.mouseDownPos = { worldX, worldY, screenX, screenY, time: Date.now() };
@@ -412,7 +439,7 @@ export class CanvasManager {
             const pointsAtPosition = this.getPointsAtPosition(worldX, worldY);
 
             if (pointsAtPosition.length > 0) {
-                // Start dragging a point
+                // Start dragging an existing point
                 const pointIndex = pointsAtPosition.length === 1
                     ? pointsAtPosition[0]
                     : Math.max(...pointsAtPosition);
@@ -426,14 +453,10 @@ export class CanvasManager {
                 });
                 this.canvas.style.cursor = 'grabbing';
             } else {
-                // Clicking empty space - capture the current snap preview for point placement
-                const visuals = this.computeVisualState();
-                this.capturedSnapPreview = visuals.snapPreview;
-
-                // Transition to placing-point state (may become panning if dragged)
-                this.transitionState('placing-point', {
-                    startOffsetX: this.offsetX,
-                    startOffsetY: this.offsetY
+                // Clicking empty space - start dragging a new point (with snapping)
+                this.transitionState('dragging-new-point', {
+                    startWorldX: worldX,
+                    startWorldY: worldY
                 });
                 this.canvas.style.cursor = 'crosshair';
             }
@@ -443,11 +466,7 @@ export class CanvasManager {
     }
     
     handleMouseMove(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const screenX = e.clientX - rect.left;
-        const screenY = e.clientY - rect.top;
-        const worldX = screenX - this.offsetX;
-        const worldY = screenY - this.offsetY;
+        const { worldX, worldY, screenX, screenY } = this.getEventCoordinates(e);
 
         // Update current mouse position for visual derivation
         this.currentMousePos = { worldX, worldY, screenX, screenY };
@@ -491,6 +510,11 @@ export class CanvasManager {
                 this.draw();
                 break;
 
+            case 'dragging-new-point':
+                // Just redraw - computeVisualState will create ghost preview
+                this.draw();
+                break;
+
             case 'drawing-line':
                 // Just redraw to update preview line
                 this.draw();
@@ -508,11 +532,7 @@ export class CanvasManager {
     }
     
     handleMouseUp(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const screenX = e.clientX - rect.left;
-        const screenY = e.clientY - rect.top;
-        const worldX = screenX - this.offsetX;
-        const worldY = screenY - this.offsetY;
+        const { worldX, worldY, screenX, screenY } = this.getEventCoordinates(e);
 
         const state = this.interactionState;
 
@@ -525,7 +545,14 @@ export class CanvasManager {
 
         switch (state.type) {
             case 'drawing-line':
-                if (!isClick) {
+                // Use same threshold as line preview - need sufficient drag to create line
+                const dragDistance = this.mouseDownPos ? Math.hypot(
+                    screenX - this.mouseDownPos.screenX,
+                    screenY - this.mouseDownPos.screenY
+                ) : 0;
+                const linePreviewThreshold = Math.max(15, this.clickThreshold * 2);
+
+                if (dragDistance > linePreviewThreshold) {
                     // Get visual state to check for endpoint snap
                     const visuals = this.computeVisualState();
 
@@ -601,7 +628,7 @@ export class CanvasManager {
 
                                 // Update intersectionIndex if now on 2+ lines
                                 if (point.onLines.length >= 2) {
-                                    point.intersectionIndex = this.findIntersectionByLines(point.onLines);
+                                    point.intersectionIndex = findIntersectionByLines(point.onLines, this.intersections);
                                 } else {
                                     point.intersectionIndex = null;
                                 }
@@ -613,7 +640,7 @@ export class CanvasManager {
 
                                 // Update intersectionIndex if now on 2+ lines
                                 if (point.onLines.length >= 2) {
-                                    point.intersectionIndex = this.findIntersectionByLines(point.onLines);
+                                    point.intersectionIndex = findIntersectionByLines(point.onLines, this.intersections);
                                     // Snap to intersection position
                                     if (point.intersectionIndex !== null) {
                                         const intersection = this.intersections[point.intersectionIndex];
@@ -633,6 +660,47 @@ export class CanvasManager {
 
                     if (this.onStateChange) {
                         this.onStateChange();
+                    }
+                }
+                break;
+
+            case 'dragging-new-point':
+                // Check if this was a click (no drag) or actual drag
+                if (isClick) {
+                    // Quick tap - create point at initial position with snap
+                    const snapPreview = this.snapManager.updateSnapPreview(
+                        state.data.startWorldX,
+                        state.data.startWorldY,
+                        this.intersections,
+                        this.lines,
+                        this.points,
+                        this.scale
+                    );
+
+                    if (snapPreview) {
+                        this.addPointWithSnap(snapPreview);
+                    } else {
+                        const pointsAtPosition = this.getPointsAtPosition(state.data.startWorldX, state.data.startWorldY);
+                        if (pointsAtPosition.length === 0) {
+                            this.addPoint(state.data.startWorldX, state.data.startWorldY, [], false);
+                        }
+                    }
+                } else {
+                    // Dragged - create point at final ghost position
+                    const visuals = this.computeVisualState();
+
+                    if (visuals.ghostPoint) {
+                        // Create point at ghost position
+                        if (visuals.snapPreview) {
+                            // Snapped to something, use addPointWithSnap
+                            this.addPointWithSnap(visuals.snapPreview);
+                        } else {
+                            // Not snapped, create point at ghost position
+                            const pointsAtPosition = this.getPointsAtPosition(visuals.ghostPoint.x, visuals.ghostPoint.y);
+                            if (pointsAtPosition.length === 0) {
+                                this.addPoint(visuals.ghostPoint.x, visuals.ghostPoint.y, [], false);
+                            }
+                        }
                     }
                 }
                 break;
@@ -668,19 +736,120 @@ export class CanvasManager {
             this.draw();
         }
     }
+
+    handleWheel(e) {
+        e.preventDefault();
+
+        const rect = this.canvas.getBoundingClientRect();
+        const screenX = e.clientX - rect.left;
+        const screenY = e.clientY - rect.top;
+
+        // Zoom in or out based on wheel delta
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        this.zoomAt(screenX, screenY, delta);
+    }
+
+    handleTouchStart(e) {
+        e.preventDefault();
+
+        // Two-finger gesture (pan/zoom)
+        if (e.touches.length === 2) {
+            const gestureInfo = this.getTouchGestureInfo(e.touches);
+            this.transitionState('two-finger-gesture', {
+                startOffsetX: this.offsetX,
+                startOffsetY: this.offsetY,
+                startScale: this.scale,
+                initialDistance: gestureInfo.distance,
+                initialCenterX: gestureInfo.centerX,
+                initialCenterY: gestureInfo.centerY
+            });
+            return;
+        }
+
+        // Single touch - treat as mouse down
+        if (e.touches.length === 1) {
+            this.handleMouseDown(e);
+        }
+    }
+
+    handleTouchMove(e) {
+        e.preventDefault();
+
+        // Two-finger gesture (pan/zoom)
+        if (e.touches.length === 2 && this.interactionState.type === 'two-finger-gesture') {
+            const gestureInfo = this.getTouchGestureInfo(e.touches);
+            const state = this.interactionState.data;
+
+            // Calculate zoom scale factor from distance ratio (with damping)
+            const distanceRatio = gestureInfo.distance / state.initialDistance;
+            const zoomSensitivity = 0.6; // Damping factor (0-1, lower = less sensitive)
+            const scaleFactor = 1 + (distanceRatio - 1) * zoomSensitivity;
+            const targetScale = state.startScale * scaleFactor;
+            const newScale = Math.max(this.minScale, Math.min(this.maxScale, targetScale));
+
+            // Calculate world position at initial center (this should stay fixed during zoom)
+            const worldX = (state.initialCenterX - state.startOffsetX) / state.startScale;
+            const worldY = (state.initialCenterY - state.startOffsetY) / state.startScale;
+
+            // Calculate new offset for zoom (keeps world point under initial center)
+            const newOffsetX = state.initialCenterX - worldX * newScale;
+            const newOffsetY = state.initialCenterY - worldY * newScale;
+
+            // Add pan from center movement
+            const panDx = gestureInfo.centerX - state.initialCenterX;
+            const panDy = gestureInfo.centerY - state.initialCenterY;
+
+            // Apply combined transform
+            this.scale = newScale;
+            this.offsetX = newOffsetX + panDx;
+            this.offsetY = newOffsetY + panDy;
+
+            this.draw();
+            return;
+        }
+
+        // Single touch - treat as mouse move
+        if (e.touches.length === 1) {
+            this.handleMouseMove(e);
+        }
+    }
+
+    handleTouchEnd(e) {
+        e.preventDefault();
+
+        // End of two-finger gesture
+        if (this.interactionState.type === 'two-finger-gesture') {
+            this.transitionState('idle');
+            this.canvas.style.cursor = 'crosshair';
+            this.draw();
+            return;
+        }
+
+        // Single touch - treat as mouse up
+        this.handleMouseUp(e);
+    }
+
+    handleTouchCancel(e) {
+        e.preventDefault();
+
+        // Treat as mouse leave
+        this.handleMouseLeave(e);
+    }
     
     getPointsAtPosition(worldX, worldY, threshold = null) {
-        const checkThreshold = threshold || this.pointRadius + 5;
+        // Convert screen-space threshold to world-space (uses pointRadius + 5 as screen pixels)
+        const screenThreshold = threshold || (this.pointRadius + 5);
+        const worldThreshold = screenThreshold / this.scale;
         const indices = [];
 
         for (let i = 0; i < this.points.length; i++) {
             const point = this.points[i];
-            const pos = this.getPointPosition(point);
+            const pos = getPointPosition(point, this.intersections);
             const dx = pos.x - worldX;
             const dy = pos.y - worldY;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (distance <= checkThreshold) {
+            if (distance <= worldThreshold) {
                 indices.push(i);
             }
         }
@@ -691,7 +860,7 @@ export class CanvasManager {
     addPoint(x, y, onLines = [], isIntersection = false, intersectionIndex = null) {
         // If on 2+ lines and no intersection index provided, find it
         if (onLines.length >= 2 && intersectionIndex === null) {
-            intersectionIndex = this.findIntersectionByLines(onLines);
+            intersectionIndex = findIntersectionByLines(onLines, this.intersections);
         }
 
         // If on 2+ lines, must reference an intersection
@@ -739,16 +908,38 @@ export class CanvasManager {
                 false,
                 null
             );
+        } else if (snapPreview.type === 'point') {
+            // Snapping to existing point - create new point at same location (multipoint)
+            const targetPoint = this.points[snapPreview.pointIndex];
+            this.addPoint(
+                snapPreview.x,
+                snapPreview.y,
+                [...targetPoint.onLines],
+                targetPoint.isIntersection,
+                targetPoint.intersectionIndex
+            );
         }
     }
     
     addLine(startX, startY, endX, endY, startPointIndices = null, endPointIndices = null) {
-        // Store line as angle and point (infinite line representation)
-        const dx = endX - startX;
-        const dy = endY - startY;
+        // If we're creating a line through existing points, use their actual positions
+        // to ensure the line passes through them exactly (avoid snap artifacts)
+        let actualStartX = startX;
+        let actualStartY = startY;
+
+        if (startPointIndices && startPointIndices.length > 0) {
+            const startPoint = this.points[startPointIndices[0]];
+            const startPos = getPointPosition(startPoint, this.intersections);
+            actualStartX = startPos.x;
+            actualStartY = startPos.y;
+        }
+
+        // Calculate angle from actual positions
+        const dx = endX - actualStartX;
+        const dy = endY - actualStartY;
         const angle = Math.atan2(dy, dx);
 
-        this.lines.push({ x: startX, y: startY, angle });
+        this.lines.push({ x: actualStartX, y: actualStartY, angle });
         const newLineIndex = this.lines.length - 1;
 
         // Collect all point indices to add to the line
@@ -770,20 +961,19 @@ export class CanvasManager {
         });
 
         // Recompute all intersections FIRST
-        this.computeIntersections();
+        this.intersections = computeIntersections(this.lines, this.points);
 
         // Update intersection references for points on 2+ lines
+        // BUT don't move points that were part of this line creation (they're already positioned correctly)
         allPointIndices.forEach(pointIndex => {
             const point = this.points[pointIndex];
             if (point.onLines.length >= 2) {
                 // Find the intersection for this point's lines
-                const intersectionIndex = this.findIntersectionByLines(point.onLines);
+                const intersectionIndex = findIntersectionByLines(point.onLines, this.intersections);
                 if (intersectionIndex !== null) {
                     point.intersectionIndex = intersectionIndex;
-                    // Update position to match intersection
-                    const intersection = this.intersections[intersectionIndex];
-                    point.x = intersection.x;
-                    point.y = intersection.y;
+                    // DON'T update position - the line was created through this point's current position
+                    // Moving it would cause a visual "snap"
                 }
             }
         });
@@ -823,23 +1013,26 @@ export class CanvasManager {
         // Derive visual state from current conditions
         const visuals = this.computeVisualState();
 
-        // Clear canvas
+        // Clear canvas (before transform)
         this.renderer.clear();
 
         // Save context state
         this.ctx.save();
 
-        // Apply pan transformation
+        // Apply pan and scale transformation
         this.ctx.translate(this.offsetX, this.offsetY);
+        this.ctx.scale(this.scale, this.scale);
 
-        // Draw grid dots
-        this.renderer.drawGridDots(this.offsetX, this.offsetY);
+        // Get viewport bounds for renderer (in world space)
+        const viewportBounds = this.getViewportBounds();
 
-        // Draw lines with computed highlights
+        // Draw grid dots in world space
+        this.renderer.drawGridDots(viewportBounds);
+
+        // Draw lines with computed highlights in world space
         this.renderer.drawLines(
             this.lines,
-            this.offsetX,
-            this.offsetY,
+            viewportBounds,
             visuals.snapPreview,
             this.intersections,
             visuals.highlightedLines
@@ -852,8 +1045,7 @@ export class CanvasManager {
                 visuals.previewLine.startY,
                 visuals.previewLine.endX,
                 visuals.previewLine.endY,
-                this.offsetX,
-                this.offsetY
+                viewportBounds
             );
         }
 
@@ -889,66 +1081,11 @@ export class CanvasManager {
             this.points,
             visuals.highlightedPoints,
             visuals.ghostPoint?.pointIndex,
-            (point) => this.getPointPosition(point)
+            (point) => getPointPosition(point, this.intersections)
         );
 
         // Restore context state
         this.ctx.restore();
-    }
-    
-    computeIntersections() {
-        const pairwiseIntersections = computeAllIntersections(this.lines);
-
-        // Cluster intersections by location to form multi-intersections
-        const clusterThreshold = 0.1; // Points within this distance are same location
-        const clusters = [];
-
-        for (const intersection of pairwiseIntersections) {
-            // Find existing cluster at this location
-            let cluster = clusters.find(c =>
-                Math.hypot(c.x - intersection.x, c.y - intersection.y) < clusterThreshold
-            );
-
-            if (cluster) {
-                // Add lines to existing cluster
-                intersection.lineIndices.forEach(lineIdx => {
-                    if (!cluster.lineIndices.includes(lineIdx)) {
-                        cluster.lineIndices.push(lineIdx);
-                    }
-                });
-            } else {
-                // Create new cluster
-                clusters.push({
-                    x: intersection.x,
-                    y: intersection.y,
-                    lineIndices: [...intersection.lineIndices]
-                });
-            }
-        }
-
-        this.intersections = clusters;
-
-        // Update all points' intersectionIndex references (they may have changed)
-        this.points.forEach(point => {
-            if (point.onLines.length >= 2) {
-                const newIntersectionIndex = this.findIntersectionByLines(point.onLines);
-                if (newIntersectionIndex !== null) {
-                    point.intersectionIndex = newIntersectionIndex;
-                    // Update position to match intersection
-                    const intersection = this.intersections[newIntersectionIndex];
-                    point.x = intersection.x;
-                    point.y = intersection.y;
-                } else {
-                    // Intersection not found - should not happen, but handle gracefully
-                    console.warn('Point on 2+ lines but intersection not found:', point.onLines);
-                    point.intersectionIndex = null;
-                }
-            } else {
-                point.intersectionIndex = null;
-            }
-        });
-
-        console.log('Computed', this.intersections.length, 'multi-intersections from', pairwiseIntersections.length, 'pairwise intersections');
     }
 
     getMatroidStats() {
@@ -1013,7 +1150,7 @@ export class CanvasManager {
         }
 
         // Recompute intersections
-        this.computeIntersections();
+        this.intersections = computeIntersections(this.lines, this.points);
 
         console.log('Removed', linesToRemove.size, 'non-essential lines');
         this.draw();

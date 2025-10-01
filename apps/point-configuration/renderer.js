@@ -19,20 +19,19 @@ export class Renderer {
     }
 
     /**
-     * Draws grid dots
-     * @param {number} offsetX - Pan offset X
-     * @param {number} offsetY - Pan offset Y
+     * Draws grid dots in world space
+     * @param {Object} viewportBounds - Viewport bounds in world coordinates {left, right, top, bottom}
      */
-    drawGridDots(offsetX, offsetY) {
+    drawGridDots(viewportBounds) {
         const borderColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--border').trim();
 
         this.ctx.fillStyle = borderColor;
 
-        const startX = Math.floor(-offsetX / this.gridSize) * this.gridSize;
-        const endX = Math.ceil((this.canvas.width - offsetX) / this.gridSize) * this.gridSize;
-        const startY = Math.floor(-offsetY / this.gridSize) * this.gridSize;
-        const endY = Math.ceil((this.canvas.height - offsetY) / this.gridSize) * this.gridSize;
+        const startX = Math.floor(viewportBounds.left / this.gridSize) * this.gridSize;
+        const endX = Math.ceil(viewportBounds.right / this.gridSize) * this.gridSize;
+        const startY = Math.floor(viewportBounds.top / this.gridSize) * this.gridSize;
+        const endY = Math.ceil(viewportBounds.bottom / this.gridSize) * this.gridSize;
 
         for (let x = startX; x <= endX; x += this.gridSize) {
             for (let y = startY; y <= endY; y += this.gridSize) {
@@ -139,15 +138,14 @@ export class Renderer {
     }
 
     /**
-     * Draws all lines
+     * Draws all lines in world space
      * @param {Array} lines - Array of line objects
-     * @param {number} offsetX - Pan offset X
-     * @param {number} offsetY - Pan offset Y
+     * @param {Object} viewportBounds - Viewport bounds in world coordinates
      * @param {Object|null} snapPreview - Current snap preview
      * @param {Array} intersections - Array of intersection objects
      * @param {Set} highlightedLines - Set of line indices to highlight
      */
-    drawLines(lines, offsetX, offsetY, snapPreview = null, intersections = [], highlightedLines = new Set()) {
+    drawLines(lines, viewportBounds, snapPreview = null, intersections = [], highlightedLines = new Set()) {
         const fgColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--fg-primary').trim();
 
@@ -158,8 +156,8 @@ export class Renderer {
             this.ctx.strokeStyle = shouldHighlight ? '#f9a826' : '#957fef';
             this.ctx.lineWidth = shouldHighlight ? 2.1 : 1.4;
 
-            // Calculate line endpoints that extend to canvas boundaries
-            const bounds = this.getCanvasBounds(offsetX, offsetY);
+            // Calculate line endpoints that extend to viewport boundaries (in world space)
+            const bounds = this.getWorldBounds(viewportBounds);
             const endpoints = getLineEndpoints(line.x, line.y, line.angle, bounds);
 
             if (!endpoints) return;
@@ -172,21 +170,20 @@ export class Renderer {
     }
 
     /**
-     * Draws a preview line while drawing
-     * @param {number} startX - Line start X
-     * @param {number} startY - Line start Y
-     * @param {number} currentX - Current mouse X
-     * @param {number} currentY - Current mouse Y
-     * @param {number} offsetX - Pan offset X
-     * @param {number} offsetY - Pan offset Y
+     * Draws a preview line while drawing in world space
+     * @param {number} startX - Line start X (world)
+     * @param {number} startY - Line start Y (world)
+     * @param {number} currentX - Current mouse X (world)
+     * @param {number} currentY - Current mouse Y (world)
+     * @param {Object} viewportBounds - Viewport bounds in world coordinates
      */
-    drawPreviewLine(startX, startY, currentX, currentY, offsetX, offsetY) {
+    drawPreviewLine(startX, startY, currentX, currentY, viewportBounds) {
         // Calculate angle from start to current position
         const dx = currentX - startX;
         const dy = currentY - startY;
         const angle = Math.atan2(dy, dx);
 
-        const bounds = this.getCanvasBounds(offsetX, offsetY);
+        const bounds = this.getWorldBounds(viewportBounds);
         const endpoints = getLineEndpoints(startX, startY, angle, bounds);
 
         if (!endpoints) return;
@@ -222,12 +219,14 @@ export class Renderer {
         this.ctx.fill();
         this.ctx.stroke();
 
-        // Draw label
-        this.ctx.fillStyle = fgColor;
-        this.ctx.font = '14px ui-sans-serif, system-ui, sans-serif';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'bottom';
-        this.ctx.fillText(pointIndex.toString(), x, y - (this.pointRadius + 6));
+        // Draw label (only for existing points, not new ones)
+        if (pointIndex >= 0) {
+            this.ctx.fillStyle = fgColor;
+            this.ctx.font = '14px ui-sans-serif, system-ui, sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'bottom';
+            this.ctx.fillText(pointIndex.toString(), x, y - (this.pointRadius + 6));
+        }
     }
 
     /**
@@ -303,24 +302,18 @@ export class Renderer {
     }
 
     /**
-     * Gets canvas bounds in world coordinates
-     * @param {number} offsetX - Pan offset X
-     * @param {number} offsetY - Pan offset Y
-     * @returns {Object} Bounds object {left, right, top, bottom}
+     * Gets world bounds with margin for line drawing
+     * @param {Object} viewportBounds - Viewport bounds in world coordinates
+     * @returns {Object} Bounds object {left, right, top, bottom} with margin
      */
-    getCanvasBounds(offsetX, offsetY) {
-        const left = -offsetX;
-        const right = this.canvas.width - offsetX;
-        const top = -offsetY;
-        const bottom = this.canvas.height - offsetY;
-
-        // Add margin for safety
+    getWorldBounds(viewportBounds) {
+        // Add margin for safety (lines should extend beyond viewport)
         const margin = 1000;
         return {
-            left: left - margin,
-            right: right + margin,
-            top: top - margin,
-            bottom: bottom + margin
+            left: viewportBounds.left - margin,
+            right: viewportBounds.right + margin,
+            top: viewportBounds.top - margin,
+            bottom: viewportBounds.bottom + margin
         };
     }
 }

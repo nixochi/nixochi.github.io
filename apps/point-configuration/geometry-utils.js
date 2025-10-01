@@ -149,3 +149,100 @@ export function computeAllIntersections(lines) {
 
     return intersections;
 }
+
+/**
+ * Get the actual position of a point (uses intersection if on 2+ lines)
+ * @param {Object} point - Point object
+ * @param {Array} intersections - Array of intersection objects
+ * @returns {Object} Position {x, y}
+ */
+export function getPointPosition(point, intersections) {
+    if (point.intersectionIndex !== null && point.intersectionIndex !== undefined) {
+        const intersection = intersections[point.intersectionIndex];
+        return { x: intersection.x, y: intersection.y };
+    }
+    return { x: point.x, y: point.y };
+}
+
+/**
+ * Find intersection index that matches the given lines
+ * @param {Array} lineIndices - Array of line indices to match
+ * @param {Array} intersections - Array of intersection objects
+ * @returns {number|null} Index of matching intersection or null
+ */
+export function findIntersectionByLines(lineIndices, intersections) {
+    // Find an intersection that contains all these lines
+    for (let i = 0; i < intersections.length; i++) {
+        const intersection = intersections[i];
+        const hasAllLines = lineIndices.every(lineIdx =>
+            intersection.lineIndices.includes(lineIdx)
+        );
+        if (hasAllLines) {
+            return i;
+        }
+    }
+    return null;
+}
+
+/**
+ * Computes and clusters all line intersections into multi-intersections
+ * @param {Array} lines - Array of line objects {x, y, angle}
+ * @param {Array} points - Array of point objects (for updating references)
+ * @returns {Array} Array of clustered intersection objects {x, y, lineIndices: [...]}
+ */
+export function computeIntersections(lines, points) {
+    const pairwiseIntersections = computeAllIntersections(lines);
+
+    // Cluster intersections by location to form multi-intersections
+    const clusterThreshold = 0.1; // Points within this distance are same location
+    const clusters = [];
+
+    for (const intersection of pairwiseIntersections) {
+        // Find existing cluster at this location
+        let cluster = clusters.find(c =>
+            Math.hypot(c.x - intersection.x, c.y - intersection.y) < clusterThreshold
+        );
+
+        if (cluster) {
+            // Add lines to existing cluster
+            intersection.lineIndices.forEach(lineIdx => {
+                if (!cluster.lineIndices.includes(lineIdx)) {
+                    cluster.lineIndices.push(lineIdx);
+                }
+            });
+        } else {
+            // Create new cluster
+            clusters.push({
+                x: intersection.x,
+                y: intersection.y,
+                lineIndices: [...intersection.lineIndices]
+            });
+        }
+    }
+
+    const intersections = clusters;
+
+    // Update all points' intersectionIndex references (they may have changed)
+    points.forEach(point => {
+        if (point.onLines.length >= 2) {
+            const newIntersectionIndex = findIntersectionByLines(point.onLines, intersections);
+            if (newIntersectionIndex !== null) {
+                point.intersectionIndex = newIntersectionIndex;
+                // Update position to match intersection
+                const intersection = intersections[newIntersectionIndex];
+                point.x = intersection.x;
+                point.y = intersection.y;
+            } else {
+                // Intersection not found - should not happen, but handle gracefully
+                console.warn('Point on 2+ lines but intersection not found:', point.onLines);
+                point.intersectionIndex = null;
+            }
+        } else {
+            point.intersectionIndex = null;
+        }
+    });
+
+    console.log('Computed', intersections.length, 'multi-intersections from', pairwiseIntersections.length, 'pairwise intersections');
+
+    return intersections;
+}

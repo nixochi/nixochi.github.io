@@ -77,19 +77,6 @@ body {
     cursor: crosshair;
 }
 
-/* Controls Panel - Top Left */
-.controls-panel {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    background: var(--backdrop-blur);
-    backdrop-filter: blur(16px);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    padding: 8px 12px;
-    z-index: 1000;
-}
 
 /* Floating action buttons - Top Right */
 #cleanBtn {
@@ -112,19 +99,6 @@ body {
     z-index: 1000;
 }
 
-.control-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
-}
-
-.control-label {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--fg-primary);
-    margin-right: 2px;
-}
 
 .control-button {
     padding: 6px 12px;
@@ -150,12 +124,17 @@ body {
 
 /* Shadcn-style switch */
 .mode-switch {
+    position: absolute;
+    top: 20px;
+    left: 20px;
     display: inline-flex;
-    background: var(--bg-secondary);
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 2px;
-    position: relative;
+    box-shadow: var(--shadow);
+    z-index: 1000;
 }
 
 .mode-switch-option {
@@ -177,7 +156,7 @@ body {
 
 .mode-switch-indicator {
     position: absolute;
-    background: color-mix(in srgb, var(--fg-primary) 8%, var(--bg-secondary));
+    background: color-mix(in srgb, var(--bg-secondary) 70%, var(--fg-primary) 30%);
     border-radius: 6px;
     transition: transform 0.2s ease, width 0.2s ease;
     height: calc(100% - 4px);
@@ -337,16 +316,11 @@ body {
         <div class="canvas-container">
             <canvas id="canvas"></canvas>
             
-            <!-- Controls Panel (Always visible) -->
-            <div class="controls-panel">
-                <div class="control-row">
-                    <span class="control-label">input:</span>
-                    <div class="mode-switch" id="modeSwitch">
-                        <div class="mode-switch-indicator" id="switchIndicator"></div>
-                        <button class="mode-switch-option active" id="pointBtn">point</button>
-                        <button class="mode-switch-option" id="lineBtn">line</button>
-                    </div>
-                </div>
+            <!-- Input Mode Switch -->
+            <div class="mode-switch" id="modeSwitch">
+                <div class="mode-switch-indicator" id="switchIndicator"></div>
+                <button class="mode-switch-option active" id="pointBtn">point</button>
+                <button class="mode-switch-option" id="lineBtn">line</button>
             </div>
 
             <!-- Add Intersections Button -->

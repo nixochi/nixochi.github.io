@@ -82,6 +82,9 @@ export class CanvasManager {
         this.mode = mode;
         this.eventHandler.setMode(mode);
         this.stateManager.canvasHoveredPointIndices = null;
+        this.stateManager.currentMousePos = null;
+        this.stateManager.mouseDownPos = null;
+        this.stateManager.capturedSnapPreview = null;
         this.stateManager.transitionState('idle');
         this.canvas.style.cursor = 'crosshair';
         this.draw();

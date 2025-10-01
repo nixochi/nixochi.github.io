@@ -57,17 +57,28 @@ export class EventHandler {
         this.stateManager.hoveredPointIndices = null;
 
         if (this.mode === 'line') {
-            // Check if starting from a hovered multipoint
+            // Check if starting from or near a point
             let startX = worldX;
             let startY = worldY;
             let startPointIndices = null;
 
+            // First check if we already have hovered point indices (from mouse move)
             if (this.stateManager.canvasHoveredPointIndices) {
                 // Use the first point's position (all points in multipoint are at same location)
                 const hoveredPoint = this.pointLineManager.points[this.stateManager.canvasHoveredPointIndices[0]];
                 startX = hoveredPoint.x;
                 startY = hoveredPoint.y;
                 startPointIndices = [...this.stateManager.canvasHoveredPointIndices];
+            } else {
+                // Check if clicking near a point (snap to it)
+                const pointsAtPosition = this.pointLineManager.getPointsAtPosition(worldX, worldY);
+                if (pointsAtPosition.length > 0) {
+                    // Use the first point's position (all points in multipoint are at same location)
+                    const nearbyPoint = this.pointLineManager.points[pointsAtPosition[0]];
+                    startX = nearbyPoint.x;
+                    startY = nearbyPoint.y;
+                    startPointIndices = [...pointsAtPosition];
+                }
             }
 
             // Transition to drawing-line state

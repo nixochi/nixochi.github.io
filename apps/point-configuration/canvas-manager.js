@@ -603,4 +603,59 @@ export class CanvasManager {
             flats: matroid.getAllFlats()
         };
     }
+
+    removeNonEssentialLines() {
+        // Count points on each line
+        const pointsPerLine = new Array(this.lines.length).fill(0);
+
+        for (const point of this.points) {
+            for (const lineIndex of point.onLines) {
+                pointsPerLine[lineIndex]++;
+            }
+        }
+
+        // Find lines with fewer than 3 points
+        const linesToRemove = new Set();
+        for (let i = 0; i < this.lines.length; i++) {
+            if (pointsPerLine[i] < 3) {
+                linesToRemove.add(i);
+            }
+        }
+
+        if (linesToRemove.size === 0) {
+            console.log('No non-essential lines to remove');
+            return;
+        }
+
+        // Create index mapping (old index -> new index)
+        const indexMap = new Map();
+        let newIndex = 0;
+        for (let i = 0; i < this.lines.length; i++) {
+            if (!linesToRemove.has(i)) {
+                indexMap.set(i, newIndex);
+                newIndex++;
+            }
+        }
+
+        // Remove lines
+        this.lines = this.lines.filter((_, i) => !linesToRemove.has(i));
+
+        // Update point line memberships
+        for (const point of this.points) {
+            point.onLines = point.onLines
+                .filter(lineIndex => !linesToRemove.has(lineIndex))
+                .map(lineIndex => indexMap.get(lineIndex));
+            point.isIntersection = point.onLines.length > 1;
+        }
+
+        // Recompute intersections
+        this.computeIntersections();
+
+        console.log('Removed', linesToRemove.size, 'non-essential lines');
+        this.draw();
+
+        if (this.onStateChange) {
+            this.onStateChange();
+        }
+    }
 }

@@ -40,21 +40,26 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        html, body {
+            height: 100vh;
+            height: 100svh;
+            overflow: hidden;
+            touch-action: none;
+            -ms-touch-action: none;
+        }
+
         body {
             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg-primary);
             color: var(--fg-primary);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
-            overflow: hidden;
-            height: 100vh;
-            touch-action: none;
-            -ms-touch-action: none;
         }
 
         .container {
             display: flex;
             height: 100vh;
+            height: 100svh;
         }
 
         /* Canvas Area - Left Side */
@@ -85,6 +90,17 @@
             z-index: 1000;
         }
 
+        /* Floating action button - Top Right */
+        #cleanBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--backdrop-blur);
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow);
+            z-index: 1000;
+        }
+
         .control-row {
             display: flex;
             align-items: center;
@@ -99,7 +115,7 @@
             margin-right: 2px;
         }
 
-        .mode-button {
+        .control-button {
             padding: 6px 12px;
             border: 1px solid var(--border);
             background: var(--bg-secondary);
@@ -111,15 +127,52 @@
             transition: all 0.2s ease;
         }
 
-        .mode-button:hover {
+        .control-button:hover {
             background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
             border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+            color: var(--fg-primary);
         }
 
-        .mode-button.active {
-            background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
-            color: var(--bg-secondary);
-            border-color: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+        .control-button:active {
+            background: color-mix(in srgb, var(--bg-secondary) 40%, var(--border) 60%);
+        }
+
+        /* Shadcn-style switch */
+        .mode-switch {
+            display: inline-flex;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2px;
+            position: relative;
+        }
+
+        .mode-switch-option {
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--fg-secondary);
+            cursor: pointer;
+            transition: color 0.2s ease;
+            position: relative;
+            z-index: 1;
+            border: none;
+            background: transparent;
+        }
+
+        .mode-switch-option.active {
+            color: var(--fg-primary);
+        }
+
+        .mode-switch-indicator {
+            position: absolute;
+            background: color-mix(in srgb, var(--fg-primary) 8%, var(--bg-secondary));
+            border-radius: 6px;
+            transition: transform 0.2s ease, width 0.2s ease;
+            height: calc(100% - 4px);
+            top: 2px;
+            left: 2px;
+            z-index: 0;
         }
 
         /* Controls Toggle Button */
@@ -277,10 +330,16 @@
             <div class="controls-panel">
                 <div class="control-row">
                     <span class="control-label">input:</span>
-                    <button class="mode-button active" id="pointBtn">point</button>
-                    <button class="mode-button" id="lineBtn">line</button>
+                    <div class="mode-switch" id="modeSwitch">
+                        <div class="mode-switch-indicator" id="switchIndicator"></div>
+                        <button class="mode-switch-option active" id="pointBtn">point</button>
+                        <button class="mode-switch-option" id="lineBtn">line</button>
+                    </div>
                 </div>
             </div>
+
+            <!-- Clean Button (Top Right) -->
+            <button class="control-button" id="cleanBtn" title="removes lines that do not affect the matroid structure">clean</button>
         </div>
 
         <!-- Right Panel -->
@@ -315,20 +374,40 @@
         const canvas = document.getElementById('canvas');
         const canvasManager = new CanvasManager(canvas);
 
-        // Mode buttons
+        // Mode switch
         const pointBtn = document.getElementById('pointBtn');
         const lineBtn = document.getElementById('lineBtn');
+        const switchIndicator = document.getElementById('switchIndicator');
+
+        function updateSwitchIndicator(activeBtn) {
+            const btnRect = activeBtn.getBoundingClientRect();
+            const switchRect = activeBtn.parentElement.getBoundingClientRect();
+            const offset = btnRect.left - switchRect.left - 2;
+            switchIndicator.style.width = `${btnRect.width}px`;
+            switchIndicator.style.transform = `translateX(${offset}px)`;
+        }
+
+        // Initialize indicator position
+        updateSwitchIndicator(pointBtn);
 
         pointBtn.addEventListener('click', () => {
             canvasManager.setMode('point');
             pointBtn.classList.add('active');
             lineBtn.classList.remove('active');
+            updateSwitchIndicator(pointBtn);
         });
 
         lineBtn.addEventListener('click', () => {
             canvasManager.setMode('line');
             lineBtn.classList.add('active');
             pointBtn.classList.remove('active');
+            updateSwitchIndicator(lineBtn);
+        });
+
+        // Clean button
+        const cleanBtn = document.getElementById('cleanBtn');
+        cleanBtn.addEventListener('click', () => {
+            canvasManager.removeNonEssentialLines();
         });
 
         // Stats panel

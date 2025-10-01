@@ -52,6 +52,18 @@ export class PointLineMatroid {
     }
     
     /**
+     * Check if two points are at the same position
+     * @param {number} i - First point index
+     * @param {number} j - Second point index
+     * @returns {boolean} True if points are at same position
+     */
+    _areAtSamePosition(i, j) {
+        const p1 = this.points[i];
+        const p2 = this.points[j];
+        return Math.abs(p1.x - p2.x) < 0.01 && Math.abs(p1.y - p2.y) < 0.01;
+    }
+    
+    /**
      * Check if a set of points are all collinear (lie on a single line)
      * @param {Array} pointIndices - Array of point indices
      * @returns {boolean} True if all points lie on a common line
@@ -83,9 +95,7 @@ export class PointLineMatroid {
         // Check for multipoints (any two points at same position = dependent)
         for (let i = 0; i < pointIndices.length; i++) {
             for (let j = i + 1; j < pointIndices.length; j++) {
-                const p1 = this.points[pointIndices[i]];
-                const p2 = this.points[pointIndices[j]];
-                if (Math.abs(p1.x - p2.x) < 0.01 && Math.abs(p1.y - p2.y) < 0.01) {
+                if (this._areAtSamePosition(pointIndices[i], pointIndices[j])) {
                     return false; // Multipoint = dependent
                 }
             }
@@ -170,6 +180,29 @@ export class PointLineMatroid {
     }
     
     /**
+     * Find all points collinear with a given pair of points
+     * @param {number} i - First point index
+     * @param {number} j - Second point index
+     * @returns {Array} All points collinear with i and j (including i and j)
+     */
+    _findCollinearPoints(i, j) {
+        // Start with the pair
+        const collinearSet = new Set([i, j]);
+        
+        // Check each explicit line
+        for (let lineIndex = 0; lineIndex < this.lines.length; lineIndex++) {
+            const pointsOnLine = this._pointsOnLine(lineIndex);
+            
+            // If both i and j are on this line, add all points on this line
+            if (pointsOnLine.includes(i) && pointsOnLine.includes(j)) {
+                pointsOnLine.forEach(p => collinearSet.add(p));
+            }
+        }
+        
+        return Array.from(collinearSet).sort((a, b) => a - b);
+    }
+    
+    /**
      * Compute the closure of a set of points
      * @param {Array} pointIndices - Array of point indices
      * @returns {Array} Closure (all points in the span)
@@ -251,9 +284,7 @@ export class PointLineMatroid {
                     // Check if any two points in the triple are at the same position
                     for (let i = 0; i < 3; i++) {
                         for (let j = i + 1; j < 3; j++) {
-                            const p1 = this.points[triple[i]];
-                            const p2 = this.points[triple[j]];
-                            if (Math.abs(p1.x - p2.x) < 0.01 && Math.abs(p1.y - p2.y) < 0.01) {
+                            if (this._areAtSamePosition(triple[i], triple[j])) {
                                 hasMultipoint = true;
                                 break;
                             }
@@ -309,7 +340,7 @@ export class PointLineMatroid {
         const flats = [];
         const seen = new Set();
         
-        // Rank 0: empty set
+        // Rank 0: empty set (always a flat)
         flats.push([]);
         seen.add('');
         
@@ -319,21 +350,64 @@ export class PointLineMatroid {
             seen.add(i.toString());
         }
         
-        // Rank 2: all lines (sets of collinear points)
-        for (let lineIndex = 0; lineIndex < this.lines.length; lineIndex++) {
-            const pointsOnLine = this._pointsOnLine(lineIndex);
-            if (pointsOnLine.length >= 2) {
-                const sorted = [...pointsOnLine].sort((a, b) => a - b);
-                const key = sorted.join(',');
+        // Base case handling for special configurations
+        if (this.points.length === 0) {
+            // No points: only empty set
+            return flats;
+        }
+        
+        if (this.points.length === 1) {
+            // One point: empty set and that point
+            return flats;
+        }
+        
+        // Check if all points are at the same position (all multipoints)
+        let allAtSamePosition = true;
+        for (let i = 1; i < this.points.length; i++) {
+            if (!this._areAtSamePosition(0, i)) {
+                allAtSamePosition = false;
+                break;
+            }
+        }
+        
+        if (allAtSamePosition) {
+            // All points at same position: no rank-2 flats, but entire set is rank-1 flat
+            // Actually, the entire set has rank 1 (all dependent), so it's a rank-1 flat
+            flats.push([...this.groundSet].sort((a, b) => a - b));
+            return flats;
+        }
+        
+        // Check if all points are collinear (on explicit lines)
+        const allCollinear = this.areCollinear(this.groundSet);
+        
+        if (allCollinear) {
+            // All points on one line: the entire set is a rank-2 flat
+            flats.push([...this.groundSet].sort((a, b) => a - b));
+            return flats;
+        }
+        
+        // General case: Rank 2 flats from pairs of points
+        for (let i = 0; i < this.points.length; i++) {
+            for (let j = i + 1; j < this.points.length; j++) {
+                // Skip multipoints (they're rank-1, not rank-2)
+                if (this._areAtSamePosition(i, j)) {
+                    continue;
+                }
+                
+                // Find all points collinear with i and j
+                const collinearPoints = this._findCollinearPoints(i, j);
+                
+                // Add as a flat (with deduplication)
+                const key = collinearPoints.join(',');
                 if (!seen.has(key)) {
                     seen.add(key);
-                    flats.push(sorted);
+                    flats.push(collinearPoints);
                 }
             }
         }
         
-        // Rank 3: the entire ground set (all points)
-        if (this.groundSet.length > 0) {
+        // Rank 3: the entire ground set (all points) - only if rank is actually 3
+        if (this.rank === 3 && this.groundSet.length > 0) {
             const sorted = [...this.groundSet].sort((a, b) => a - b);
             const key = sorted.join(',');
             if (!seen.has(key)) {

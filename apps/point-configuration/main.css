@@ -1,10 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Point-Line Configuration</title>
-    <style>
 /* CSS Variables for theming */
 :root {
     --bg-primary: #fafafa;
@@ -329,58 +322,3 @@ body {
         border-top: 1px solid var(--border);
     }
 }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Canvas Container -->
-        <div class="canvas-container">
-            <canvas id="canvas"></canvas>
-            
-            <!-- Controls Panel (Always visible) -->
-            <div class="controls-panel">
-                <div class="control-row">
-                    <span class="control-label">input:</span>
-                    <div class="mode-switch" id="modeSwitch">
-                        <div class="mode-switch-indicator" id="switchIndicator"></div>
-                        <button class="mode-switch-option active" id="pointBtn">point</button>
-                        <button class="mode-switch-option" id="lineBtn">line</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Add Intersections Button -->
-            <button class="control-button" id="addIntersectionsBtn" title="adds points at all intersections in viewport">add intersections</button>
-
-            <!-- Clean Button (Top Right) -->
-            <button class="control-button" id="cleanBtn" title="removes lines that do not affect the matroid structure">clean</button>
-        </div>
-
-        <!-- Right Panel -->
-        <div class="right-panel">
-            <div class="panel-header">
-                <span class="panel-title">stats</span>
-                <div class="dropdown-container">
-                    <button class="dropdown-trigger" id="dropdownTrigger">
-                        <span id="dropdownLabel">general</span>
-                        <div class="dropdown-arrow"></div>
-                    </button>
-                    <div class="dropdown-content" id="dropdownContent">
-                        <button class="dropdown-item active" data-value="general">general</button>
-                        <button class="dropdown-item" data-value="bases">bases</button>
-                        <button class="dropdown-item" data-value="flats">flats</button>
-                        <button class="dropdown-item" data-value="circuits">circuits</button>
-                    </div>
-                </div>
-            </div>
-            <div class="panel-content" id="panelContent">
-                <div class="empty-state">
-                    add points and lines to see matroid properties
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script type="module" src="./src/app.js"></script>
-</body>
-</html>

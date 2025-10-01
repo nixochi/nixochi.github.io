@@ -1,7 +1,7 @@
 // renderer.js
 // Rendering logic for canvas elements
 
-import { getLineEndpoints } from './geometry-utils.js';
+import { getLineEndpoints } from '../geometry/geometry-utils.js';
 
 export class Renderer {
     constructor(canvas, ctx) {
@@ -21,8 +21,14 @@ export class Renderer {
     /**
      * Draws grid dots in world space
      * @param {Object} viewportBounds - Viewport bounds in world coordinates {left, right, top, bottom}
+     * @param {number} scale - Current zoom scale
      */
-    drawGridDots(viewportBounds) {
+    drawGridDots(viewportBounds, scale) {
+        // Skip grid rendering when zoomed out too far (performance optimization)
+        if (scale < 0.3) {
+            return;
+        }
+
         const borderColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--border').trim();
 
@@ -32,6 +38,16 @@ export class Renderer {
         const endX = Math.ceil(viewportBounds.right / this.gridSize) * this.gridSize;
         const startY = Math.floor(viewportBounds.top / this.gridSize) * this.gridSize;
         const endY = Math.ceil(viewportBounds.bottom / this.gridSize) * this.gridSize;
+
+        // Cap the number of dots to prevent performance issues
+        const maxDotsPerAxis = 200;
+        const dotsX = (endX - startX) / this.gridSize;
+        const dotsY = (endY - startY) / this.gridSize;
+
+        if (dotsX > maxDotsPerAxis || dotsY > maxDotsPerAxis) {
+            // Too many dots, skip rendering
+            return;
+        }
 
         for (let x = startX; x <= endX; x += this.gridSize) {
             for (let y = startY; y <= endY; y += this.gridSize) {

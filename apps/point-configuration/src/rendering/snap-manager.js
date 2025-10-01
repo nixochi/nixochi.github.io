@@ -1,7 +1,7 @@
 // snap-manager.js
 // Logic for snapping points to intersections and lines
 
-import { projectPointOntoLine, getPointPosition } from './geometry-utils.js';
+import { projectPointOntoLine, getPointPosition } from '../geometry/geometry-utils.js';
 
 export class SnapManager {
     constructor(intersectionSnapThreshold = 15, lineSnapThreshold = 20) {

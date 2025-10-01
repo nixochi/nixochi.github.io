@@ -1022,4 +1022,46 @@ export class CanvasManager {
             this.onStateChange();
         }
     }
+
+    addIntersectionPoints() {
+        if (this.intersections.length === 0) {
+            console.log('No intersections to add points to');
+            return;
+        }
+
+        const viewportBounds = this.getViewportBounds();
+        let addedCount = 0;
+
+        // Check each intersection
+        for (let i = 0; i < this.intersections.length; i++) {
+            const intersection = this.intersections[i];
+
+            // Check if intersection is in viewport
+            if (intersection.x < viewportBounds.left || intersection.x > viewportBounds.right ||
+                intersection.y < viewportBounds.top || intersection.y > viewportBounds.bottom) {
+                continue;
+            }
+
+            // Check if there's already a point at this intersection
+            const existingPoints = this.getPointsAtPosition(intersection.x, intersection.y, 1);
+
+            if (existingPoints.length === 0) {
+                // No point exists, add one with all the lines from this intersection
+                this.addPoint(
+                    intersection.x,
+                    intersection.y,
+                    [...intersection.lineIndices],
+                    true,
+                    i
+                );
+                addedCount++;
+            }
+        }
+
+        console.log('Added', addedCount, 'intersection points');
+
+        if (addedCount > 0 && this.onStateChange) {
+            this.onStateChange();
+        }
+    }
 }

@@ -90,11 +90,21 @@
             z-index: 1000;
         }
 
-        /* Floating action button - Top Right */
+        /* Floating action buttons - Top Right */
         #cleanBtn {
             position: absolute;
             top: 20px;
             right: 20px;
+            background: var(--backdrop-blur);
+            backdrop-filter: blur(16px);
+            box-shadow: var(--shadow);
+            z-index: 1000;
+        }
+
+        #addIntersectionsBtn {
+            position: absolute;
+            top: 20px;
+            right: 90px;
             background: var(--backdrop-blur);
             backdrop-filter: blur(16px);
             box-shadow: var(--shadow);
@@ -338,6 +348,9 @@
                 </div>
             </div>
 
+            <!-- Add Intersections Button -->
+            <button class="control-button" id="addIntersectionsBtn" title="adds points at all intersections in viewport">add intersections</button>
+
             <!-- Clean Button (Top Right) -->
             <button class="control-button" id="cleanBtn" title="removes lines that do not affect the matroid structure">clean</button>
         </div>
@@ -408,6 +421,12 @@
         const cleanBtn = document.getElementById('cleanBtn');
         cleanBtn.addEventListener('click', () => {
             canvasManager.removeNonEssentialLines();
+        });
+
+        // Add intersections button
+        const addIntersectionsBtn = document.getElementById('addIntersectionsBtn');
+        addIntersectionsBtn.addEventListener('click', () => {
+            canvasManager.addIntersectionPoints();
         });
 
         // Stats panel

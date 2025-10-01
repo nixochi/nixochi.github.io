@@ -91,7 +91,8 @@ export class PointLineMatroid {
      */
     isIndependent(pointIndices) {
         if (pointIndices.length === 0) return true;
-        
+        if (pointIndices.length === 1) return true; // Single point is always independent
+
         // Check for multipoints (any two points at same position = dependent)
         for (let i = 0; i < pointIndices.length; i++) {
             for (let j = i + 1; j < pointIndices.length; j++) {
@@ -100,10 +101,14 @@ export class PointLineMatroid {
                 }
             }
         }
-        
+
+        // Two points (not at same position) are always independent
+        if (pointIndices.length === 2) return true;
+
+        // Three or more points: check collinearity
         return !this.areCollinear(pointIndices);
     }
-    
+
     /**
      * Compute the rank of a subset of points
      * @param {Array} pointIndices - Array of point indices
@@ -112,13 +117,29 @@ export class PointLineMatroid {
     rankOfSubset(pointIndices) {
         if (pointIndices.length === 0) return 0;
         if (pointIndices.length === 1) return 1;
-        if (pointIndices.length === 2) return 2;
-        
-        // If all points are collinear, rank is 2 (or less if fewer points)
-        if (this.areCollinear(pointIndices)) {
-            return Math.min(2, pointIndices.length);
+
+        // Check for multipoints in pairs
+        if (pointIndices.length === 2) {
+            if (this._areAtSamePosition(pointIndices[0], pointIndices[1])) {
+                return 1; // Two points at same position have rank 1
+            }
+            return 2; // Two distinct points have rank 2
         }
-        
+
+        // For 3+ points: check multipoints first
+        for (let i = 0; i < pointIndices.length; i++) {
+            for (let j = i + 1; j < pointIndices.length; j++) {
+                if (this._areAtSamePosition(pointIndices[i], pointIndices[j])) {
+                    return 1; // Any multipoint means rank 1
+                }
+            }
+        }
+
+        // If all points are collinear, rank is 2
+        if (this.areCollinear(pointIndices)) {
+            return 2;
+        }
+
         // Otherwise, rank is 3 (we're in 2D, so max rank is 3)
         return 3;
     }
@@ -339,73 +360,81 @@ export class PointLineMatroid {
     getAllFlats() {
         const flats = [];
         const seen = new Set();
-        
+
         // Rank 0: empty set (always a flat)
         flats.push([]);
         seen.add('');
-        
-        // Rank 1: all individual points
-        for (let i = 0; i < this.points.length; i++) {
-            flats.push([i]);
-            seen.add(i.toString());
-        }
-        
+
         // Base case handling for special configurations
         if (this.points.length === 0) {
-            // No points: only empty set
             return flats;
         }
-        
-        if (this.points.length === 1) {
-            // One point: empty set and that point
-            return flats;
-        }
-        
-        // Check if all points are at the same position (all multipoints)
-        let allAtSamePosition = true;
-        for (let i = 1; i < this.points.length; i++) {
-            if (!this._areAtSamePosition(0, i)) {
-                allAtSamePosition = false;
-                break;
+
+        // Get all multipoints (groups of points at the same position)
+        const multipoints = Array.from(this.pointsByPosition.values())
+            .map(group => group.sort((a, b) => a - b));
+
+        // Rank 1: each multipoint is a flat
+        for (const multipoint of multipoints) {
+            const key = multipoint.join(',');
+            if (!seen.has(key)) {
+                seen.add(key);
+                flats.push([...multipoint]);
             }
         }
-        
-        if (allAtSamePosition) {
-            // All points at same position: no rank-2 flats, but entire set is rank-1 flat
-            // Actually, the entire set has rank 1 (all dependent), so it's a rank-1 flat
-            flats.push([...this.groundSet].sort((a, b) => a - b));
+
+        // If only one multipoint exists, we're done (all points at same position)
+        if (multipoints.length === 1) {
             return flats;
         }
-        
-        // Check if all points are collinear (on explicit lines)
+
+        // Check if all points are collinear
         const allCollinear = this.areCollinear(this.groundSet);
-        
-        if (allCollinear) {
+
+        if (allCollinear && this.rank === 2) {
             // All points on one line: the entire set is a rank-2 flat
             flats.push([...this.groundSet].sort((a, b) => a - b));
             return flats;
         }
-        
-        // General case: Rank 2 flats from pairs of points
-        for (let i = 0; i < this.points.length; i++) {
-            for (let j = i + 1; j < this.points.length; j++) {
-                // Skip multipoints (they're rank-1, not rank-2)
-                if (this._areAtSamePosition(i, j)) {
-                    continue;
+
+        // Rank 2: for each pair of multipoints, find all multipoints on their line
+        for (let i = 0; i < multipoints.length; i++) {
+            for (let j = i + 1; j < multipoints.length; j++) {
+                const mp1 = multipoints[i];
+                const mp2 = multipoints[j];
+
+                // Take one representative point from each multipoint
+                const rep1 = mp1[0];
+                const rep2 = mp2[0];
+
+                // Find all points collinear with these two representatives
+                const collinearPoints = this._findCollinearPoints(rep1, rep2);
+
+                // Group these collinear points by their multipoints
+                const collinearMultipoints = new Set();
+                for (const pointIndex of collinearPoints) {
+                    // Find which multipoint this point belongs to
+                    for (const mp of multipoints) {
+                        if (mp.includes(pointIndex)) {
+                            // Add all points in this multipoint
+                            mp.forEach(p => collinearMultipoints.add(p));
+                            break;
+                        }
+                    }
                 }
-                
-                // Find all points collinear with i and j
-                const collinearPoints = this._findCollinearPoints(i, j);
-                
+
+                // Convert to sorted array
+                const flat = Array.from(collinearMultipoints).sort((a, b) => a - b);
+
                 // Add as a flat (with deduplication)
-                const key = collinearPoints.join(',');
+                const key = flat.join(',');
                 if (!seen.has(key)) {
                     seen.add(key);
-                    flats.push(collinearPoints);
+                    flats.push(flat);
                 }
             }
         }
-        
+
         // Rank 3: the entire ground set (all points) - only if rank is actually 3
         if (this.rank === 3 && this.groundSet.length > 0) {
             const sorted = [...this.groundSet].sort((a, b) => a - b);
@@ -414,7 +443,7 @@ export class PointLineMatroid {
                 flats.push(sorted);
             }
         }
-        
+
         // Sort flats by size then lexicographically
         flats.sort((a, b) => {
             if (a.length !== b.length) return a.length - b.length;
@@ -423,7 +452,7 @@ export class PointLineMatroid {
             }
             return 0;
         });
-        
+
         return flats;
     }
 }

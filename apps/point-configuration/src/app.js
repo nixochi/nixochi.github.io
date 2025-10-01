@@ -60,7 +60,7 @@ function updateStatsPanel() {
 
     if (currentView === 'general') {
         panelContent.innerHTML = `
-            <div style="font-size: 14px; line-height: 1.8;">
+            <div style="font-size: 13px; line-height: 1.6;">
                 <div><strong>rank:</strong> ${stats.rank}</div>
                 <div><strong>points:</strong> ${stats.numPoints}</div>
                 <div><strong>lines:</strong> ${stats.numLines}</div>
@@ -201,3 +201,88 @@ canvasManager.onStateChange = updateStatsPanel;
 
 // Initial update
 updateStatsPanel();
+
+// Mobile panel drag behavior
+const statsPanel = document.getElementById('statsPanel');
+const panelHeader = document.getElementById('panelHeader');
+
+let isDragging = false;
+let startY = 0;
+let currentY = 0;
+let panelStartTranslate = 0;
+
+function isMobile() {
+    return window.innerWidth <= 768;
+}
+
+function handleDragStart(e) {
+    if (!isMobile()) return;
+
+    // Don't drag if interacting with dropdown
+    if (e.target.closest('.dropdown-trigger') || e.target.closest('.dropdown-content')) {
+        return;
+    }
+
+    isDragging = true;
+    statsPanel.classList.add('dragging');
+
+    const touch = e.type.includes('touch') ? e.touches[0] : e;
+    startY = touch.clientY;
+
+    // Get current translate value
+    const isCollapsed = statsPanel.classList.contains('collapsed');
+    const panelHeight = statsPanel.offsetHeight;
+    panelStartTranslate = isCollapsed ? panelHeight - 70 : 0;
+}
+
+function handleDragMove(e) {
+    if (!isDragging || !isMobile()) return;
+
+    e.preventDefault();
+
+    const touch = e.type.includes('touch') ? e.touches[0] : e;
+    currentY = touch.clientY;
+
+    const deltaY = currentY - startY;
+    const newTranslate = Math.max(0, Math.min(statsPanel.offsetHeight - 70, panelStartTranslate + deltaY));
+
+    statsPanel.style.transform = `translateY(${newTranslate}px)`;
+}
+
+function handleDragEnd(e) {
+    if (!isDragging || !isMobile()) return;
+
+    isDragging = false;
+    statsPanel.classList.remove('dragging');
+
+    const deltaY = currentY - startY;
+    const panelHeight = statsPanel.offsetHeight;
+    const currentTranslate = panelStartTranslate + deltaY;
+
+    // Determine final state based on position and direction
+    const threshold = (panelHeight - 70) / 2;
+
+    if (currentTranslate > threshold) {
+        // Collapse
+        statsPanel.classList.add('collapsed');
+        statsPanel.classList.remove('expanded');
+    } else {
+        // Expand
+        statsPanel.classList.remove('collapsed');
+        statsPanel.classList.add('expanded');
+    }
+
+    // Reset inline transform to use CSS classes
+    statsPanel.style.transform = '';
+}
+
+// Touch events
+panelHeader.addEventListener('touchstart', handleDragStart, { passive: false });
+document.addEventListener('touchmove', handleDragMove, { passive: false });
+document.addEventListener('touchend', handleDragEnd);
+document.addEventListener('touchcancel', handleDragEnd);
+
+// Mouse events (for testing on desktop)
+panelHeader.addEventListener('mousedown', handleDragStart);
+document.addEventListener('mousemove', handleDragMove);
+document.addEventListener('mouseup', handleDragEnd);

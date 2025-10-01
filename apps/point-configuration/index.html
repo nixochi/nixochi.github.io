@@ -176,7 +176,7 @@ body {
 }
 
 .panel-header {
-    padding: 20px;
+    padding: 8px 16px;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
@@ -184,7 +184,7 @@ body {
 }
 
 .panel-title {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--fg-primary);
 }
@@ -280,7 +280,7 @@ body {
 
 .panel-content {
     flex: 1;
-    padding: 20px;
+    padding: 16px;
     overflow-y: auto;
 }
 
@@ -290,6 +290,16 @@ body {
     text-align: center;
     margin-top: 40px;
     line-height: 1.6;
+}
+
+/* Mobile drag handle */
+.drag-handle {
+    display: none;
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 12px auto 8px;
 }
 
 /* Responsive */
@@ -306,6 +316,37 @@ body {
         flex: 0 0 40%;
         border-left: none;
         border-top: 1px solid var(--border);
+        position: relative;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform;
+    }
+
+    .drag-handle {
+        display: block;
+    }
+
+    .panel-header {
+        cursor: grab;
+        touch-action: none;
+    }
+
+    .panel-header:active {
+        cursor: grabbing;
+    }
+
+    /* Collapsed state - show only drag handle and header */
+    .right-panel.collapsed {
+        transform: translateY(calc(100% - 70px));
+    }
+
+    /* Expanded state */
+    .right-panel.expanded {
+        transform: translateY(0);
+    }
+
+    /* Disable transition during drag */
+    .right-panel.dragging {
+        transition: none;
     }
 }
     </style>
@@ -331,8 +372,9 @@ body {
         </div>
 
         <!-- Right Panel -->
-        <div class="right-panel">
-            <div class="panel-header">
+        <div class="right-panel collapsed" id="statsPanel">
+            <div class="drag-handle"></div>
+            <div class="panel-header" id="panelHeader">
                 <span class="panel-title">stats</span>
                 <div class="dropdown-container">
                     <button class="dropdown-trigger" id="dropdownTrigger">

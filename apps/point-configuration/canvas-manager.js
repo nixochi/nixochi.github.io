@@ -11,7 +11,7 @@ export class CanvasManager {
         this.ctx = canvas.getContext('2d');
 
         // State
-        this.points = []; // Array of {x, y, onLines: [], isIntersection: boolean}
+        this.points = []; // Array of {x, y, onLines: [], isIntersection: boolean, intersectionIndex: null}
         this.lines = []; // Array of {x, y, angle} - infinite lines through point with angle
         this.intersections = []; // Array of {x, y, lineIndices: [i, j]}
         this.mode = 'point';
@@ -33,6 +33,7 @@ export class CanvasManager {
 
         // External state inputs (from UI)
         this.hoveredPointIndices = null; // Set from UI hover events
+        this.canvasHoveredPointIndices = null; // Points hovered on canvas (for line mode)
 
         // Settings
         this.pointRadius = 9;
@@ -78,6 +79,126 @@ export class CanvasManager {
     }
 
     /**
+     * Get viewport bounds in world coordinates
+     */
+    getViewportBounds() {
+        return {
+            left: -this.offsetX,
+            right: this.canvas.width - this.offsetX,
+            top: -this.offsetY,
+            bottom: this.canvas.height - this.offsetY
+        };
+    }
+
+    /**
+     * Get the actual position of a point (uses intersection if on 2+ lines)
+     */
+    getPointPosition(point) {
+        if (point.intersectionIndex !== null && point.intersectionIndex !== undefined) {
+            const intersection = this.intersections[point.intersectionIndex];
+            return { x: intersection.x, y: intersection.y };
+        }
+        return { x: point.x, y: point.y };
+    }
+
+    /**
+     * Find intersection index that matches the given lines
+     */
+    findIntersectionByLines(lineIndices) {
+        // Find an intersection that contains all these lines
+        for (let i = 0; i < this.intersections.length; i++) {
+            const intersection = this.intersections[i];
+            const hasAllLines = lineIndices.every(lineIdx =>
+                intersection.lineIndices.includes(lineIdx)
+            );
+            if (hasAllLines) {
+                return i;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Find snap targets for line preview near cursor
+     * Only snaps when cursor is NEAR existing multipoints or multi-intersections
+     */
+    findLineEndpointSnap(_startX, _startY, endX, endY, snapThreshold = 30) {
+        const viewportBounds = this.getViewportBounds();
+        const candidates = [];
+
+        // Check all existing points (including those not on any line)
+        for (let i = 0; i < this.points.length; i++) {
+            const point = this.points[i];
+            const pos = this.getPointPosition(point);
+
+            // Check if in viewport
+            if (pos.x < viewportBounds.left || pos.x > viewportBounds.right ||
+                pos.y < viewportBounds.top || pos.y > viewportBounds.bottom) {
+                continue;
+            }
+
+            // Check if cursor is near this point
+            const distToCursor = Math.hypot(pos.x - endX, pos.y - endY);
+            if (distToCursor <= snapThreshold) {
+                // Find all points at this location (multipoint)
+                const pointIndices = this.getPointsAtPosition(pos.x, pos.y);
+
+                // Check if already added
+                const alreadyAdded = candidates.some(c =>
+                    c.type === 'multipoint' &&
+                    Math.hypot(c.x - pos.x, c.y - pos.y) < 0.1
+                );
+
+                if (!alreadyAdded) {
+                    candidates.push({
+                        type: 'multipoint',
+                        x: pos.x,
+                        y: pos.y,
+                        pointIndices: pointIndices,
+                        distance: distToCursor
+                    });
+                }
+            }
+        }
+
+        // Check all multi-intersections (2+ lines)
+        for (let i = 0; i < this.intersections.length; i++) {
+            const intersection = this.intersections[i];
+
+            // Only consider multi-intersections (2+ lines)
+            if (intersection.lineIndices.length < 2) continue;
+
+            // Check if in viewport
+            if (intersection.x < viewportBounds.left || intersection.x > viewportBounds.right ||
+                intersection.y < viewportBounds.top || intersection.y > viewportBounds.bottom) {
+                continue;
+            }
+
+            // Check if cursor is near this multi-intersection
+            const distToCursor = Math.hypot(intersection.x - endX, intersection.y - endY);
+            if (distToCursor <= snapThreshold) {
+                candidates.push({
+                    type: 'intersection',
+                    x: intersection.x,
+                    y: intersection.y,
+                    lineIndices: intersection.lineIndices,
+                    distance: distToCursor
+                });
+            }
+        }
+
+        if (candidates.length === 0) return null;
+
+        // Sort by distance to cursor
+        candidates.sort((a, b) => a.distance - b.distance);
+
+        return {
+            snapTarget: candidates[0],
+            allIntersections: candidates // All nearby targets (not all line intersections)
+        };
+    }
+
+    /**
      * Visual derivation layer - computes what should be visible
      * Pure function of current state + inputs
      */
@@ -88,7 +209,9 @@ export class CanvasManager {
             highlightedPoints: new Set(),
             highlightedLines: new Set(),
             previewLine: null,
-            ghostPoint: null
+            ghostPoint: null,
+            lineEndSnap: null,
+            allLineIntersections: [] // All preview line intersections to show
         };
 
         // Compute based on current state
@@ -113,6 +236,11 @@ export class CanvasManager {
                             intersection.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
                         }
                     }
+                }
+
+                // In line mode, highlight hovered points (entire multipoint)
+                if (this.mode === 'line' && this.canvasHoveredPointIndices) {
+                    this.canvasHoveredPointIndices.forEach(idx => visuals.highlightedPoints.add(idx));
                 }
 
                 // UI hover highlights (only in idle state)
@@ -172,7 +300,7 @@ export class CanvasManager {
                 break;
 
             case 'drawing-line':
-                // Show preview line
+                // Show preview line with endpoint snapping
                 if (state.data && this.currentMousePos) {
                     const hasMoved = this.mouseDownPos &&
                         Math.hypot(
@@ -181,15 +309,48 @@ export class CanvasManager {
                         ) > this.clickThreshold;
 
                     if (hasMoved) {
-                        visuals.previewLine = {
-                            startX: state.data.startX,
-                            startY: state.data.startY,
-                            endX: this.currentMousePos.worldX,
-                            endY: this.currentMousePos.worldY
-                        };
+                        // Check for endpoint snap and all intersections
+                        const snapResult = this.findLineEndpointSnap(
+                            state.data.startX,
+                            state.data.startY,
+                            this.currentMousePos.worldX,
+                            this.currentMousePos.worldY
+                        );
+
+                        if (snapResult) {
+                            visuals.lineEndSnap = snapResult.snapTarget;
+                            visuals.allLineIntersections = snapResult.allIntersections;
+
+                            visuals.previewLine = {
+                                startX: state.data.startX,
+                                startY: state.data.startY,
+                                endX: snapResult.snapTarget.x,
+                                endY: snapResult.snapTarget.y
+                            };
+
+                            // Highlight ALL intersections
+                            snapResult.allIntersections.forEach(intersection => {
+                                if (intersection.type === 'multipoint') {
+                                    intersection.pointIndices.forEach(idx => visuals.highlightedPoints.add(idx));
+                                } else if (intersection.type === 'intersection') {
+                                    intersection.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
+                                }
+                            });
+                        } else {
+                            visuals.previewLine = {
+                                startX: state.data.startX,
+                                startY: state.data.startY,
+                                endX: this.currentMousePos.worldX,
+                                endY: this.currentMousePos.worldY
+                            };
+                        }
                     }
                 }
-                // No snap preview or highlights while drawing line
+
+                // Highlight the starting points that the line is being created from
+                if (state.data.startPointIndices) {
+                    state.data.startPointIndices.forEach(idx => visuals.highlightedPoints.add(idx));
+                }
                 break;
 
             case 'placing-point':
@@ -226,10 +387,24 @@ export class CanvasManager {
         this.mouseDownPos = { worldX, worldY, screenX, screenY, time: Date.now() };
 
         if (this.mode === 'line') {
+            // Check if starting from a hovered multipoint
+            let startX = worldX;
+            let startY = worldY;
+            let startPointIndices = null;
+
+            if (this.canvasHoveredPointIndices) {
+                // Use the first point's position (all points in multipoint are at same location)
+                const hoveredPoint = this.points[this.canvasHoveredPointIndices[0]];
+                startX = hoveredPoint.x;
+                startY = hoveredPoint.y;
+                startPointIndices = [...this.canvasHoveredPointIndices];
+            }
+
             // Transition to drawing-line state
             this.transitionState('drawing-line', {
-                startX: worldX,
-                startY: worldY
+                startX,
+                startY,
+                startPointIndices
             });
             this.canvas.style.cursor = 'crosshair';
         } else {
@@ -281,6 +456,12 @@ export class CanvasManager {
 
         switch (state.type) {
             case 'idle':
+                // In line mode, update canvas hover for point detection (capture entire multipoint)
+                if (this.mode === 'line') {
+                    const hoveredPoints = this.getPointsAtPosition(worldX, worldY);
+                    this.canvasHoveredPointIndices = hoveredPoints.length > 0 ? hoveredPoints : null;
+                }
+
                 // Just redraw to update snap preview
                 this.draw();
                 break;
@@ -345,8 +526,33 @@ export class CanvasManager {
         switch (state.type) {
             case 'drawing-line':
                 if (!isClick) {
-                    // Add the line
-                    this.addLine(state.data.startX, state.data.startY, worldX, worldY);
+                    // Get visual state to check for endpoint snap
+                    const visuals = this.computeVisualState();
+
+                    let endX = worldX;
+                    let endY = worldY;
+                    let endPointIndices = null;
+
+                    // If snapped to endpoint, use snap position and points
+                    if (visuals.lineEndSnap) {
+                        endX = visuals.lineEndSnap.x;
+                        endY = visuals.lineEndSnap.y;
+
+                        // Only add points if snapping to multipoint (not intersection)
+                        if (visuals.lineEndSnap.type === 'multipoint') {
+                            endPointIndices = visuals.lineEndSnap.pointIndices;
+                        }
+                    }
+
+                    // Add the line with start and end point indices
+                    this.addLine(
+                        state.data.startX,
+                        state.data.startY,
+                        endX,
+                        endY,
+                        state.data.startPointIndices,
+                        endPointIndices
+                    );
                 }
                 break;
 
@@ -386,16 +592,37 @@ export class CanvasManager {
                                 const intersection = this.intersections[visuals.snapPreview.intersectionIndex];
                                 point.onLines = [...new Set([...point.onLines, ...intersection.lineIndices])];
                                 point.isIntersection = true;
+                                point.intersectionIndex = visuals.snapPreview.intersectionIndex;
                             } else if (visuals.snapPreview.type === 'line') {
                                 if (!point.onLines.includes(visuals.snapPreview.lineIndex)) {
                                     point.onLines.push(visuals.snapPreview.lineIndex);
                                 }
                                 point.isIntersection = point.onLines.length > 1;
+
+                                // Update intersectionIndex if now on 2+ lines
+                                if (point.onLines.length >= 2) {
+                                    point.intersectionIndex = this.findIntersectionByLines(point.onLines);
+                                } else {
+                                    point.intersectionIndex = null;
+                                }
                             } else if (visuals.snapPreview.type === 'point') {
                                 // Snapped to another point - merge line memberships
                                 const snapTarget = this.points[visuals.snapPreview.pointIndex];
                                 point.onLines = [...new Set([...point.onLines, ...snapTarget.onLines])];
                                 point.isIntersection = point.onLines.length > 1;
+
+                                // Update intersectionIndex if now on 2+ lines
+                                if (point.onLines.length >= 2) {
+                                    point.intersectionIndex = this.findIntersectionByLines(point.onLines);
+                                    // Snap to intersection position
+                                    if (point.intersectionIndex !== null) {
+                                        const intersection = this.intersections[point.intersectionIndex];
+                                        point.x = intersection.x;
+                                        point.y = intersection.y;
+                                    }
+                                } else {
+                                    point.intersectionIndex = null;
+                                }
                             }
                         }
                     } else {
@@ -419,8 +646,9 @@ export class CanvasManager {
                 break;
         }
 
-        // Clear captured snap and transition back to idle
+        // Clear captured snap and canvas hover and transition back to idle
         this.capturedSnapPreview = null;
+        this.canvasHoveredPointIndices = null;
         this.transitionState('idle');
         this.canvas.style.cursor = 'crosshair';
         this.draw();
@@ -430,6 +658,7 @@ export class CanvasManager {
         // Clear all transient state
         this.currentMousePos = null;
         this.capturedSnapPreview = null;
+        this.canvasHoveredPointIndices = null;
 
         // If actively interacting, treat as mouseup
         if (this.interactionState.type !== 'idle') {
@@ -443,30 +672,55 @@ export class CanvasManager {
     getPointsAtPosition(worldX, worldY, threshold = null) {
         const checkThreshold = threshold || this.pointRadius + 5;
         const indices = [];
-        
+
         for (let i = 0; i < this.points.length; i++) {
             const point = this.points[i];
-            const dx = point.x - worldX;
-            const dy = point.y - worldY;
+            const pos = this.getPointPosition(point);
+            const dx = pos.x - worldX;
+            const dy = pos.y - worldY;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            
+
             if (distance <= checkThreshold) {
                 indices.push(i);
             }
         }
-        
+
         return indices;
     }
     
-    addPoint(x, y, onLines = [], isIntersection = false) {
-        this.points.push({ x, y, onLines, isIntersection });
+    addPoint(x, y, onLines = [], isIntersection = false, intersectionIndex = null) {
+        // If on 2+ lines and no intersection index provided, find it
+        if (onLines.length >= 2 && intersectionIndex === null) {
+            intersectionIndex = this.findIntersectionByLines(onLines);
+        }
+
+        // If on 2+ lines, must reference an intersection
+        if (onLines.length >= 2 && intersectionIndex !== null) {
+            const intersection = this.intersections[intersectionIndex];
+            this.points.push({
+                x: intersection.x,
+                y: intersection.y,
+                onLines,
+                isIntersection: true,
+                intersectionIndex
+            });
+        } else {
+            this.points.push({
+                x,
+                y,
+                onLines,
+                isIntersection,
+                intersectionIndex: null
+            });
+        }
+
         this.draw();
-        console.log('Added point:', this.points.length - 1, 'at', x, y, 'onLines:', onLines);
+        console.log('Added point:', this.points.length - 1, 'at', x, y, 'onLines:', onLines, 'intersectionIndex:', intersectionIndex);
         if (this.onStateChange) {
             this.onStateChange();
         }
     }
-    
+
     addPointWithSnap(snapPreview) {
         if (snapPreview.type === 'intersection') {
             const intersection = this.intersections[snapPreview.intersectionIndex];
@@ -474,31 +728,68 @@ export class CanvasManager {
                 intersection.x,
                 intersection.y,
                 [...intersection.lineIndices],
-                true
+                true,
+                snapPreview.intersectionIndex
             );
         } else if (snapPreview.type === 'line') {
             this.addPoint(
                 snapPreview.x,
                 snapPreview.y,
                 [snapPreview.lineIndex],
-                false
+                false,
+                null
             );
         }
     }
     
-    addLine(startX, startY, endX, endY) {
+    addLine(startX, startY, endX, endY, startPointIndices = null, endPointIndices = null) {
         // Store line as angle and point (infinite line representation)
         const dx = endX - startX;
         const dy = endY - startY;
         const angle = Math.atan2(dy, dx);
 
         this.lines.push({ x: startX, y: startY, angle });
+        const newLineIndex = this.lines.length - 1;
 
-        // Recompute all intersections
+        // Collect all point indices to add to the line
+        const allPointIndices = new Set();
+        if (startPointIndices) {
+            startPointIndices.forEach(idx => allPointIndices.add(idx));
+        }
+        if (endPointIndices) {
+            endPointIndices.forEach(idx => allPointIndices.add(idx));
+        }
+
+        // Add all points to the line
+        allPointIndices.forEach(pointIndex => {
+            const point = this.points[pointIndex];
+            if (!point.onLines.includes(newLineIndex)) {
+                point.onLines.push(newLineIndex);
+                point.isIntersection = point.onLines.length > 1;
+            }
+        });
+
+        // Recompute all intersections FIRST
         this.computeIntersections();
 
+        // Update intersection references for points on 2+ lines
+        allPointIndices.forEach(pointIndex => {
+            const point = this.points[pointIndex];
+            if (point.onLines.length >= 2) {
+                // Find the intersection for this point's lines
+                const intersectionIndex = this.findIntersectionByLines(point.onLines);
+                if (intersectionIndex !== null) {
+                    point.intersectionIndex = intersectionIndex;
+                    // Update position to match intersection
+                    const intersection = this.intersections[intersectionIndex];
+                    point.x = intersection.x;
+                    point.y = intersection.y;
+                }
+            }
+        });
+
         this.draw();
-        console.log('Added line:', this.lines.length - 1, 'angle:', angle);
+        console.log('Added line:', newLineIndex, 'angle:', angle, 'startPoints:', startPointIndices, 'endPoints:', endPointIndices);
         if (this.onStateChange) {
             this.onStateChange();
         }
@@ -506,6 +797,7 @@ export class CanvasManager {
     
     setMode(mode) {
         this.mode = mode;
+        this.canvasHoveredPointIndices = null;
         this.transitionState('idle');
         this.canvas.style.cursor = 'crosshair';
         this.draw();
@@ -565,6 +857,23 @@ export class CanvasManager {
             );
         }
 
+        // Draw all line intersection previews (non-snapped)
+        if (visuals.allLineIntersections && visuals.allLineIntersections.length > 0) {
+            visuals.allLineIntersections.forEach((intersection) => {
+                // Draw all intersections, but highlight the snapped one differently
+                const isSnapped = visuals.lineEndSnap &&
+                    Math.hypot(intersection.x - visuals.lineEndSnap.x, intersection.y - visuals.lineEndSnap.y) < 0.1;
+
+                if (isSnapped) {
+                    // Draw snapped one with full style
+                    this.renderer.drawSnapPreview(intersection);
+                } else {
+                    // Draw others with subtle style
+                    this.renderer.drawIntersectionPreview(intersection);
+                }
+            });
+        }
+
         // Draw snap preview
         if (visuals.snapPreview && this.mode === 'point') {
             this.renderer.drawSnapPreview(visuals.snapPreview);
@@ -576,15 +885,70 @@ export class CanvasManager {
         }
 
         // Draw points with computed highlights
-        this.renderer.drawPoints(this.points, visuals.highlightedPoints, visuals.ghostPoint?.pointIndex);
+        this.renderer.drawPoints(
+            this.points,
+            visuals.highlightedPoints,
+            visuals.ghostPoint?.pointIndex,
+            (point) => this.getPointPosition(point)
+        );
 
         // Restore context state
         this.ctx.restore();
     }
     
     computeIntersections() {
-        this.intersections = computeAllIntersections(this.lines);
-        console.log('Computed', this.intersections.length, 'intersections');
+        const pairwiseIntersections = computeAllIntersections(this.lines);
+
+        // Cluster intersections by location to form multi-intersections
+        const clusterThreshold = 0.1; // Points within this distance are same location
+        const clusters = [];
+
+        for (const intersection of pairwiseIntersections) {
+            // Find existing cluster at this location
+            let cluster = clusters.find(c =>
+                Math.hypot(c.x - intersection.x, c.y - intersection.y) < clusterThreshold
+            );
+
+            if (cluster) {
+                // Add lines to existing cluster
+                intersection.lineIndices.forEach(lineIdx => {
+                    if (!cluster.lineIndices.includes(lineIdx)) {
+                        cluster.lineIndices.push(lineIdx);
+                    }
+                });
+            } else {
+                // Create new cluster
+                clusters.push({
+                    x: intersection.x,
+                    y: intersection.y,
+                    lineIndices: [...intersection.lineIndices]
+                });
+            }
+        }
+
+        this.intersections = clusters;
+
+        // Update all points' intersectionIndex references (they may have changed)
+        this.points.forEach(point => {
+            if (point.onLines.length >= 2) {
+                const newIntersectionIndex = this.findIntersectionByLines(point.onLines);
+                if (newIntersectionIndex !== null) {
+                    point.intersectionIndex = newIntersectionIndex;
+                    // Update position to match intersection
+                    const intersection = this.intersections[newIntersectionIndex];
+                    point.x = intersection.x;
+                    point.y = intersection.y;
+                } else {
+                    // Intersection not found - should not happen, but handle gracefully
+                    console.warn('Point on 2+ lines but intersection not found:', point.onLines);
+                    point.intersectionIndex = null;
+                }
+            } else {
+                point.intersectionIndex = null;
+            }
+        });
+
+        console.log('Computed', this.intersections.length, 'multi-intersections from', pairwiseIntersections.length, 'pairwise intersections');
     }
 
     getMatroidStats() {

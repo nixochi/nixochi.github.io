@@ -48,8 +48,9 @@ export class Renderer {
      * @param {Array} points - Array of point objects
      * @param {Set} highlightedPoints - Set of point indices to highlight
      * @param {number|undefined} skipPointIndex - Point index to skip (for ghost rendering)
+     * @param {Function} getPosition - Function to get actual position of a point
      */
-    drawPoints(points, highlightedPoints = new Set(), skipPointIndex = undefined) {
+    drawPoints(points, highlightedPoints = new Set(), skipPointIndex = undefined, getPosition = null) {
         const fgColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--fg-primary').trim();
 
@@ -60,7 +61,8 @@ export class Renderer {
             // Skip the dragged point (will be drawn as ghost)
             if (index === skipPointIndex) return;
 
-            const key = `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+            const pos = getPosition ? getPosition(point) : { x: point.x, y: point.y };
+            const key = `${pos.x.toFixed(2)},${pos.y.toFixed(2)}`;
             if (!positionMap.has(key)) {
                 positionMap.set(key, []);
             }
@@ -254,6 +256,42 @@ export class Renderer {
             const crossSize = 6;
             this.ctx.strokeStyle = '#45b7d1';
             this.ctx.lineWidth = 2;
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(x - crossSize, y);
+            this.ctx.lineTo(x + crossSize, y);
+            this.ctx.moveTo(x, y - crossSize);
+            this.ctx.lineTo(x, y + crossSize);
+            this.ctx.stroke();
+        }
+    }
+
+    /**
+     * Draws a subtle intersection preview indicator (for non-snapped intersections)
+     * @param {Object} intersection - Intersection object
+     */
+    drawIntersectionPreview(intersection) {
+        if (!intersection) return;
+
+        const { x, y, type } = intersection;
+
+        // Draw a subtle preview circle/marker
+        this.ctx.strokeStyle = 'rgba(69, 183, 209, 0.5)';
+        this.ctx.fillStyle = 'rgba(69, 183, 209, 0.1)';
+        this.ctx.lineWidth = 1.5;
+
+        const radius = type === 'intersection' ? this.pointRadius + 2 : this.pointRadius;
+
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.stroke();
+
+        // Add a small cross for intersection types
+        if (type === 'intersection') {
+            const crossSize = 4;
+            this.ctx.strokeStyle = 'rgba(69, 183, 209, 0.5)';
+            this.ctx.lineWidth = 1.5;
 
             this.ctx.beginPath();
             this.ctx.moveTo(x - crossSize, y);

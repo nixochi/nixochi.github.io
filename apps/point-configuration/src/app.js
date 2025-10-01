@@ -205,6 +205,7 @@ updateStatsPanel();
 // Mobile panel drag behavior
 const statsPanel = document.getElementById('statsPanel');
 const panelHeader = document.getElementById('panelHeader');
+const dragHandle = document.querySelector('.drag-handle');
 
 let isDragging = false;
 let startY = 0;
@@ -218,11 +219,6 @@ function isMobile() {
 function handleDragStart(e) {
     if (!isMobile()) return;
 
-    // Don't drag if interacting with dropdown
-    if (e.target.closest('.dropdown-trigger') || e.target.closest('.dropdown-content')) {
-        return;
-    }
-
     isDragging = true;
     statsPanel.classList.add('dragging');
 
@@ -232,7 +228,7 @@ function handleDragStart(e) {
     // Get current translate value
     const isCollapsed = statsPanel.classList.contains('collapsed');
     const panelHeight = statsPanel.offsetHeight;
-    panelStartTranslate = isCollapsed ? panelHeight - 70 : 0;
+    panelStartTranslate = isCollapsed ? panelHeight - 102 : 0;
 }
 
 function handleDragMove(e) {
@@ -244,7 +240,7 @@ function handleDragMove(e) {
     currentY = touch.clientY;
 
     const deltaY = currentY - startY;
-    const newTranslate = Math.max(0, Math.min(statsPanel.offsetHeight - 70, panelStartTranslate + deltaY));
+    const newTranslate = Math.max(0, Math.min(statsPanel.offsetHeight - 102, panelStartTranslate + deltaY));
 
     statsPanel.style.transform = `translateY(${newTranslate}px)`;
 }
@@ -260,7 +256,7 @@ function handleDragEnd(e) {
     const currentTranslate = panelStartTranslate + deltaY;
 
     // Determine final state based on position and direction
-    const threshold = (panelHeight - 70) / 2;
+    const threshold = (panelHeight - 102) / 2;
 
     if (currentTranslate > threshold) {
         // Collapse
@@ -277,12 +273,12 @@ function handleDragEnd(e) {
 }
 
 // Touch events
-panelHeader.addEventListener('touchstart', handleDragStart, { passive: false });
+dragHandle.addEventListener('touchstart', handleDragStart, { passive: false });
 document.addEventListener('touchmove', handleDragMove, { passive: false });
 document.addEventListener('touchend', handleDragEnd);
 document.addEventListener('touchcancel', handleDragEnd);
 
 // Mouse events (for testing on desktop)
-panelHeader.addEventListener('mousedown', handleDragStart);
+dragHandle.addEventListener('mousedown', handleDragStart);
 document.addEventListener('mousemove', handleDragMove);
 document.addEventListener('mouseup', handleDragEnd);

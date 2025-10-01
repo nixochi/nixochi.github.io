@@ -181,6 +181,7 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
+    justify-content: center;
 }
 
 .panel-title {
@@ -295,11 +296,36 @@ body {
 /* Mobile drag handle */
 .drag-handle {
     display: none;
-    width: 40px;
+    position: absolute;
+    top: -32px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 32px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    cursor: grab;
+    touch-action: none;
+    z-index: 10;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.drag-handle::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 32px;
     height: 4px;
     background: var(--border);
     border-radius: 2px;
-    margin: 12px auto 8px;
+    box-shadow: 0 6px 0 var(--border), 0 -6px 0 var(--border);
 }
 
 /* Responsive */
@@ -325,18 +351,9 @@ body {
         display: block;
     }
 
-    .panel-header {
-        cursor: grab;
-        touch-action: none;
-    }
-
-    .panel-header:active {
-        cursor: grabbing;
-    }
-
     /* Collapsed state - show only drag handle and header */
     .right-panel.collapsed {
-        transform: translateY(calc(100% - 70px));
+        transform: translateY(calc(100% - 102px));
     }
 
     /* Expanded state */

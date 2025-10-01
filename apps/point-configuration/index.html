@@ -395,13 +395,13 @@
                     const pointsStr = item.getAttribute('data-points');
                     if (pointsStr) {
                         const points = pointsStr.split(',').map(Number).filter(n => !isNaN(n));
-                        canvasManager.setHighlightedPoints(points);
+                        canvasManager.setHoveredPoints(points);
                     }
                     item.style.background = 'color-mix(in srgb, var(--bg-secondary) 90%, var(--fg-primary) 10%)';
                 });
 
                 item.addEventListener('mouseleave', () => {
-                    canvasManager.clearHighlightedPoints();
+                    canvasManager.clearHoveredPoints();
                     item.style.background = 'transparent';
                 });
             });

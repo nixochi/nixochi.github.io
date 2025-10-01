@@ -20,25 +20,19 @@ export class CanvasManager {
         this.offsetX = 0;
         this.offsetY = 0;
 
-        // Interaction state
-        this.mouseDownX = 0;
-        this.mouseDownY = 0;
-        this.mouseDownTime = 0;
-        this.hasMoved = false;
-        this.isInteracting = false;
+        // State machine - replaces all boolean flags
+        this.interactionState = {
+            type: 'idle', // 'idle' | 'dragging-point' | 'drawing-line' | 'panning' | 'placing-point'
+            data: null
+        };
 
-        // Dragging state
-        this.draggingPointIndex = null;
-        this.isDraggingGrid = false;
-        this.dragStartOffsetX = 0;
-        this.dragStartOffsetY = 0;
+        // Mouse tracking for visual derivation
+        this.currentMousePos = null; // {worldX, worldY, screenX, screenY}
+        this.mouseDownPos = null; // {worldX, worldY, screenX, screenY, time}
+        this.capturedSnapPreview = null; // Snap preview captured on mousedown for point placement
 
-        // Line drawing state
-        this.isDrawingLine = false;
-        this.lineStartX = 0;
-        this.lineStartY = 0;
-        this.lineCurrentX = 0;
-        this.lineCurrentY = 0;
+        // External state inputs (from UI)
+        this.hoveredPointIndices = null; // Set from UI hover events
 
         // Settings
         this.pointRadius = 9;
@@ -51,9 +45,6 @@ export class CanvasManager {
 
         // Callback for state changes
         this.onStateChange = null;
-
-        // Highlighting state
-        this.highlightedPoints = new Set();
 
         // Initialize
         this.setupCanvas();
@@ -78,6 +69,151 @@ export class CanvasManager {
         this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
         this.canvas.addEventListener('mouseleave', (e) => this.handleMouseLeave(e));
     }
+
+    /**
+     * State machine transition helper
+     */
+    transitionState(newType, newData = null) {
+        this.interactionState = { type: newType, data: newData };
+    }
+
+    /**
+     * Visual derivation layer - computes what should be visible
+     * Pure function of current state + inputs
+     */
+    computeVisualState() {
+        const state = this.interactionState;
+        const visuals = {
+            snapPreview: null,
+            highlightedPoints: new Set(),
+            highlightedLines: new Set(),
+            previewLine: null,
+            ghostPoint: null
+        };
+
+        // Compute based on current state
+        switch (state.type) {
+            case 'idle':
+                // In idle mode with point mode, show snap preview
+                if (this.mode === 'point' && this.currentMousePos) {
+                    visuals.snapPreview = this.snapManager.updateSnapPreview(
+                        this.currentMousePos.worldX,
+                        this.currentMousePos.worldY,
+                        this.intersections,
+                        this.lines,
+                        this.points
+                    );
+
+                    // Highlight lines involved in snap
+                    if (visuals.snapPreview) {
+                        if (visuals.snapPreview.type === 'line') {
+                            visuals.highlightedLines.add(visuals.snapPreview.lineIndex);
+                        } else if (visuals.snapPreview.type === 'intersection') {
+                            const intersection = this.intersections[visuals.snapPreview.intersectionIndex];
+                            intersection.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
+                        }
+                    }
+                }
+
+                // UI hover highlights (only in idle state)
+                if (this.hoveredPointIndices) {
+                    this.hoveredPointIndices.forEach(idx => visuals.highlightedPoints.add(idx));
+                }
+                break;
+
+            case 'dragging-point':
+                // Ensure point is at original position for snap calculation
+                const draggedPoint = this.points[state.data.pointIndex];
+                const tempX = draggedPoint.x;
+                const tempY = draggedPoint.y;
+                draggedPoint.x = state.data.originalX;
+                draggedPoint.y = state.data.originalY;
+
+                // Compute snap at current mouse position (with point at original position)
+                if (this.currentMousePos) {
+                    visuals.snapPreview = this.snapManager.updateSnapPreview(
+                        this.currentMousePos.worldX,
+                        this.currentMousePos.worldY,
+                        this.intersections,
+                        this.lines,
+                        this.points
+                    );
+
+                    // Determine ghost position from snap
+                    if (visuals.snapPreview) {
+                        visuals.ghostPoint = {
+                            x: visuals.snapPreview.x,
+                            y: visuals.snapPreview.y,
+                            pointIndex: state.data.pointIndex
+                        };
+
+                        // Highlight lines involved in snap
+                        if (visuals.snapPreview.type === 'line') {
+                            visuals.highlightedLines.add(visuals.snapPreview.lineIndex);
+                        } else if (visuals.snapPreview.type === 'intersection') {
+                            const intersection = this.intersections[visuals.snapPreview.intersectionIndex];
+                            intersection.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
+                        }
+                    } else {
+                        // No snap, ghost at mouse position
+                        visuals.ghostPoint = {
+                            x: this.currentMousePos.worldX,
+                            y: this.currentMousePos.worldY,
+                            pointIndex: state.data.pointIndex
+                        };
+                    }
+                }
+
+                // Restore temporary position
+                draggedPoint.x = tempX;
+                draggedPoint.y = tempY;
+
+                // No UI hover highlights while dragging
+                break;
+
+            case 'drawing-line':
+                // Show preview line
+                if (state.data && this.currentMousePos) {
+                    const hasMoved = this.mouseDownPos &&
+                        Math.hypot(
+                            this.currentMousePos.screenX - this.mouseDownPos.screenX,
+                            this.currentMousePos.screenY - this.mouseDownPos.screenY
+                        ) > this.clickThreshold;
+
+                    if (hasMoved) {
+                        visuals.previewLine = {
+                            startX: state.data.startX,
+                            startY: state.data.startY,
+                            endX: this.currentMousePos.worldX,
+                            endY: this.currentMousePos.worldY
+                        };
+                    }
+                }
+                // No snap preview or highlights while drawing line
+                break;
+
+            case 'placing-point':
+                // Show the captured snap preview
+                if (this.capturedSnapPreview) {
+                    visuals.snapPreview = this.capturedSnapPreview;
+
+                    // Highlight lines involved in captured snap
+                    if (this.capturedSnapPreview.type === 'line') {
+                        visuals.highlightedLines.add(this.capturedSnapPreview.lineIndex);
+                    } else if (this.capturedSnapPreview.type === 'intersection') {
+                        const intersection = this.intersections[this.capturedSnapPreview.intersectionIndex];
+                        intersection.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
+                    }
+                }
+                break;
+
+            case 'panning':
+                // No visual overlays while panning
+                break;
+        }
+
+        return visuals;
+    }
     
     handleMouseDown(e) {
         const rect = this.canvas.getBoundingClientRect();
@@ -85,39 +221,50 @@ export class CanvasManager {
         const screenY = e.clientY - rect.top;
         const worldX = screenX - this.offsetX;
         const worldY = screenY - this.offsetY;
-        
-        this.mouseDownX = screenX;
-        this.mouseDownY = screenY;
-        this.mouseDownTime = Date.now();
-        this.hasMoved = false;
-        this.isInteracting = true;
-        
+
+        // Store mouse down position
+        this.mouseDownPos = { worldX, worldY, screenX, screenY, time: Date.now() };
+
         if (this.mode === 'line') {
-            // Start drawing line
-            this.isDrawingLine = true;
-            this.lineStartX = worldX;
-            this.lineStartY = worldY;
-            this.lineCurrentX = worldX;
-            this.lineCurrentY = worldY;
+            // Transition to drawing-line state
+            this.transitionState('drawing-line', {
+                startX: worldX,
+                startY: worldY
+            });
             this.canvas.style.cursor = 'crosshair';
         } else {
             // Point mode logic
             const pointsAtPosition = this.getPointsAtPosition(worldX, worldY);
-            
+
             if (pointsAtPosition.length > 0) {
-                if (pointsAtPosition.length === 1) {
-                    this.draggingPointIndex = pointsAtPosition[0];
-                } else {
-                    this.draggingPointIndex = Math.max(...pointsAtPosition);
-                }
+                // Start dragging a point
+                const pointIndex = pointsAtPosition.length === 1
+                    ? pointsAtPosition[0]
+                    : Math.max(...pointsAtPosition);
+
+                // Store original position for ghost preview
+                const originalPoint = this.points[pointIndex];
+                this.transitionState('dragging-point', {
+                    pointIndex,
+                    originalX: originalPoint.x,
+                    originalY: originalPoint.y
+                });
                 this.canvas.style.cursor = 'grabbing';
             } else {
-                this.isDraggingGrid = true;
-                this.dragStartOffsetX = this.offsetX - screenX;
-                this.dragStartOffsetY = this.offsetY - screenY;
-                this.canvas.style.cursor = 'grabbing';
+                // Clicking empty space - capture the current snap preview for point placement
+                const visuals = this.computeVisualState();
+                this.capturedSnapPreview = visuals.snapPreview;
+
+                // Transition to placing-point state (may become panning if dragged)
+                this.transitionState('placing-point', {
+                    startOffsetX: this.offsetX,
+                    startOffsetY: this.offsetY
+                });
+                this.canvas.style.cursor = 'crosshair';
             }
         }
+
+        this.draw();
     }
     
     handleMouseMove(e) {
@@ -126,154 +273,170 @@ export class CanvasManager {
         const screenY = e.clientY - rect.top;
         const worldX = screenX - this.offsetX;
         const worldY = screenY - this.offsetY;
-        
-        // Always update snap preview in point mode when not dragging
-        if (this.mode === 'point' && !this.isInteracting) {
-            const oldSnap = this.snapManager.getSnapPreview();
-            const newSnap = this.snapManager.updateSnapPreview(worldX, worldY, this.intersections, this.lines, this.points);
 
-            // Only redraw if snap changed
-            if (JSON.stringify(oldSnap) !== JSON.stringify(newSnap)) {
+        // Update current mouse position for visual derivation
+        this.currentMousePos = { worldX, worldY, screenX, screenY };
+
+        const state = this.interactionState;
+
+        switch (state.type) {
+            case 'idle':
+                // Just redraw to update snap preview
                 this.draw();
-            }
-        }
+                break;
 
-        // Update snap preview while dragging a point
-        if (this.isInteracting && this.draggingPointIndex !== null) {
-            const oldSnap = this.snapManager.getSnapPreview();
-            const newSnap = this.snapManager.updateDragSnapPreview(
-                worldX, worldY, this.intersections, this.lines, this.points
-            );
+            case 'placing-point':
+                // Check if user is dragging (transition to panning if so)
+                const dragDist = Math.hypot(
+                    screenX - this.mouseDownPos.screenX,
+                    screenY - this.mouseDownPos.screenY
+                );
 
-            // Only redraw if snap changed
-            if (JSON.stringify(oldSnap) !== JSON.stringify(newSnap)) {
-                this.draw();
-            }
-        }
-        
-        if (!this.isInteracting) return;
-        
-        const dx = screenX - this.mouseDownX;
-        const dy = screenY - this.mouseDownY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        if (distance > this.clickThreshold) {
-            this.hasMoved = true;
-        }
-        
-        if (this.hasMoved) {
-            if (this.mode === 'line' && this.isDrawingLine) {
-                // Update line end position
-                this.lineCurrentX = worldX;
-                this.lineCurrentY = worldY;
-                this.draw();
-            } else if (this.draggingPointIndex !== null) {
-                // Dragging a point - always use snap preview if available, otherwise free movement
-                const point = this.points[this.draggingPointIndex];
-                const snapPreview = this.snapManager.getSnapPreview();
-
-                if (snapPreview) {
-                    point.x = snapPreview.x;
-                    point.y = snapPreview.y;
-                } else {
-                    point.x = worldX;
-                    point.y = worldY;
+                if (dragDist > this.clickThreshold) {
+                    // Transition to panning - user is dragging, not placing
+                    this.capturedSnapPreview = null; // Clear captured snap
+                    this.transitionState('panning', {
+                        startOffsetX: state.data.startOffsetX,
+                        startOffsetY: state.data.startOffsetY
+                    });
+                    this.canvas.style.cursor = 'grabbing';
                 }
 
                 this.draw();
-            } else if (this.isDraggingGrid) {
-                // Panning the grid
-                this.offsetX = screenX + this.dragStartOffsetX;
-                this.offsetY = screenY + this.dragStartOffsetY;
-                this.snapManager.clearSnapPreview(); // Clear snap preview during pan
+                break;
+
+            case 'dragging-point':
+                // Just redraw - computeVisualState will create ghost preview
                 this.draw();
-            }
+                break;
+
+            case 'drawing-line':
+                // Just redraw to update preview line
+                this.draw();
+                break;
+
+            case 'panning':
+                // Update pan offset
+                const dx = screenX - this.mouseDownPos.screenX;
+                const dy = screenY - this.mouseDownPos.screenY;
+                this.offsetX = state.data.startOffsetX + dx;
+                this.offsetY = state.data.startOffsetY + dy;
+                this.draw();
+                break;
         }
     }
     
     handleMouseUp(e) {
-        if (!this.isInteracting) return;
-        
         const rect = this.canvas.getBoundingClientRect();
         const screenX = e.clientX - rect.left;
         const screenY = e.clientY - rect.top;
         const worldX = screenX - this.offsetX;
         const worldY = screenY - this.offsetY;
-        
-        if (this.mode === 'line' && this.isDrawingLine) {
-            if (this.hasMoved) {
-                // Add the line
-                this.addLine(this.lineStartX, this.lineStartY, worldX, worldY);
-            }
-            this.isDrawingLine = false;
-            this.draw(); // Clear the preview line immediately
-        } else if (!this.hasMoved && this.mode === 'point') {
-            // Click in point mode - use snap preview if available
-            const snapPreview = this.snapManager.getSnapPreview();
-            if (snapPreview) {
-                this.addPointWithSnap(snapPreview);
-            } else {
-                // No snap, add point at mouse position
-                const pointsAtPosition = this.getPointsAtPosition(worldX, worldY);
-                if (pointsAtPosition.length === 0) {
-                    this.addPoint(worldX, worldY, [], false);
-                }
-            }
-        } else if (this.hasMoved && this.draggingPointIndex !== null) {
-            // Finished dragging point
-            const point = this.points[this.draggingPointIndex];
-            const snapPreview = this.snapManager.getSnapPreview();
 
-            // Apply snap if available
-            if (snapPreview) {
-                if (snapPreview.type === 'intersection') {
-                    const intersection = this.intersections[snapPreview.intersectionIndex];
-                    point.x = intersection.x;
-                    point.y = intersection.y;
-                    point.onLines = [...new Set([...point.onLines, ...intersection.lineIndices])];
-                    point.isIntersection = true;
-                } else if (snapPreview.type === 'line') {
-                    point.x = snapPreview.x;
-                    point.y = snapPreview.y;
-                    if (!point.onLines.includes(snapPreview.lineIndex)) {
-                        point.onLines.push(snapPreview.lineIndex);
+        const state = this.interactionState;
+
+        // Check if this was a click (minimal movement)
+        const isClick = this.mouseDownPos &&
+            Math.hypot(
+                screenX - this.mouseDownPos.screenX,
+                screenY - this.mouseDownPos.screenY
+            ) <= this.clickThreshold;
+
+        switch (state.type) {
+            case 'drawing-line':
+                if (!isClick) {
+                    // Add the line
+                    this.addLine(state.data.startX, state.data.startY, worldX, worldY);
+                }
+                break;
+
+            case 'placing-point':
+                // Place the point using the captured snap preview
+                if (this.capturedSnapPreview) {
+                    this.addPointWithSnap(this.capturedSnapPreview);
+                } else {
+                    // No snap, add point at mouse position
+                    const pointsAtPosition = this.getPointsAtPosition(worldX, worldY);
+                    if (pointsAtPosition.length === 0) {
+                        this.addPoint(worldX, worldY, [], false);
                     }
-                    point.isIntersection = point.onLines.length > 1;
                 }
-            } else {
-                // Check for snap to other points
-                const targetPoints = this.getPointsAtPosition(point.x, point.y, this.snapThreshold);
-                const otherPoints = targetPoints.filter(idx => idx !== this.draggingPointIndex);
-                
-                if (otherPoints.length > 0) {
-                    const snapTarget = this.points[otherPoints[0]];
-                    point.x = snapTarget.x;
-                    point.y = snapTarget.y;
-                    // Merge line memberships
-                    point.onLines = [...new Set([...point.onLines, ...snapTarget.onLines])];
-                    point.isIntersection = point.onLines.length > 1;
-                }
-            }
-            
-            this.draw();
-        }
-        
-        // Reset state
-        this.isInteracting = false;
-        this.isDraggingGrid = false;
-        this.draggingPointIndex = null;
-        this.hasMoved = false;
-        this.snapManager.clearSnapPreview(); // Clear snap preview after interaction
-        this.canvas.style.cursor = 'crosshair';
+                break;
 
-        if (this.onStateChange) {
-            this.onStateChange();
+            case 'dragging-point':
+                // Finalize dragged point
+                const point = this.points[state.data.pointIndex];
+
+                // If it was just a click (not a drag), restore original position
+                if (isClick) {
+                    point.x = state.data.originalX;
+                    point.y = state.data.originalY;
+                } else {
+                    // Get final ghost position from visuals
+                    const visuals = this.computeVisualState();
+
+                    if (visuals.ghostPoint) {
+                        // Apply ghost position to actual point
+                        point.x = visuals.ghostPoint.x;
+                        point.y = visuals.ghostPoint.y;
+
+                        // Update line memberships if snapped
+                        if (visuals.snapPreview) {
+                            if (visuals.snapPreview.type === 'intersection') {
+                                const intersection = this.intersections[visuals.snapPreview.intersectionIndex];
+                                point.onLines = [...new Set([...point.onLines, ...intersection.lineIndices])];
+                                point.isIntersection = true;
+                            } else if (visuals.snapPreview.type === 'line') {
+                                if (!point.onLines.includes(visuals.snapPreview.lineIndex)) {
+                                    point.onLines.push(visuals.snapPreview.lineIndex);
+                                }
+                                point.isIntersection = point.onLines.length > 1;
+                            } else if (visuals.snapPreview.type === 'point') {
+                                // Snapped to another point - merge line memberships
+                                const snapTarget = this.points[visuals.snapPreview.pointIndex];
+                                point.onLines = [...new Set([...point.onLines, ...snapTarget.onLines])];
+                                point.isIntersection = point.onLines.length > 1;
+                            }
+                        }
+                    } else {
+                        // No ghost (shouldn't happen), restore original
+                        point.x = state.data.originalX;
+                        point.y = state.data.originalY;
+                    }
+
+                    if (this.onStateChange) {
+                        this.onStateChange();
+                    }
+                }
+                break;
+
+            case 'panning':
+                // Panning complete, nothing to finalize
+                break;
+
+            case 'idle':
+                // Should not happen, but handle gracefully
+                break;
         }
+
+        // Clear captured snap and transition back to idle
+        this.capturedSnapPreview = null;
+        this.transitionState('idle');
+        this.canvas.style.cursor = 'crosshair';
+        this.draw();
     }
     
     handleMouseLeave(e) {
-        if (this.isInteracting) {
+        // Clear all transient state
+        this.currentMousePos = null;
+        this.capturedSnapPreview = null;
+
+        // If actively interacting, treat as mouseup
+        if (this.interactionState.type !== 'idle') {
             this.handleMouseUp(e);
+        } else {
+            // Just redraw to clear any snap previews
+            this.draw();
         }
     }
     
@@ -343,11 +506,31 @@ export class CanvasManager {
     
     setMode(mode) {
         this.mode = mode;
-        this.snapManager.clearSnapPreview();
+        this.transitionState('idle');
         this.canvas.style.cursor = 'crosshair';
+        this.draw();
+    }
+
+    /**
+     * Set which points should be highlighted (called from UI)
+     */
+    setHoveredPoints(pointIndices) {
+        this.hoveredPointIndices = pointIndices ? new Set(pointIndices) : null;
+        this.draw();
+    }
+
+    /**
+     * Clear hovered points
+     */
+    clearHoveredPoints() {
+        this.hoveredPointIndices = null;
+        this.draw();
     }
     
     draw() {
+        // Derive visual state from current conditions
+        const visuals = this.computeVisualState();
+
         // Clear canvas
         this.renderer.clear();
 
@@ -360,26 +543,40 @@ export class CanvasManager {
         // Draw grid dots
         this.renderer.drawGridDots(this.offsetX, this.offsetY);
 
-        // Draw lines (permanent ones) - with highlighting if applicable
-        const snapPreview = this.snapManager.getSnapPreview();
-        this.renderer.drawLines(this.lines, this.offsetX, this.offsetY, snapPreview, this.intersections);
+        // Draw lines with computed highlights
+        this.renderer.drawLines(
+            this.lines,
+            this.offsetX,
+            this.offsetY,
+            visuals.snapPreview,
+            this.intersections,
+            visuals.highlightedLines
+        );
 
-        // Draw preview line if currently drawing
-        if (this.isDrawingLine && this.hasMoved) {
+        // Draw preview line if in drawing-line state
+        if (visuals.previewLine) {
             this.renderer.drawPreviewLine(
-                this.lineStartX, this.lineStartY,
-                this.lineCurrentX, this.lineCurrentY,
-                this.offsetX, this.offsetY
+                visuals.previewLine.startX,
+                visuals.previewLine.startY,
+                visuals.previewLine.endX,
+                visuals.previewLine.endY,
+                this.offsetX,
+                this.offsetY
             );
         }
 
-        // Draw snap preview (works for both placement and dragging)
-        if (snapPreview && this.mode === 'point') {
-            this.renderer.drawSnapPreview(snapPreview);
+        // Draw snap preview
+        if (visuals.snapPreview && this.mode === 'point') {
+            this.renderer.drawSnapPreview(visuals.snapPreview);
         }
 
-        // Draw points (pass highlightedPoints)
-        this.renderer.drawPoints(this.points, this.highlightedPoints);
+        // Draw ghost point if dragging
+        if (visuals.ghostPoint) {
+            this.renderer.drawGhostPoint(visuals.ghostPoint);
+        }
+
+        // Draw points with computed highlights
+        this.renderer.drawPoints(this.points, visuals.highlightedPoints, visuals.ghostPoint?.pointIndex);
 
         // Restore context state
         this.ctx.restore();
@@ -405,15 +602,5 @@ export class CanvasManager {
             circuits: matroid.getAllCircuits(),
             flats: matroid.getAllFlats()
         };
-    }
-
-    setHighlightedPoints(pointIndices) {
-        this.highlightedPoints = new Set(pointIndices);
-        this.draw();
-    }
-
-    clearHighlightedPoints() {
-        this.highlightedPoints.clear();
-        this.draw();
     }
 }

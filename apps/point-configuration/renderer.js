@@ -47,8 +47,9 @@ export class Renderer {
      * Draws all points
      * @param {Array} points - Array of point objects
      * @param {Set} highlightedPoints - Set of point indices to highlight
+     * @param {number|undefined} skipPointIndex - Point index to skip (for ghost rendering)
      */
-    drawPoints(points, highlightedPoints = new Set()) {
+    drawPoints(points, highlightedPoints = new Set(), skipPointIndex = undefined) {
         const fgColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--fg-primary').trim();
 
@@ -56,6 +57,9 @@ export class Renderer {
         const positionMap = new Map();
 
         points.forEach((point, index) => {
+            // Skip the dragged point (will be drawn as ghost)
+            if (index === skipPointIndex) return;
+
             const key = `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
             if (!positionMap.has(key)) {
                 positionMap.set(key, []);
@@ -93,12 +97,42 @@ export class Renderer {
                 this.ctx.stroke();
             }
 
-            const label = indices.join(',');
-            this.ctx.fillStyle = fgColor;
+            // Draw label with individual highlighting for merged points
             this.ctx.font = isMerged ? 'bold 14px ui-sans-serif, system-ui, sans-serif' : '14px ui-sans-serif, system-ui, sans-serif';
-            this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'bottom';
-            this.ctx.fillText(label, x, y - (radius + (isHighlighted ? 8 : 6)));
+
+            if (isMerged) {
+                // For merged points, draw each index separately with appropriate color
+                const labelParts = [];
+                indices.forEach((idx, i) => {
+                    labelParts.push({
+                        text: idx.toString(),
+                        highlighted: highlightedPoints.has(idx)
+                    });
+                    if (i < indices.length - 1) {
+                        labelParts.push({ text: ',', highlighted: false });
+                    }
+                });
+
+                // Measure total width
+                const totalText = indices.join(',');
+                const totalWidth = this.ctx.measureText(totalText).width;
+
+                // Draw each part with appropriate color
+                let currentX = x - totalWidth / 2;
+                labelParts.forEach(part => {
+                    this.ctx.fillStyle = part.highlighted ? '#f9a826' : fgColor;
+                    this.ctx.textAlign = 'left';
+                    this.ctx.fillText(part.text, currentX, y - (radius + (isHighlighted ? 8 : 6)));
+                    currentX += this.ctx.measureText(part.text).width;
+                });
+            } else {
+                // Single point - simple label
+                const label = indices[0].toString();
+                this.ctx.fillStyle = isHighlighted ? '#f9a826' : fgColor;
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(label, x, y - (radius + (isHighlighted ? 8 : 6)));
+            }
         });
     }
 
@@ -109,27 +143,15 @@ export class Renderer {
      * @param {number} offsetY - Pan offset Y
      * @param {Object|null} snapPreview - Current snap preview
      * @param {Array} intersections - Array of intersection objects
+     * @param {Set} highlightedLines - Set of line indices to highlight
      */
-    drawLines(lines, offsetX, offsetY, snapPreview = null, intersections = []) {
+    drawLines(lines, offsetX, offsetY, snapPreview = null, intersections = [], highlightedLines = new Set()) {
         const fgColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--fg-primary').trim();
 
         lines.forEach((line, index) => {
-            // Check if this line should be highlighted
-            let shouldHighlight = false;
-
-            if (snapPreview) {
-                if (snapPreview.type === 'line' && snapPreview.lineIndex === index) {
-                    // Snapping to this specific line
-                    shouldHighlight = true;
-                } else if (snapPreview.type === 'intersection') {
-                    // Snapping to an intersection - highlight all contributing lines
-                    const intersection = intersections[snapPreview.intersectionIndex];
-                    if (intersection.lineIndices.includes(index)) {
-                        shouldHighlight = true;
-                    }
-                }
-            }
+            // Check if this line should be highlighted (from derived visual state)
+            const shouldHighlight = highlightedLines.has(index);
 
             this.ctx.strokeStyle = shouldHighlight ? '#f9a826' : '#957fef';
             this.ctx.lineWidth = shouldHighlight ? 2.1 : 1.4;
@@ -177,6 +199,33 @@ export class Renderer {
         this.ctx.stroke();
 
         this.ctx.setLineDash([]);
+    }
+
+    /**
+     * Draws a ghost point (dragged point preview)
+     * @param {Object} ghostPoint - Ghost point object {x, y, pointIndex}
+     */
+    drawGhostPoint(ghostPoint) {
+        const { x, y, pointIndex } = ghostPoint;
+        const fgColor = getComputedStyle(document.documentElement)
+            .getPropertyValue('--fg-primary').trim();
+
+        // Draw ghost with semi-transparent fill
+        this.ctx.fillStyle = 'rgba(78, 205, 196, 0.6)';
+        this.ctx.strokeStyle = '#4ecdc4';
+        this.ctx.lineWidth = 2;
+
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, this.pointRadius, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.stroke();
+
+        // Draw label
+        this.ctx.fillStyle = fgColor;
+        this.ctx.font = '14px ui-sans-serif, system-ui, sans-serif';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'bottom';
+        this.ctx.fillText(pointIndex.toString(), x, y - (this.pointRadius + 6));
     }
 
     /**

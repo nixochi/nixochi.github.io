@@ -202,83 +202,81 @@ canvasManager.onStateChange = updateStatsPanel;
 // Initial update
 updateStatsPanel();
 
-// Mobile panel drag behavior
+// Panel resize behavior
 const statsPanel = document.getElementById('statsPanel');
-const panelHeader = document.getElementById('panelHeader');
-const dragHandle = document.querySelector('.drag-handle');
+const resizeHandle = document.getElementById('resizeHandle');
 
-let isDragging = false;
-let startY = 0;
-let currentY = 0;
-let panelStartTranslate = 0;
+let isResizing = false;
+let startPos = 0;
+let startSize = 0;
 
 function isMobile() {
     return window.innerWidth <= 768;
 }
 
-function handleDragStart(e) {
-    if (!isMobile()) return;
-
-    isDragging = true;
-    statsPanel.classList.add('dragging');
+function handleResizeStart(e) {
+    isResizing = true;
+    document.body.classList.add('resizing');
 
     const touch = e.type.includes('touch') ? e.touches[0] : e;
-    startY = touch.clientY;
 
-    // Get current translate value
-    const isCollapsed = statsPanel.classList.contains('collapsed');
-    const panelHeight = statsPanel.offsetHeight;
-    panelStartTranslate = isCollapsed ? panelHeight - 102 : 0;
+    if (isMobile()) {
+        startPos = touch.clientY;
+        startSize = statsPanel.offsetHeight;
+    } else {
+        startPos = touch.clientX;
+        startSize = statsPanel.offsetWidth;
+    }
+
+    e.preventDefault();
 }
 
-function handleDragMove(e) {
-    if (!isDragging || !isMobile()) return;
+function handleResizeMove(e) {
+    if (!isResizing) return;
 
     e.preventDefault();
 
     const touch = e.type.includes('touch') ? e.touches[0] : e;
-    currentY = touch.clientY;
 
-    const deltaY = currentY - startY;
-    const newTranslate = Math.max(0, Math.min(statsPanel.offsetHeight - 102, panelStartTranslate + deltaY));
+    if (isMobile()) {
+        const currentY = touch.clientY;
+        const deltaY = startPos - currentY; // Inverted because dragging up increases height
 
-    statsPanel.style.transform = `translateY(${newTranslate}px)`;
+        const newHeight = startSize + deltaY;
+        const minHeight = 150;
+        // Use visualViewport for iOS compatibility, fallback to window.innerHeight
+        const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        const maxHeight = viewportHeight * 0.8;
+        const clampedHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
+
+        statsPanel.style.height = `${clampedHeight}px`;
+    } else {
+        const currentX = touch.clientX;
+        const deltaX = startPos - currentX; // Inverted because dragging left increases width
+
+        const newWidth = startSize + deltaX;
+        const minWidth = 250;
+        const maxWidth = window.innerWidth * 0.6;
+        const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+        statsPanel.style.width = `${clampedWidth}px`;
+    }
 }
 
-function handleDragEnd(e) {
-    if (!isDragging || !isMobile()) return;
+function handleResizeEnd(e) {
+    if (!isResizing) return;
 
-    isDragging = false;
-    statsPanel.classList.remove('dragging');
-
-    const deltaY = currentY - startY;
-    const panelHeight = statsPanel.offsetHeight;
-    const currentTranslate = panelStartTranslate + deltaY;
-
-    // Determine final state based on position and direction
-    const threshold = (panelHeight - 102) / 2;
-
-    if (currentTranslate > threshold) {
-        // Collapse
-        statsPanel.classList.add('collapsed');
-        statsPanel.classList.remove('expanded');
-    } else {
-        // Expand
-        statsPanel.classList.remove('collapsed');
-        statsPanel.classList.add('expanded');
-    }
-
-    // Reset inline transform to use CSS classes
-    statsPanel.style.transform = '';
+    isResizing = false;
+    document.body.classList.remove('resizing');
 }
 
 // Touch events
-dragHandle.addEventListener('touchstart', handleDragStart, { passive: false });
-document.addEventListener('touchmove', handleDragMove, { passive: false });
-document.addEventListener('touchend', handleDragEnd);
-document.addEventListener('touchcancel', handleDragEnd);
+resizeHandle.addEventListener('touchstart', handleResizeStart, { passive: false });
+document.addEventListener('touchmove', handleResizeMove, { passive: false });
+document.addEventListener('touchend', handleResizeEnd);
+document.addEventListener('touchcancel', handleResizeEnd);
 
-// Mouse events (for testing on desktop)
-dragHandle.addEventListener('mousedown', handleDragStart);
-document.addEventListener('mousemove', handleDragMove);
-document.addEventListener('mouseup', handleDragEnd);
+// Mouse events
+resizeHandle.addEventListener('mousedown', handleResizeStart);
+document.addEventListener('mousemove', handleResizeMove);
+document.addEventListener('mouseup', handleResizeEnd);

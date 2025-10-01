@@ -69,6 +69,13 @@ export class CanvasManager {
 
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
+
+        // Use ResizeObserver to detect when canvas container size changes
+        // (e.g., when panel is resized)
+        const resizeObserver = new ResizeObserver(() => {
+            resizeCanvas();
+        });
+        resizeObserver.observe(this.canvas.parentElement);
     }
 
     setMode(mode) {

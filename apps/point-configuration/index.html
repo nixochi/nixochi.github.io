@@ -42,10 +42,12 @@
 
 html, body {
     height: 100vh;
+    height: -webkit-fill-available;
     height: 100svh;
     overflow: hidden;
     touch-action: none;
     -ms-touch-action: none;
+    -webkit-overflow-scrolling: touch;
 }
 
 body {
@@ -60,12 +62,12 @@ body {
 .container {
     display: flex;
     height: 100vh;
+    height: -webkit-fill-available;
     height: 100svh;
 }
 
 /* Canvas Area - Left Side */
 .canvas-container {
-    flex: 0 0 70%;
     position: relative;
     background: var(--bg-primary);
 }
@@ -167,7 +169,6 @@ body {
 
 /* Controls Toggle Button */
 .right-panel {
-    flex: 0 0 30%;
     background: var(--bg-secondary);
     border-left: 1px solid var(--border);
     display: flex;
@@ -293,39 +294,75 @@ body {
     line-height: 1.6;
 }
 
-/* Mobile drag handle */
-.drag-handle {
-    display: none;
-    position: absolute;
-    top: -32px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 80px;
-    height: 32px;
+/* Resizable handle */
+.resize-handle {
+    width: 10px;
+    height: 100%;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-bottom: none;
-    border-radius: 12px 12px 0 0;
-    cursor: grab;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    cursor: ew-resize;
     touch-action: none;
-    z-index: 10;
+    position: relative;
+    z-index: 1000;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.drag-handle:active {
-    cursor: grabbing;
+.resize-handle:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 90%, var(--fg-primary) 10%);
 }
 
-.drag-handle::before {
+.resize-handle:active {
+    background: color-mix(in srgb, var(--bg-secondary) 85%, var(--fg-primary) 15%);
+}
+
+.resize-handle::before {
     content: '';
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 32px;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    box-shadow: 0 6px 0 var(--border), 0 -6px 0 var(--border);
+    width: 3px;
+    height: 18px;
+    background:
+        radial-gradient(circle, var(--fg-secondary) 1.5px, transparent 1.5px),
+        radial-gradient(circle, var(--fg-secondary) 1.5px, transparent 1.5px),
+        radial-gradient(circle, var(--fg-secondary) 1.5px, transparent 1.5px);
+    background-size: 3px 3px;
+    background-position: center 0, center 50%, center 100%;
+    background-repeat: no-repeat;
+    z-index: 1;
+}
+
+/* Desktop resizable panel */
+.canvas-container {
+    flex: 1 1 auto;
+    min-width: 300px;
+}
+
+.right-panel {
+    flex: 0 0 auto;
+    width: 250px;
+    min-width: 250px;
+    max-width: 60vw;
+}
+
+/* Disable user selection during resize */
+body.resizing {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body.resizing * {
+    pointer-events: none;
+}
+
+body.resizing .resize-handle {
+    pointer-events: auto;
 }
 
 /* Responsive */
@@ -335,35 +372,52 @@ body {
     }
 
     .canvas-container {
-        flex: 0 0 60%;
+        flex: 1 1 auto;
+        min-height: 200px;
+        min-width: unset;
+    }
+
+    .resize-handle {
+        width: 100%;
+        height: 20px;
+        cursor: ns-resize;
+        border-left: none;
+        border-right: none;
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+    }
+
+    .resize-handle::before {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 18px;
+        height: 3px;
+        background:
+            radial-gradient(circle, var(--fg-secondary) 1.5px, transparent 1.5px),
+            radial-gradient(circle, var(--fg-secondary) 1.5px, transparent 1.5px),
+            radial-gradient(circle, var(--fg-secondary) 1.5px, transparent 1.5px);
+        background-size: 3px 3px;
+        background-position: 0 center, 50% center, 100% center;
+        background-repeat: no-repeat;
+        z-index: 1;
     }
 
     .right-panel {
-        flex: 0 0 40%;
+        flex: 0 0 auto;
+        height: 150px;
+        width: 100%;
+        min-height: 150px;
+        max-height: 80vh;
+        max-height: 80svh;
+        min-width: unset;
+        max-width: unset;
         border-left: none;
         border-top: 1px solid var(--border);
-        position: relative;
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        will-change: transform;
     }
 
-    .drag-handle {
-        display: block;
-    }
-
-    /* Collapsed state - show only drag handle and header */
-    .right-panel.collapsed {
-        transform: translateY(calc(100% - 102px));
-    }
-
-    /* Expanded state */
-    .right-panel.expanded {
-        transform: translateY(0);
-    }
-
-    /* Disable transition during drag */
-    .right-panel.dragging {
-        transition: none;
+    body.resizing {
+        cursor: ns-resize !important;
     }
 }
     </style>
@@ -388,9 +442,11 @@ body {
             <button class="control-button" id="cleanBtn" title="removes lines that do not affect the matroid structure">clean</button>
         </div>
 
+        <!-- Resize Handle -->
+        <div class="resize-handle" id="resizeHandle"></div>
+
         <!-- Right Panel -->
-        <div class="right-panel collapsed" id="statsPanel">
-            <div class="drag-handle"></div>
+        <div class="right-panel" id="statsPanel">
             <div class="panel-header" id="panelHeader">
                 <span class="panel-title">stats</span>
                 <div class="dropdown-container">

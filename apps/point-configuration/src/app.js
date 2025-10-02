@@ -49,6 +49,61 @@ addIntersectionsBtn.addEventListener('click', () => {
 // Stats panel
 let currentView = 'general';
 
+// Pagination state
+let paginationState = {
+    bases: { offset: 0, batchSize: 50 },
+    circuits: { offset: 0, batchSize: 50 },
+    flats: { offset: 0, batchSize: 50 }
+};
+
+function resetPagination(view = null) {
+    if (view) {
+        paginationState[view].offset = 0;
+    } else {
+        // Reset all
+        paginationState.bases.offset = 0;
+        paginationState.circuits.offset = 0;
+        paginationState.flats.offset = 0;
+    }
+}
+
+function loadMoreItems() {
+    const stats = canvasManager.getMatroidStats();
+    if (!stats) return;
+
+    const view = currentView;
+    if (view === 'bases' || view === 'circuits' || view === 'flats') {
+        const totalItems = stats[view].length;
+        const currentLimit = paginationState[view].offset + paginationState[view].batchSize;
+
+        // Only load more if there are more items to show
+        if (currentLimit < totalItems) {
+            paginationState[view].offset += paginationState[view].batchSize;
+            updateStatsPanel();
+        }
+    }
+}
+
+function setupScrollListener() {
+    const panelContent = document.getElementById('panelContent');
+
+    // Remove existing listener to avoid duplicates
+    panelContent.removeEventListener('scroll', handlePanelScroll);
+
+    // Add new listener
+    panelContent.addEventListener('scroll', handlePanelScroll);
+}
+
+function handlePanelScroll() {
+    const panelContent = document.getElementById('panelContent');
+    const scrollPercentage = (panelContent.scrollTop + panelContent.clientHeight) / panelContent.scrollHeight;
+
+    // Load more when scrolled 80% down
+    if (scrollPercentage > 0.8) {
+        loadMoreItems();
+    }
+}
+
 function updateStatsPanel() {
     const stats = canvasManager.getMatroidStats();
     const panelContent = document.getElementById('panelContent');
@@ -73,31 +128,43 @@ function updateStatsPanel() {
         if (stats.bases.length === 0) {
             panelContent.innerHTML = '<div class="empty-state">no bases yet</div>';
         } else {
-            const basesHtml = stats.bases.map((base, idx) =>
+            const limit = paginationState.bases.offset + paginationState.bases.batchSize;
+            const visibleBases = stats.bases.slice(0, limit);
+            const basesHtml = visibleBases.map((base) =>
                 `<div class="matroid-item" data-points="${base.join(',')}" style="padding: 8px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s ease;">{${base.join(', ')}}</div>`
             ).join('');
-            panelContent.innerHTML = basesHtml;
+            const countHtml = `<div style="padding: 8px; color: var(--fg-secondary); font-size: 12px;">showing ${visibleBases.length} of ${stats.bases.length}</div>`;
+            panelContent.innerHTML = basesHtml + countHtml;
             attachHoverListeners();
+            setupScrollListener();
         }
     } else if (currentView === 'circuits') {
         if (stats.circuits.length === 0) {
             panelContent.innerHTML = '<div class="empty-state">no circuits yet</div>';
         } else {
-            const circuitsHtml = stats.circuits.map((circuit, idx) =>
+            const limit = paginationState.circuits.offset + paginationState.circuits.batchSize;
+            const visibleCircuits = stats.circuits.slice(0, limit);
+            const circuitsHtml = visibleCircuits.map((circuit) =>
                 `<div class="matroid-item" data-points="${circuit.join(',')}" style="padding: 8px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s ease;">{${circuit.join(', ')}}</div>`
             ).join('');
-            panelContent.innerHTML = circuitsHtml;
+            const countHtml = `<div style="padding: 8px; color: var(--fg-secondary); font-size: 12px;">showing ${visibleCircuits.length} of ${stats.circuits.length}</div>`;
+            panelContent.innerHTML = circuitsHtml + countHtml;
             attachHoverListeners();
+            setupScrollListener();
         }
     } else if (currentView === 'flats') {
         if (stats.flats.length === 0) {
             panelContent.innerHTML = '<div class="empty-state">no flats yet</div>';
         } else {
-            const flatsHtml = stats.flats.map((flat, idx) =>
+            const limit = paginationState.flats.offset + paginationState.flats.batchSize;
+            const visibleFlats = stats.flats.slice(0, limit);
+            const flatsHtml = visibleFlats.map((flat) =>
                 `<div class="matroid-item" data-points="${flat.join(',')}" style="padding: 8px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s ease;">{${flat.join(', ')}}</div>`
             ).join('');
-            panelContent.innerHTML = flatsHtml;
+            const countHtml = `<div style="padding: 8px; color: var(--fg-secondary); font-size: 12px;">showing ${visibleFlats.length} of ${stats.flats.length}</div>`;
+            panelContent.innerHTML = flatsHtml + countHtml;
             attachHoverListeners();
+            setupScrollListener();
         }
     }
 }
@@ -188,6 +255,8 @@ dropdownItems.forEach(item => {
         dropdownLabel.textContent = value;
         currentView = value;
 
+        // Reset pagination when switching views
+        resetPagination(value);
         updateStatsPanel();
 
         isDropdownOpen = false;
@@ -197,7 +266,10 @@ dropdownItems.forEach(item => {
 });
 
 // Wire up state change callback
-canvasManager.onStateChange = updateStatsPanel;
+canvasManager.onStateChange = () => {
+    resetPagination(); // Reset all pagination when configuration changes
+    updateStatsPanel();
+};
 
 // Initial update
 updateStatsPanel();

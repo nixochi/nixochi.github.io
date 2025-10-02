@@ -5,7 +5,7 @@ todo:
 [ ] add undo options, delete, and clear options
 [x] make the base,ciruits,flats page paginated
 [ ] add documentation and description of how to use the applet
-[ ] add visual options for showing only line segments
+[x] add visual options for showing only line segments (added opacity)
 [ ] add export options for sage math and macaulay (exporting the matroid)
 [ ] add calculation options such as characteristic poly and tutte poly
 [ ] calculate properties of matroids (sparse-paving, connected, etc)

@@ -80,25 +80,88 @@ body {
 }
 
 
-/* Floating action buttons - Top Right */
-#cleanBtn {
+/* Options button - Top Right */
+.options-button {
     position: absolute;
     top: 20px;
     right: 20px;
     background: var(--backdrop-blur);
     backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 8px;
     box-shadow: var(--shadow);
-    z-index: 1000;
+    padding: 6px 12px;
+    z-index: 1001;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
 }
 
-#addIntersectionsBtn {
+.options-button:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+/* Floating Panel */
+.floating-panel {
     position: absolute;
-    top: 20px;
-    right: 90px;
     background: var(--backdrop-blur);
     backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     box-shadow: var(--shadow);
+    padding: 16px;
     z-index: 1000;
+    min-width: 200px;
+    transition: all 0.3s ease;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+}
+
+.floating-panel.expanded {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.options-panel {
+    top: 60px;
+    right: 20px;
+}
+
+.control-group {
+    margin-bottom: 12px;
+}
+
+.control-group:last-child {
+    margin-bottom: 0;
+}
+
+.action-btn {
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg-primary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+.action-btn:last-child {
+    margin-bottom: 0;
 }
 
 
@@ -582,7 +645,7 @@ body.resizing .resize-handle {
         <!-- Canvas Container -->
         <div class="canvas-container">
             <canvas id="canvas"></canvas>
-            
+
             <!-- Input Mode Switch -->
             <div class="mode-switch" id="modeSwitch">
                 <div class="mode-switch-indicator" id="switchIndicator"></div>
@@ -590,11 +653,16 @@ body.resizing .resize-handle {
                 <button class="mode-switch-option" id="lineBtn">line</button>
             </div>
 
-            <!-- Add Intersections Button -->
-            <button class="control-button" id="addIntersectionsBtn" title="adds points at all intersections in viewport">add intersections</button>
+            <!-- Options Button (Top Right) -->
+            <button class="options-button" id="optionsBtn">options</button>
 
-            <!-- Clean Button (Top Right) -->
-            <button class="control-button" id="cleanBtn" title="removes lines that do not affect the matroid structure">clean</button>
+            <!-- Options Panel (Starts hidden) -->
+            <div class="floating-panel options-panel" id="optionsPanel" style="display: none;">
+                <div class="control-group">
+                    <button class="action-btn" id="addIntersectionsBtn" title="adds points at all intersections in viewport">add intersections</button>
+                    <button class="action-btn" id="cleanBtn" title="removes lines that do not affect the matroid structure">clean</button>
+                </div>
+            </div>
         </div>
 
         <!-- Resize Handle -->

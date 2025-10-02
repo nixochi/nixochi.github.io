@@ -34,6 +34,31 @@ lineBtn.addEventListener('click', () => {
     updateSwitchIndicator(lineBtn);
 });
 
+// Options panel toggle
+const optionsBtn = document.getElementById('optionsBtn');
+const optionsPanel = document.getElementById('optionsPanel');
+let isPanelVisible = false;
+
+optionsBtn.addEventListener('click', () => {
+    isPanelVisible = !isPanelVisible;
+    if (isPanelVisible) {
+        optionsPanel.style.display = 'block';
+        // Force reflow before adding class for smooth animation
+        optionsPanel.offsetHeight;
+        optionsPanel.classList.add('expanded');
+        optionsBtn.textContent = 'close';
+    } else {
+        optionsPanel.classList.remove('expanded');
+        // Wait for animation to complete before hiding
+        setTimeout(() => {
+            if (!isPanelVisible) { // Check again in case user clicked during animation
+                optionsPanel.style.display = 'none';
+            }
+        }, 300); // Match CSS transition duration
+        optionsBtn.textContent = 'options';
+    }
+});
+
 // Clean button
 const cleanBtn = document.getElementById('cleanBtn');
 cleanBtn.addEventListener('click', () => {

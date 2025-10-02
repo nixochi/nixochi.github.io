@@ -164,6 +164,33 @@ body {
     margin-bottom: 0;
 }
 
+/* Range slider styling */
+input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.1s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+    background: color-mix(in srgb, var(--fg-secondary) 80%, var(--bg-secondary) 20%);
+    transform: scale(1.1);
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
 
 .control-button {
     padding: 6px 12px;
@@ -658,6 +685,12 @@ body.resizing .resize-handle {
 
             <!-- Options Panel (Starts hidden) -->
             <div class="floating-panel options-panel" id="optionsPanel" style="display: none;">
+                <div class="control-group">
+                    <label style="font-size: 12px; color: var(--fg-secondary); margin-bottom: 4px; display: block;">ray opacity</label>
+                    <input type="range" id="rayOpacitySlider" min="0" max="1" step="0.1" value="1"
+                           style="width: 100%; margin-bottom: 4px; height: 6px; background: var(--border); border-radius: 3px; outline: none; appearance: none; cursor: pointer;">
+                    <div id="rayOpacityValue" style="font-size: 12px; color: var(--fg-secondary); text-align: right; margin-bottom: 12px;">100%</div>
+                </div>
                 <div class="control-group">
                     <button class="action-btn" id="addIntersectionsBtn" title="adds points at all intersections in viewport">add intersections</button>
                     <button class="action-btn" id="cleanBtn" title="removes lines that do not affect the matroid structure">clean</button>

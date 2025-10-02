@@ -160,8 +160,10 @@ export class Renderer {
      * @param {Object|null} snapPreview - Current snap preview
      * @param {Array} intersections - Array of intersection objects
      * @param {Set} highlightedLines - Set of line indices to highlight
+     * @param {Array} points - Array of point objects
+     * @param {number} rayOpacity - Opacity for ray portions (0-1)
      */
-    drawLines(lines, viewportBounds, snapPreview = null, intersections = [], highlightedLines = new Set()) {
+    drawLines(lines, viewportBounds, snapPreview = null, intersections = [], highlightedLines = new Set(), points = [], rayOpacity = 1.0) {
         const fgColor = getComputedStyle(document.documentElement)
             .getPropertyValue('--fg-primary').trim();
 
@@ -169,8 +171,8 @@ export class Renderer {
             // Check if this line should be highlighted (from derived visual state)
             const shouldHighlight = highlightedLines.has(index);
 
-            this.ctx.strokeStyle = shouldHighlight ? '#f9a826' : '#957fef';
-            this.ctx.lineWidth = shouldHighlight ? 2.1 : 1.4;
+            const strokeColor = shouldHighlight ? '#f9a826' : '#957fef';
+            const lineWidth = shouldHighlight ? 2.1 : 1.4;
 
             // Calculate line endpoints that extend to viewport boundaries (in world space)
             const bounds = this.getWorldBounds(viewportBounds);
@@ -178,10 +180,70 @@ export class Renderer {
 
             if (!endpoints) return;
 
-            this.ctx.beginPath();
-            this.ctx.moveTo(endpoints.x1, endpoints.y1);
-            this.ctx.lineTo(endpoints.x2, endpoints.y2);
-            this.ctx.stroke();
+            // Find all points on this line
+            const pointsOnLine = [];
+            points.forEach((point, pointIndex) => {
+                if (point.onLines && point.onLines.includes(index)) {
+                    // Get actual position (could be intersection)
+                    const pos = point.intersectionIndex !== null && point.intersectionIndex !== undefined
+                        ? { x: intersections[point.intersectionIndex].x, y: intersections[point.intersectionIndex].y }
+                        : { x: point.x, y: point.y };
+
+                    // Calculate parameter t along the line
+                    const dx = Math.cos(line.angle);
+                    const dy = Math.sin(line.angle);
+                    const vx = pos.x - line.x;
+                    const vy = pos.y - line.y;
+                    const t = vx * dx + vy * dy;
+
+                    pointsOnLine.push({ ...pos, t, pointIndex });
+                }
+            });
+
+            // Sort points along the line by parameter t
+            pointsOnLine.sort((a, b) => a.t - b.t);
+
+            if (pointsOnLine.length === 0) {
+                // No points on line - draw entire line with ray opacity
+                this.ctx.globalAlpha = rayOpacity;
+                this.ctx.strokeStyle = strokeColor;
+                this.ctx.lineWidth = lineWidth;
+                this.ctx.beginPath();
+                this.ctx.moveTo(endpoints.x1, endpoints.y1);
+                this.ctx.lineTo(endpoints.x2, endpoints.y2);
+                this.ctx.stroke();
+                this.ctx.globalAlpha = 1.0;
+            } else {
+                // Draw first ray (from viewport edge to first point)
+                this.ctx.globalAlpha = rayOpacity;
+                this.ctx.strokeStyle = strokeColor;
+                this.ctx.lineWidth = lineWidth;
+                this.ctx.beginPath();
+                this.ctx.moveTo(endpoints.x1, endpoints.y1);
+                this.ctx.lineTo(pointsOnLine[0].x, pointsOnLine[0].y);
+                this.ctx.stroke();
+                this.ctx.globalAlpha = 1.0;
+
+                // Draw segments between consecutive points
+                for (let i = 0; i < pointsOnLine.length - 1; i++) {
+                    this.ctx.strokeStyle = strokeColor;
+                    this.ctx.lineWidth = lineWidth;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(pointsOnLine[i].x, pointsOnLine[i].y);
+                    this.ctx.lineTo(pointsOnLine[i + 1].x, pointsOnLine[i + 1].y);
+                    this.ctx.stroke();
+                }
+
+                // Draw last ray (from last point to viewport edge)
+                this.ctx.globalAlpha = rayOpacity;
+                this.ctx.strokeStyle = strokeColor;
+                this.ctx.lineWidth = lineWidth;
+                this.ctx.beginPath();
+                this.ctx.moveTo(pointsOnLine[pointsOnLine.length - 1].x, pointsOnLine[pointsOnLine.length - 1].y);
+                this.ctx.lineTo(endpoints.x2, endpoints.y2);
+                this.ctx.stroke();
+                this.ctx.globalAlpha = 1.0;
+            }
         });
     }
 

@@ -59,6 +59,17 @@ optionsBtn.addEventListener('click', () => {
     }
 });
 
+// Ray opacity slider
+const rayOpacitySlider = document.getElementById('rayOpacitySlider');
+const rayOpacityValue = document.getElementById('rayOpacityValue');
+
+rayOpacitySlider.addEventListener('input', (e) => {
+    const value = parseFloat(e.target.value);
+    const percentage = Math.round(value * 100);
+    rayOpacityValue.textContent = `${percentage}%`;
+    canvasManager.setRayOpacity(value);
+});
+
 // Clean button
 const cleanBtn = document.getElementById('cleanBtn');
 cleanBtn.addEventListener('click', () => {

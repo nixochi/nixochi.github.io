@@ -22,6 +22,7 @@ export class CanvasManager {
         this.pointRadius = this.isTouchDevice ? 14 : 9;
         this.snapThreshold = this.isTouchDevice ? 25 : 15;
         this.clickThreshold = this.isTouchDevice ? 8 : 5;
+        this.rayOpacity = 1.0; // Default opacity for rays
 
         // Initialize managers
         this.stateManager = new StateManager();
@@ -96,6 +97,14 @@ export class CanvasManager {
     }
 
     /**
+     * Set ray opacity (called from UI)
+     */
+    setRayOpacity(opacity) {
+        this.rayOpacity = opacity;
+        this.draw();
+    }
+
+    /**
      * Set which points should be highlighted (called from UI)
      */
     setHoveredPoints(pointIndices) {
@@ -146,7 +155,9 @@ export class CanvasManager {
             viewportBounds,
             visuals.snapPreview,
             this.pointLineManager.intersections,
-            visuals.highlightedLines
+            visuals.highlightedLines,
+            this.pointLineManager.points,
+            this.rayOpacity
         );
 
         // Draw preview line if in drawing-line state

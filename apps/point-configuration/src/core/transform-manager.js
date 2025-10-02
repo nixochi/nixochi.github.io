@@ -16,6 +16,14 @@ export class TransformManager {
     }
 
     /**
+     * Center the origin (0,0) on the canvas
+     */
+    centerOrigin() {
+        this.offsetX = this.canvas.width / 2;
+        this.offsetY = this.canvas.height / 2;
+    }
+
+    /**
      * Extract coordinates from mouse or touch event
      */
     getEventCoordinates(e) {

@@ -484,4 +484,59 @@ export class PointLineManager {
             return false;
         }
     }
+
+    /**
+     * Load configuration from JSON
+     */
+    async loadConfiguration(configName) {
+        try {
+            const response = await fetch('src/examples/examples.json');
+            if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
+
+            const examples = await response.json();
+            const config = examples[configName];
+            if (!config) throw new Error(`Configuration '${configName}' not found`);
+
+            // Parse points from compact format [x, y, [lines]]
+            this.points = config.points.map(([x, y, onLines]) => ({
+                x,
+                y,
+                onLines,
+                isIntersection: onLines.length > 1,
+                intersectionIndex: null
+            }));
+
+            // Compute lines from points
+            const linePoints = new Map();
+            this.points.forEach((point, idx) => {
+                point.onLines.forEach(lineIdx => {
+                    if (!linePoints.has(lineIdx)) linePoints.set(lineIdx, []);
+                    linePoints.get(lineIdx).push(idx);
+                });
+            });
+
+            this.lines = [];
+            linePoints.forEach((pointIndices, lineIdx) => {
+                if (pointIndices.length < 2) throw new Error(`Line ${lineIdx} has < 2 points`);
+                const p1 = this.points[pointIndices[0]];
+                const p2 = this.points[pointIndices[1]];
+                const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                this.lines[lineIdx] = { x: p1.x, y: p1.y, angle };
+            });
+
+            // Compute intersections
+            this.intersections = computeIntersections(this.lines, this.points);
+
+            console.log(`✅ Loaded ${config.name}: ${this.points.length} points, ${this.lines.length} lines`);
+
+            if (this.onStateChange) {
+                this.onStateChange();
+            }
+
+            return true;
+        } catch (e) {
+            console.error('Failed to load configuration:', e);
+            return false;
+        }
+    }
 }

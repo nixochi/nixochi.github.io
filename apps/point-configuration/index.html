@@ -280,6 +280,161 @@ body {
     font-weight: 500;
 }
 
+/* Examples button */
+.examples-button {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.examples-button:hover {
+    background: color-mix(in srgb, var(--bg-primary) 95%, var(--fg-primary) 5%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+/* Modal styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    width: 100svw;
+    height: 100vh;
+    height: 100svh;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    max-width: 500px;
+    width: 90%;
+    height: 80vh;
+    height: 80svh;
+    max-height: 500px;
+    display: flex;
+    flex-direction: column;
+    transform: scale(0.9) translateY(20px);
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.modal-overlay.active .modal-content {
+    transform: scale(1) translateY(0);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 24px 16px 24px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--fg-primary);
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--fg-secondary);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.close-button:hover {
+    background: var(--border);
+    color: var(--fg-primary);
+}
+
+.modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px 24px 24px;
+}
+
+.examples-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.example-card {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    min-height: 50px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.example-card:hover {
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    transform: translateY(-1px);
+}
+
+.example-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--fg-primary);
+}
+
+.modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+    background: var(--fg-secondary);
+}
+
+body.modal-open {
+    overflow: hidden;
+}
+
 .panel-content {
     flex: 1;
     padding: 16px;
@@ -449,6 +604,7 @@ body.resizing .resize-handle {
         <div class="right-panel" id="statsPanel">
             <div class="panel-header" id="panelHeader">
                 <span class="panel-title">stats</span>
+                <button class="examples-button" id="examplesBtn">examples</button>
                 <div class="dropdown-container">
                     <button class="dropdown-trigger" id="dropdownTrigger">
                         <span id="dropdownLabel">general</span>
@@ -465,6 +621,21 @@ body.resizing .resize-handle {
             <div class="panel-content" id="panelContent">
                 <div class="empty-state">
                     add points and lines to see matroid properties
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Examples Modal -->
+    <div class="modal-overlay" id="examplesModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Load Example</h2>
+                <button class="close-button" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="examples-grid" id="examplesGrid">
+                    <!-- Example cards will be dynamically generated -->
                 </div>
             </div>
         </div>

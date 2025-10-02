@@ -68,6 +68,7 @@ export class CanvasManager {
         const resizeCanvas = () => {
             this.canvas.width = this.canvas.offsetWidth;
             this.canvas.height = this.canvas.offsetHeight;
+            this.transformManager.centerOrigin();
             this.draw();
         };
 
@@ -211,6 +212,14 @@ export class CanvasManager {
         const viewportBounds = this.transformManager.getViewportBounds();
         this.pointLineManager.addIntersectionPoints(viewportBounds);
         this.draw();
+    }
+
+    async loadConfiguration(configName) {
+        const success = await this.pointLineManager.loadConfiguration(configName);
+        if (success) {
+            this.draw();
+        }
+        return success;
     }
 
     /**

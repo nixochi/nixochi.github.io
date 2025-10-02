@@ -352,3 +352,67 @@ document.addEventListener('touchcancel', handleResizeEnd);
 resizeHandle.addEventListener('mousedown', handleResizeStart);
 document.addEventListener('mousemove', handleResizeMove);
 document.addEventListener('mouseup', handleResizeEnd);
+
+// Examples modal
+const examplesBtn = document.getElementById('examplesBtn');
+const examplesModal = document.getElementById('examplesModal');
+const closeModal = document.getElementById('closeModal');
+const examplesGrid = document.getElementById('examplesGrid');
+
+function openExamplesModal() {
+    examplesModal.classList.add('active');
+    document.body.classList.add('modal-open');
+}
+
+function closeExamplesModal() {
+    examplesModal.classList.remove('active');
+    document.body.classList.remove('modal-open');
+}
+
+examplesBtn.addEventListener('click', () => {
+    openExamplesModal();
+    loadExamples();
+});
+
+closeModal.addEventListener('click', closeExamplesModal);
+
+examplesModal.addEventListener('click', (e) => {
+    if (e.target === examplesModal) {
+        closeExamplesModal();
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && examplesModal.classList.contains('active')) {
+        closeExamplesModal();
+    }
+});
+
+async function loadExamples() {
+    try {
+        const response = await fetch('src/examples/examples.json');
+        if (!response.ok) throw new Error('Failed to load examples');
+
+        const examples = await response.json();
+
+        examplesGrid.innerHTML = '';
+        Object.keys(examples).forEach(key => {
+            const example = examples[key];
+            const card = document.createElement('div');
+            card.className = 'example-card';
+            card.dataset.example = key;
+
+            card.innerHTML = `<div class="example-name">${example.name}</div>`;
+
+            card.addEventListener('click', async () => {
+                await canvasManager.loadConfiguration(key);
+                closeExamplesModal();
+            });
+
+            examplesGrid.appendChild(card);
+        });
+    } catch (e) {
+        console.error('Failed to load examples:', e);
+        examplesGrid.innerHTML = '<div style="color: var(--fg-secondary); text-align: center;">Failed to load examples</div>';
+    }
+}

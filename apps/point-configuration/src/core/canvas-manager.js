@@ -105,6 +105,14 @@ export class CanvasManager {
     }
 
     /**
+     * Set color palette (called from UI)
+     */
+    setColorPalette(palette) {
+        this.renderer.setPalette(palette);
+        this.draw();
+    }
+
+    /**
      * Set which points should be highlighted (called from UI)
      */
     setHoveredPoints(pointIndices) {

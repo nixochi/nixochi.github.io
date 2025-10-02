@@ -99,6 +99,47 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+// Color palette switch
+const monoBtn = document.getElementById('monoBtn');
+const rainbowBtn = document.getElementById('rainbowBtn');
+const pastelBtn = document.getElementById('pastelBtn');
+const paletteSwitchIndicator = document.getElementById('paletteSwitchIndicator');
+
+function updatePaletteSwitchIndicator(activeBtn) {
+    const btnRect = activeBtn.getBoundingClientRect();
+    const switchRect = activeBtn.parentElement.getBoundingClientRect();
+    const offset = btnRect.left - switchRect.left - 2;
+    paletteSwitchIndicator.style.width = `${btnRect.width}px`;
+    paletteSwitchIndicator.style.transform = `translateX(${offset}px)`;
+}
+
+// Initialize indicator position
+updatePaletteSwitchIndicator(monoBtn);
+
+monoBtn.addEventListener('click', () => {
+    canvasManager.setColorPalette('monochromatic');
+    monoBtn.classList.add('active');
+    rainbowBtn.classList.remove('active');
+    pastelBtn.classList.remove('active');
+    updatePaletteSwitchIndicator(monoBtn);
+});
+
+rainbowBtn.addEventListener('click', () => {
+    canvasManager.setColorPalette('rainbow');
+    rainbowBtn.classList.add('active');
+    monoBtn.classList.remove('active');
+    pastelBtn.classList.remove('active');
+    updatePaletteSwitchIndicator(rainbowBtn);
+});
+
+pastelBtn.addEventListener('click', () => {
+    canvasManager.setColorPalette('pastel');
+    pastelBtn.classList.add('active');
+    monoBtn.classList.remove('active');
+    rainbowBtn.classList.remove('active');
+    updatePaletteSwitchIndicator(pastelBtn);
+});
+
 // Ray opacity slider
 const rayOpacitySlider = document.getElementById('rayOpacitySlider');
 const rayOpacityValue = document.getElementById('rayOpacityValue');
@@ -133,9 +174,9 @@ let paginationState = {
 };
 
 function resetPagination(view = null) {
-    if (view) {
+    if (view && paginationState[view]) {
         paginationState[view].offset = 0;
-    } else {
+    } else if (!view) {
         // Reset all
         paginationState.bases.offset = 0;
         paginationState.circuits.offset = 0;
@@ -297,6 +338,7 @@ const dropdownTrigger = document.getElementById('dropdownTrigger');
 const dropdownContent = document.getElementById('dropdownContent');
 const dropdownLabel = document.getElementById('dropdownLabel');
 const dropdownItems = dropdownContent.querySelectorAll('.dropdown-item');
+const libraryBtn = document.getElementById('libraryBtn');
 let isDropdownOpen = false;
 
 dropdownTrigger.addEventListener('click', (e) => {
@@ -325,9 +367,6 @@ dropdownItems.forEach(item => {
         e.stopPropagation();
         const value = item.getAttribute('data-value');
 
-        dropdownItems.forEach(i => i.classList.remove('active'));
-        item.classList.add('active');
-
         dropdownLabel.textContent = value;
         currentView = value;
 
@@ -339,6 +378,11 @@ dropdownItems.forEach(item => {
         dropdownTrigger.classList.remove('open');
         dropdownContent.classList.remove('open');
     });
+});
+
+libraryBtn.addEventListener('click', () => {
+    openExamplesModal();
+    loadExamples();
 });
 
 // Wire up state change callback
@@ -432,7 +476,6 @@ document.addEventListener('mousemove', handleResizeMove);
 document.addEventListener('mouseup', handleResizeEnd);
 
 // Examples modal
-const examplesBtn = document.getElementById('examplesBtn');
 const examplesModal = document.getElementById('examplesModal');
 const closeModal = document.getElementById('closeModal');
 const examplesGrid = document.getElementById('examplesGrid');
@@ -446,11 +489,6 @@ function closeExamplesModal() {
     examplesModal.classList.remove('active');
     document.body.classList.remove('modal-open');
 }
-
-examplesBtn.addEventListener('click', () => {
-    openExamplesModal();
-    loadExamples();
-});
 
 closeModal.addEventListener('click', closeExamplesModal);
 

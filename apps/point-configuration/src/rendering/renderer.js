@@ -9,6 +9,47 @@ export class Renderer {
         this.ctx = ctx;
         this.gridSize = 30;
         this.pointRadius = 9;
+        this.colorPalette = 'monochromatic';
+
+        // Color palettes - expanded to 50 colors to avoid repetition
+        this.palettes = {
+            monochromatic: ['#957fef'],
+            rainbow: [
+                '#ff0000', '#ff4500', '#ff8c00', '#ffd700', '#ffff00',
+                '#adff2f', '#7fff00', '#32cd32', '#00ff00', '#00fa9a',
+                '#00ffff', '#00bfff', '#1e90ff', '#0000ff', '#4169e1',
+                '#8a2be2', '#9370db', '#ba55d3', '#da70d6', '#ff00ff',
+                '#ff1493', '#ff69b4', '#dc143c', '#b22222', '#8b0000',
+                '#ff6347', '#ff7f50', '#ffa500', '#ffb347', '#f0e68c',
+                '#9acd32', '#66cdaa', '#20b2aa', '#48d1cc', '#40e0d0',
+                '#4682b4', '#5f9ea0', '#6495ed', '#7b68ee', '#9932cc',
+                '#8b008b', '#9400d3', '#a020f0', '#c71585', '#db7093',
+                '#cd5c5c', '#f08080', '#fa8072', '#e9967a', '#ffa07a'
+            ],
+            pastel: [
+                '#ffb3ba', '#ffdfba', '#ffffba', '#baffc9', '#bae1ff',
+                '#e0bbff', '#ffc9de', '#ffd6e8', '#c9f0ff', '#d5f4e6',
+                '#fff5ba', '#e8d5c4', '#d5e8d4', '#f4e4d5', '#ffe5e5',
+                '#e5f5ff', '#f5e5ff', '#ffe5f5', '#e5ffe5', '#ffffe5',
+                '#ffc4d6', '#d6e5f4', '#f4d6e5', '#e5f4d6', '#d6f4e5',
+                '#f4e5d6', '#e5d6f4', '#d6fff4', '#f4ffd6', '#ffd6d6',
+                '#d6d6ff', '#ffd6ff', '#d6ffff', '#ffffd6', '#f0d6e8',
+                '#d6f0e8', '#e8f0d6', '#e8d6f0', '#d6e8f0', '#f0e8d6',
+                '#f5c6d0', '#d0f5c6', '#c6d0f5', '#f5d0c6', '#c6f5d0',
+                '#d0c6f5', '#f5f5c6', '#c6f5f5', '#f5c6f5', '#c6c6f5'
+            ]
+        };
+    }
+
+    setPalette(palette) {
+        if (this.palettes[palette]) {
+            this.colorPalette = palette;
+        }
+    }
+
+    getLineColor(lineIndex) {
+        const colors = this.palettes[this.colorPalette];
+        return colors[lineIndex % colors.length];
     }
 
     /**
@@ -171,7 +212,7 @@ export class Renderer {
             // Check if this line should be highlighted (from derived visual state)
             const shouldHighlight = highlightedLines.has(index);
 
-            const strokeColor = shouldHighlight ? '#f9a826' : '#957fef';
+            const strokeColor = shouldHighlight ? '#f9a826' : this.getLineColor(index);
             const lineWidth = shouldHighlight ? 2.1 : 1.4;
 
             // Calculate line endpoints that extend to viewport boundaries (in world space)

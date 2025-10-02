@@ -1,6 +1,6 @@
 {
   "triangle": {
-    "name": "Triangle",
+    "name": "triangle",
     "points": [
       [0, -100, [0, 1]],
       [100, 50, [0, 2]],
@@ -8,7 +8,7 @@
     ]
   },
   "pappus": {
-    "name": "Pappus Configuration",
+    "name": "Pappus configuration",
     "points": [
       [-180,-90,[0,3,5]],
       [0,-90,[0,7,8]],

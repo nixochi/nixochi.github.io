@@ -164,6 +164,46 @@ body {
     margin-bottom: 0;
 }
 
+/* Palette switch (similar to mode switch) */
+.palette-switch {
+    display: inline-flex;
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px;
+    position: relative;
+}
+
+.palette-switch-option {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fg-secondary);
+    cursor: pointer;
+    transition: color 0.2s ease;
+    position: relative;
+    z-index: 1;
+    border: none;
+    background: transparent;
+}
+
+.palette-switch-option.active {
+    color: var(--fg-primary);
+}
+
+.palette-switch-indicator {
+    position: absolute;
+    background: color-mix(in srgb, var(--bg-secondary) 70%, var(--fg-primary) 30%);
+    border-radius: 4px;
+    transition: transform 0.2s ease, width 0.2s ease;
+    height: calc(100% - 4px);
+    top: 2px;
+    left: 2px;
+    z-index: 0;
+}
+
 /* Range slider styling */
 input[type="range"]::-webkit-slider-thumb {
     appearance: none;
@@ -290,12 +330,13 @@ input[type="range"]::-moz-range-thumb {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 6px 12px;
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--bg-primary);
     color: var(--fg-primary);
-    font-size: 15px;
+    font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
     outline: none;
     transition: all 0.2s ease;
@@ -365,12 +406,7 @@ input[type="range"]::-moz-range-thumb {
     background: color-mix(in srgb, var(--bg-secondary) 90%, var(--fg-primary) 10%);
 }
 
-.dropdown-item.active {
-    background: color-mix(in srgb, var(--bg-secondary) 85%, var(--fg-primary) 15%);
-    font-weight: 500;
-}
-
-/* Examples button */
+/* Library button */
 .examples-button {
     padding: 6px 12px;
     border: 1px solid var(--border);
@@ -449,6 +485,7 @@ input[type="range"]::-moz-range-thumb {
     font-size: 18px;
     font-weight: 600;
     color: var(--fg-primary);
+    text-transform: lowercase;
 }
 
 .close-button {
@@ -693,6 +730,15 @@ body.resizing .resize-handle {
                     </div>
                 </div>
                 <div class="control-group">
+                    <label style="font-size: 12px; color: var(--fg-secondary); margin-bottom: 4px; display: block;">color palette</label>
+                    <div class="palette-switch" id="paletteSwitch">
+                        <div class="palette-switch-indicator" id="paletteSwitchIndicator"></div>
+                        <button class="palette-switch-option active" id="monoBtn">mono</button>
+                        <button class="palette-switch-option" id="rainbowBtn">rainbow</button>
+                        <button class="palette-switch-option" id="pastelBtn">pastel</button>
+                    </div>
+                </div>
+                <div class="control-group">
                     <label style="font-size: 12px; color: var(--fg-secondary); margin-bottom: 4px; display: block;">ray opacity</label>
                     <input type="range" id="rayOpacitySlider" min="0" max="1" step="0.1" value="1"
                            style="width: 100%; margin-bottom: 4px; height: 6px; background: var(--border); border-radius: 3px; outline: none; appearance: none; cursor: pointer;">
@@ -712,19 +758,19 @@ body.resizing .resize-handle {
         <div class="right-panel" id="statsPanel">
             <div class="panel-header" id="panelHeader">
                 <span class="panel-title">stats</span>
-                <button class="examples-button" id="examplesBtn">examples</button>
                 <div class="dropdown-container">
                     <button class="dropdown-trigger" id="dropdownTrigger">
                         <span id="dropdownLabel">general</span>
                         <div class="dropdown-arrow"></div>
                     </button>
                     <div class="dropdown-content" id="dropdownContent">
-                        <button class="dropdown-item active" data-value="general">general</button>
+                        <button class="dropdown-item" data-value="general">general</button>
                         <button class="dropdown-item" data-value="bases">bases</button>
                         <button class="dropdown-item" data-value="flats">flats</button>
                         <button class="dropdown-item" data-value="circuits">circuits</button>
                     </div>
                 </div>
+                <button class="examples-button" id="libraryBtn">library</button>
             </div>
             <div class="panel-content" id="panelContent">
                 <div class="empty-state">
@@ -738,7 +784,7 @@ body.resizing .resize-handle {
     <div class="modal-overlay" id="examplesModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title">Load Example</h2>
+                <h2 class="modal-title">library</h2>
                 <button class="close-button" id="closeModal">&times;</button>
             </div>
             <div class="modal-body">

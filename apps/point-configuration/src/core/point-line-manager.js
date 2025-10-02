@@ -3,6 +3,7 @@
 
 import { getPointPosition, findIntersectionByLines, computeIntersections } from '../geometry/geometry-utils.js';
 import { PointLineMatroid } from '../math/matroid.js';
+import pako from 'https://esm.sh/pako@2.1.0';
 
 export class PointLineManager {
     constructor(scale) {
@@ -307,52 +308,175 @@ export class PointLineManager {
     }
 
     /**
-     * Serialize current state to URL-safe string
+     * Serialize current state to compressed URL-safe string
+     * Uses compact array format and gzip compression
      */
     serializeState() {
-        const state = {
-            points: this.points.map(p => ({
-                x: Math.round(p.x * 100) / 100, // Round for compactness
-                y: Math.round(p.y * 100) / 100,
-                onLines: p.onLines
-            })),
-            lines: this.lines.map(l => ({
-                x: Math.round(l.x * 100) / 100,
-                y: Math.round(l.y * 100) / 100,
-                angle: Math.round(l.angle * 1000) / 1000
-            }))
-        };
+        // Try with 1 decimal precision first
+        let precision = 1;
+        let state = this._createCompactState(precision);
 
-        const json = JSON.stringify(state);
-        // Use base64url encoding (URL-safe variant)
-        return btoa(json)
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=+$/, '');
+        // Verify topology is preserved
+        if (!this._verifyTopology(state, precision)) {
+            console.warn('Topology changed with precision 1, trying precision 2');
+            precision = 2;
+            state = this._createCompactState(precision);
+
+            if (!this._verifyTopology(state, precision)) {
+                console.error('Topology still changed with precision 2, using precision 3');
+                precision = 3;
+                state = this._createCompactState(precision);
+            }
+        }
+
+        // Convert to JSON and compress
+        const jsonStr = JSON.stringify(state);
+
+        try {
+            // Compress with pako
+            const compressed = pako.deflate(jsonStr, { level: 9 });
+
+            // Convert to base64url (URL-safe base64)
+            const base64 = btoa(String.fromCharCode.apply(null, compressed))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+
+            console.log(`Serialized state: ${jsonStr.length} chars → ${base64.length} chars (${Math.round(base64.length / jsonStr.length * 100)}% of original)`);
+
+            return base64;
+        } catch (e) {
+            console.error('Compression failed, using uncompressed:', e);
+            // Fallback to uncompressed base64
+            return btoa(jsonStr)
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+        }
     }
 
     /**
-     * Deserialize state from URL-safe string
+     * Create compact state representation with given precision
+     * Format: {p: [[x,y,[lines]], ...], l: [[x,y,angle], ...], v: 1}
+     */
+    _createCompactState(precision) {
+        const factor = Math.pow(10, precision);
+
+        return {
+            v: 1, // version number for future compatibility
+            p: this.points.map(p => [
+                Math.round(p.x * factor) / factor,
+                Math.round(p.y * factor) / factor,
+                p.onLines
+            ]),
+            l: this.lines.map(l => [
+                Math.round(l.x * factor) / factor,
+                Math.round(l.y * factor) / factor,
+                Math.round(l.angle * 10000) / 10000 // 4 decimals for angles
+            ])
+        };
+    }
+
+    /**
+     * Verify that topology is preserved with given precision
+     * Returns true if all points remain on their assigned lines
+     */
+    _verifyTopology(compactState, precision) {
+        const tolerance = 1 / Math.pow(10, precision) + 0.01; // Add small epsilon
+
+        // Check each point is still on all its lines
+        for (let i = 0; i < compactState.p.length; i++) {
+            const [px, py, onLines] = compactState.p[i];
+
+            for (const lineIdx of onLines) {
+                const [lx, ly, angle] = compactState.l[lineIdx];
+
+                // Calculate distance from point to line
+                const dx = Math.cos(angle);
+                const dy = Math.sin(angle);
+
+                // Vector from line point to target point
+                const vx = px - lx;
+                const vy = py - ly;
+
+                // Project onto line direction
+                const t = vx * dx + vy * dy;
+
+                // Perpendicular distance
+                const perpX = vx - t * dx;
+                const perpY = vy - t * dy;
+                const distance = Math.sqrt(perpX * perpX + perpY * perpY);
+
+                if (distance > tolerance) {
+                    console.warn(`Point ${i} is ${distance.toFixed(4)} units from line ${lineIdx} (tolerance: ${tolerance.toFixed(4)})`);
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Deserialize state from compressed URL-safe string
      */
     deserializeState(encoded) {
+        if (!encoded) return false;
+
         try {
-            // Decode base64url
-            const base64 = encoded
+            // Convert base64url to base64
+            let base64 = encoded
                 .replace(/-/g, '+')
                 .replace(/_/g, '/');
-            const json = atob(base64);
-            const state = JSON.parse(json);
 
-            // Restore state
-            this.points = state.points.map(p => ({
-                ...p,
-                isIntersection: p.onLines.length > 1,
+            // Add padding if needed
+            while (base64.length % 4) {
+                base64 += '=';
+            }
+
+            // Try to decompress (assume it's compressed)
+            let jsonStr;
+            try {
+                const binaryString = atob(base64);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+
+                const decompressed = pako.inflate(bytes, { to: 'string' });
+                jsonStr = decompressed;
+            } catch (e) {
+                // Not compressed, try direct decode
+                jsonStr = atob(base64);
+            }
+
+            const state = JSON.parse(jsonStr);
+
+            // Version check
+            if (state.v !== 1) {
+                console.error('Unsupported state version:', state.v);
+                return false;
+            }
+
+            // Restore from compact format
+            this.points = state.p.map(([x, y, onLines]) => ({
+                x,
+                y,
+                onLines,
+                isIntersection: onLines.length > 1,
                 intersectionIndex: null
             }));
-            this.lines = state.lines;
+
+            this.lines = state.l.map(([x, y, angle]) => ({
+                x,
+                y,
+                angle
+            }));
 
             // Recompute intersections
             this.intersections = computeIntersections(this.lines, this.points);
+
+            console.log(`✅ Loaded configuration: ${this.points.length} points, ${this.lines.length} lines`);
 
             return true;
         } catch (e) {

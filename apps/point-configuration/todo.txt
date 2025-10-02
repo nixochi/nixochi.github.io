@@ -1,0 +1,15 @@
+todo:
+
+
+- make matroid calculation non-blocking
+- add undo options, delete, and clear options
+- add documentation and description of how to use the applet
+- paginate the loading of bases,circuits,flats so they do not block the main thread
+- add visual options for showing only line segments
+- add export options for sage math and macaulay (exporting the matroid)
+- add calculation options such as characteristic poly and tutte poly
+- calculate properties of matroids (sparse-paving, connected, etc)
+- add a library of common and famous examples
+- add way of adding configurations precisely (for beautiful images and such)
+- consolidate the options menu
+- change line snapping so it is based on angle when not near a specific point

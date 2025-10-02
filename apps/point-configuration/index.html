@@ -91,10 +91,20 @@ body {
     z-index: 1000;
 }
 
-#addIntersectionsBtn {
+#shareBtn {
     position: absolute;
     top: 20px;
     right: 90px;
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    box-shadow: var(--shadow);
+    z-index: 1000;
+}
+
+#addIntersectionsBtn {
+    position: absolute;
+    top: 20px;
+    right: 145px;
     background: var(--backdrop-blur);
     backdrop-filter: blur(16px);
     box-shadow: var(--shadow);
@@ -437,6 +447,9 @@ body.resizing .resize-handle {
 
             <!-- Add Intersections Button -->
             <button class="control-button" id="addIntersectionsBtn" title="adds points at all intersections in viewport">add intersections</button>
+
+            <!-- Share Button -->
+            <button class="control-button" id="shareBtn" title="copy shareable link">share</button>
 
             <!-- Clean Button (Top Right) -->
             <button class="control-button" id="cleanBtn" title="removes lines that do not affect the matroid structure">clean</button>

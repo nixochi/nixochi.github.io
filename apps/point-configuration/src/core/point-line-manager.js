@@ -305,4 +305,59 @@ export class PointLineManager {
             flats: matroid.getAllFlats()
         };
     }
+
+    /**
+     * Serialize current state to URL-safe string
+     */
+    serializeState() {
+        const state = {
+            points: this.points.map(p => ({
+                x: Math.round(p.x * 100) / 100, // Round for compactness
+                y: Math.round(p.y * 100) / 100,
+                onLines: p.onLines
+            })),
+            lines: this.lines.map(l => ({
+                x: Math.round(l.x * 100) / 100,
+                y: Math.round(l.y * 100) / 100,
+                angle: Math.round(l.angle * 1000) / 1000
+            }))
+        };
+
+        const json = JSON.stringify(state);
+        // Use base64url encoding (URL-safe variant)
+        return btoa(json)
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+    }
+
+    /**
+     * Deserialize state from URL-safe string
+     */
+    deserializeState(encoded) {
+        try {
+            // Decode base64url
+            const base64 = encoded
+                .replace(/-/g, '+')
+                .replace(/_/g, '/');
+            const json = atob(base64);
+            const state = JSON.parse(json);
+
+            // Restore state
+            this.points = state.points.map(p => ({
+                ...p,
+                isIntersection: p.onLines.length > 1,
+                intersectionIndex: null
+            }));
+            this.lines = state.lines;
+
+            // Recompute intersections
+            this.intersections = computeIntersections(this.lines, this.points);
+
+            return true;
+        } catch (e) {
+            console.error('Failed to deserialize state:', e);
+            return false;
+        }
+    }
 }

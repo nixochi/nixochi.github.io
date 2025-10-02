@@ -47,8 +47,12 @@ export class CanvasManager {
         // Callback for state changes
         this.onStateChange = null;
 
+        // Load state from URL on startup
+        this.loadStateFromURL();
+
         // Wire up point/line manager callback
         this.pointLineManager.onStateChange = () => {
+            this.updateURL();
             if (this.onStateChange) {
                 this.onStateChange();
             }
@@ -207,5 +211,40 @@ export class CanvasManager {
         const viewportBounds = this.transformManager.getViewportBounds();
         this.pointLineManager.addIntersectionPoints(viewportBounds);
         this.draw();
+    }
+
+    /**
+     * Load configuration from URL hash
+     */
+    loadStateFromURL() {
+        const hash = window.location.hash.slice(1); // Remove #
+        if (hash) {
+            const loaded = this.pointLineManager.deserializeState(hash);
+            if (loaded) {
+                console.log('✅ Loaded configuration from URL');
+                this.draw();
+            }
+        }
+    }
+
+    /**
+     * Update URL with current state (debounced)
+     */
+    updateURL() {
+        // Debounce to avoid updating URL too frequently
+        clearTimeout(this._urlUpdateTimeout);
+        this._urlUpdateTimeout = setTimeout(() => {
+            const encoded = this.pointLineManager.serializeState();
+            const newURL = `${window.location.pathname}#${encoded}`;
+            window.history.replaceState(null, '', newURL);
+        }, 500);
+    }
+
+    /**
+     * Get shareable URL for current configuration
+     */
+    getShareableURL() {
+        const encoded = this.pointLineManager.serializeState();
+        return `${window.location.origin}${window.location.pathname}#${encoded}`;
     }
 }

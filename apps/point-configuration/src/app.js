@@ -46,6 +46,24 @@ addIntersectionsBtn.addEventListener('click', () => {
     canvasManager.addIntersectionPoints();
 });
 
+// Share button
+const shareBtn = document.getElementById('shareBtn');
+shareBtn.addEventListener('click', async () => {
+    const url = canvasManager.getShareableURL();
+
+    try {
+        await navigator.clipboard.writeText(url);
+        // Visual feedback
+        shareBtn.textContent = '✓ copied!';
+        setTimeout(() => {
+            shareBtn.textContent = 'share';
+        }, 2000);
+    } catch (err) {
+        // Fallback for browsers without clipboard API
+        prompt('Copy this URL:', url);
+    }
+});
+
 // Stats panel
 let currentView = 'general';
 

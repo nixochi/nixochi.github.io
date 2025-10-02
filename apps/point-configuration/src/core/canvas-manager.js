@@ -217,6 +217,7 @@ export class CanvasManager {
     async loadConfiguration(configName) {
         const success = await this.pointLineManager.loadConfiguration(configName);
         if (success) {
+            this.updateURL();
             this.draw();
         }
         return success;

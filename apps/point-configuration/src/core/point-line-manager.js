@@ -3,6 +3,7 @@
 
 import { getPointPosition, findIntersectionByLines, computeIntersections } from '../geometry/geometry-utils.js';
 import { PointLineMatroid } from '../math/matroid.js';
+import { HistoryManager } from './history-manager.js';
 import pako from 'https://esm.sh/pako@2.1.0';
 
 export class PointLineManager {
@@ -15,6 +16,9 @@ export class PointLineManager {
         // Settings
         this.pointRadius = 'ontouchstart' in window || navigator.maxTouchPoints > 0 ? 14 : 9;
         this.scale = scale;
+
+        // History manager
+        this.history = new HistoryManager(this);
 
         // Callback for state changes
         this.onStateChange = null;
@@ -80,7 +84,15 @@ export class PointLineManager {
             });
         }
 
-        console.log('Added point:', this.points.length - 1, 'at', x, y, 'onLines:', onLines, 'intersectionIndex:', intersectionIndex);
+        const newIndex = this.points.length - 1;
+        const newPoint = this.points[newIndex];
+
+        // Record history
+        this.history.recordAction(
+            this.history.createAddPointAction(newIndex, newPoint)
+        );
+
+        console.log('Added point:', newIndex, 'at', x, y, 'onLines:', onLines, 'intersectionIndex:', intersectionIndex);
         if (this.onStateChange) {
             this.onStateChange();
         }
@@ -153,6 +165,18 @@ export class PointLineManager {
             endPointIndices.forEach(idx => allPointIndices.add(idx));
         }
 
+        // Track changes for history (before modification)
+        const affectedPoints = [];
+        allPointIndices.forEach(pointIndex => {
+            const point = this.points[pointIndex];
+            affectedPoints.push({
+                index: pointIndex,
+                oldOnLines: [...point.onLines],
+                oldIsIntersection: point.isIntersection,
+                oldIntersectionIndex: point.intersectionIndex
+            });
+        });
+
         // Add all points to the line
         allPointIndices.forEach(pointIndex => {
             const point = this.points[pointIndex];
@@ -180,10 +204,89 @@ export class PointLineManager {
             }
         });
 
+        // Record history
+        this.history.recordAction(
+            this.history.createAddLineAction(
+                newLineIndex,
+                this.lines[newLineIndex],
+                affectedPoints
+            )
+        );
+
         console.log('Added line:', newLineIndex, 'angle:', angle, 'startPoints:', startPointIndices, 'endPoints:', endPointIndices);
         if (this.onStateChange) {
             this.onStateChange();
         }
+    }
+
+    /**
+     * Remove a point by index
+     */
+    removePoint(index) {
+        if (index < 0 || index >= this.points.length) {
+            console.error('Invalid point index:', index);
+            return false;
+        }
+
+        this.points.splice(index, 1);
+
+        // No need to update point indices in onLines since we're not tracking point-to-point references
+        // Just recompute intersections
+        this.intersections = computeIntersections(this.lines, this.points);
+
+        console.log('Removed point:', index);
+        if (this.onStateChange) {
+            this.onStateChange();
+        }
+
+        return true;
+    }
+
+    /**
+     * Remove a line by index
+     */
+    removeLine(index) {
+        if (index < 0 || index >= this.lines.length) {
+            console.error('Invalid line index:', index);
+            return false;
+        }
+
+        // Remove the line
+        this.lines.splice(index, 1);
+
+        // Update all points' onLines arrays
+        for (const point of this.points) {
+            // Remove references to the deleted line
+            point.onLines = point.onLines.filter(lineIdx => lineIdx !== index);
+
+            // Adjust indices for lines that came after the deleted one
+            point.onLines = point.onLines.map(lineIdx => lineIdx > index ? lineIdx - 1 : lineIdx);
+
+            // Update intersection status
+            point.isIntersection = point.onLines.length > 1;
+
+            // Clear intersection index (will be recomputed)
+            if (!point.isIntersection) {
+                point.intersectionIndex = null;
+            }
+        }
+
+        // Recompute intersections
+        this.intersections = computeIntersections(this.lines, this.points);
+
+        // Update intersection indices for all points
+        for (const point of this.points) {
+            if (point.isIntersection && point.onLines.length >= 2) {
+                point.intersectionIndex = findIntersectionByLines(point.onLines, this.intersections);
+            }
+        }
+
+        console.log('Removed line:', index);
+        if (this.onStateChange) {
+            this.onStateChange();
+        }
+
+        return true;
     }
 
     /**
@@ -476,6 +579,9 @@ export class PointLineManager {
             // Recompute intersections
             this.intersections = computeIntersections(this.lines, this.points);
 
+            // Clear history when loading from URL
+            this.history.clear();
+
             console.log(`✅ Loaded configuration: ${this.points.length} points, ${this.lines.length} lines`);
 
             return true;
@@ -526,6 +632,9 @@ export class PointLineManager {
 
             // Compute intersections
             this.intersections = computeIntersections(this.lines, this.points);
+
+            // Clear history when loading a configuration
+            this.history.clear();
 
             console.log(`✅ Loaded ${config.name}: ${this.points.length} points, ${this.lines.length} lines`);
 

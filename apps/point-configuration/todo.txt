@@ -2,7 +2,7 @@ todo:
 
 
 [ ] make matroid calculation non-blocking
-[ ] add undo options, delete, and clear options
+[x] add undo options, delete, and clear options
 [x] make the base,ciruits,flats page paginated
 [ ] add documentation and description of how to use the applet
 [x] add visual options for showing only line segments (added opacity)

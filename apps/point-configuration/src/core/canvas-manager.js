@@ -225,6 +225,42 @@ export class CanvasManager {
         this.draw();
     }
 
+    /**
+     * Undo last action
+     */
+    undo() {
+        const success = this.pointLineManager.history.undo();
+        if (success) {
+            this.draw();
+        }
+        return success;
+    }
+
+    /**
+     * Redo last undone action
+     */
+    redo() {
+        const success = this.pointLineManager.history.redo();
+        if (success) {
+            this.draw();
+        }
+        return success;
+    }
+
+    /**
+     * Check if undo is available
+     */
+    canUndo() {
+        return this.pointLineManager.history.canUndo();
+    }
+
+    /**
+     * Check if redo is available
+     */
+    canRedo() {
+        return this.pointLineManager.history.canRedo();
+    }
+
     async loadConfiguration(configName) {
         const success = await this.pointLineManager.loadConfiguration(configName);
         if (success) {

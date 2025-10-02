@@ -59,6 +59,46 @@ optionsBtn.addEventListener('click', () => {
     }
 });
 
+// Undo/Redo buttons
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+
+function updateHistoryButtons() {
+    undoBtn.disabled = !canvasManager.canUndo();
+    redoBtn.disabled = !canvasManager.canRedo();
+    undoBtn.style.opacity = canvasManager.canUndo() ? '1' : '0.5';
+    redoBtn.style.opacity = canvasManager.canRedo() ? '1' : '0.5';
+    undoBtn.style.cursor = canvasManager.canUndo() ? 'pointer' : 'not-allowed';
+    redoBtn.style.cursor = canvasManager.canRedo() ? 'pointer' : 'not-allowed';
+}
+
+undoBtn.addEventListener('click', () => {
+    canvasManager.undo();
+    updateHistoryButtons();
+});
+
+redoBtn.addEventListener('click', () => {
+    canvasManager.redo();
+    updateHistoryButtons();
+});
+
+// Keyboard shortcuts for undo/redo
+document.addEventListener('keydown', (e) => {
+    // Check if Ctrl (Windows/Linux) or Cmd (Mac) is pressed
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const modifierKey = isMac ? e.metaKey : e.ctrlKey;
+
+    if (modifierKey && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        canvasManager.undo();
+        updateHistoryButtons();
+    } else if (modifierKey && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        canvasManager.redo();
+        updateHistoryButtons();
+    }
+});
+
 // Ray opacity slider
 const rayOpacitySlider = document.getElementById('rayOpacitySlider');
 const rayOpacityValue = document.getElementById('rayOpacityValue');
@@ -305,10 +345,12 @@ dropdownItems.forEach(item => {
 canvasManager.onStateChange = () => {
     resetPagination(); // Reset all pagination when configuration changes
     updateStatsPanel();
+    updateHistoryButtons();
 };
 
 // Initial update
 updateStatsPanel();
+updateHistoryButtons();
 
 // Panel resize behavior
 const statsPanel = document.getElementById('statsPanel');

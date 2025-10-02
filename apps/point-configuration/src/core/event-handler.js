@@ -264,6 +264,23 @@ export class EventHandler {
                     point.x = state.data.originalX;
                     point.y = state.data.originalY;
                 } else {
+                    // Capture old state for history
+                    const oldState = {
+                        x: state.data.originalX,
+                        y: state.data.originalY,
+                        onLines: [...point.onLines],
+                        isIntersection: point.isIntersection,
+                        intersectionIndex: point.intersectionIndex
+                    };
+
+                    // Check if there were other points at the old position
+                    const oldPositionPoints = this.pointLineManager.getPointsAtPosition(
+                        state.data.originalX,
+                        state.data.originalY,
+                        1
+                    ).filter(idx => idx !== state.data.pointIndex);
+                    const wasAtMultipoint = oldPositionPoints.length > 0;
+
                     // Get final ghost position from visuals
                     const visuals = this.stateManager.computeVisualState(
                         this.mode,
@@ -318,6 +335,56 @@ export class EventHandler {
                                 }
                             }
                         }
+
+                        // Capture new state
+                        const newState = {
+                            x: point.x,
+                            y: point.y,
+                            onLines: [...point.onLines],
+                            isIntersection: point.isIntersection,
+                            intersectionIndex: point.intersectionIndex
+                        };
+
+                        // Check if there are other points at the new position
+                        const newPositionPoints = this.pointLineManager.getPointsAtPosition(
+                            point.x,
+                            point.y,
+                            1
+                        ).filter(idx => idx !== state.data.pointIndex);
+                        const isAtMultipoint = newPositionPoints.length > 0;
+
+                        // Determine action type: move, merge, or unmerge
+                        let actionType;
+                        if (!wasAtMultipoint && isAtMultipoint) {
+                            actionType = 'merge';
+                        } else if (wasAtMultipoint && !isAtMultipoint) {
+                            actionType = 'unmerge';
+                        } else {
+                            actionType = 'move';
+                        }
+
+                        // Record history
+                        let action;
+                        if (actionType === 'merge') {
+                            action = this.pointLineManager.history.createMergePointAction(
+                                state.data.pointIndex,
+                                oldState,
+                                newState
+                            );
+                        } else if (actionType === 'unmerge') {
+                            action = this.pointLineManager.history.createUnmergePointAction(
+                                state.data.pointIndex,
+                                oldState,
+                                newState
+                            );
+                        } else {
+                            action = this.pointLineManager.history.createMovePointAction(
+                                state.data.pointIndex,
+                                oldState,
+                                newState
+                            );
+                        }
+                        this.pointLineManager.history.recordAction(action);
                     } else {
                         // No ghost (shouldn't happen), restore original
                         point.x = state.data.originalX;

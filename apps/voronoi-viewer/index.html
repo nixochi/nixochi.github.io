@@ -4,62 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Voronoi Diagram Viewer</title>
-    <link rel="stylesheet" href="voronoi-styles.css?v=1.1.0">
+    <link rel="stylesheet" href="voronoi-styles.css?v=1.2.0">
 </head>
 <body>
     <!-- Options Button -->
     <button class="options-button" id="optionsBtn">options</button>
 
     <!-- Fullscreen voronoi viewer -->
-    <voronoi-viewer id="viewer" algorithm="jfa"></voronoi-viewer>
+    <voronoi-viewer id="viewer"></voronoi-viewer>
     
-    <!-- Compact Controls Panel (Starts hidden in HTML, no CSS required) -->
+    <!-- Compact Controls Panel -->
     <div class="floating-panel controls-panel" id="controlsPanel" style="display: none;">
         <div class="control-group">
             <label class="control-label">display</label>
             <div class="toggle-wrapper">
-                <div class="toggle active" id="cellsToggle"></div>
-                <span class="toggle-label">show cells</span>
-            </div>
-            <div class="toggle-wrapper">
                 <div class="toggle active" id="edgesToggle"></div>
                 <span class="toggle-label">show edges</span>
-            </div>
-            <div class="toggle-wrapper">
-                <div class="toggle active" id="sitesToggle"></div>
-                <span class="toggle-label">show sites</span>
-            </div>
-            <div class="toggle-wrapper">
-                <div class="toggle" id="delaunayToggle"></div>
-                <span class="toggle-label">show delaunay</span>
-            </div>
-        </div>
-
-        <div class="control-group">
-            <label class="control-label">colors</label>
-            <div class="color-grid" id="colorGrid">
-                <div class="color-option active" data-palette="default" style="background: linear-gradient(45deg, #FF6B6B, #4ECDC4, #45B7D1, #96CEB4);"></div>
-                <div class="color-option" data-palette="warm" style="background: linear-gradient(45deg, #ff6b35, #f7931e, #ffb700, #c5d86d);"></div>
-                <div class="color-option" data-palette="cool" style="background: linear-gradient(45deg, #667eea, #764ba2, #6b73ff, #9bafd9);"></div>
-                <div class="color-option" data-palette="nature" style="background: linear-gradient(45deg, #56ab2f, #a8e6cf, #7fcdcd, #c8e6c9);"></div>
-                <div class="color-option" data-palette="sunset" style="background: linear-gradient(45deg, #fa709a, #fee140, #ffa726, #ff7043);"></div>
-                <div class="color-option" data-palette="ocean" style="background: linear-gradient(45deg, #2196F3, #21CBF3, #00BCD4, #009688);"></div>
-                <div class="color-option" data-palette="purple" style="background: linear-gradient(45deg, #8b5cf6, #a855f7, #9333ea, #7c3aed);"></div>
-                <div class="color-option" data-palette="mono" style="background: linear-gradient(45deg, #6b7280, #9ca3af, #d1d5db, #f3f4f6);"></div>
-            </div>
-        </div>
-
-        <div class="control-group">
-            <label class="control-label">algorithm</label>
-            <div class="select-wrapper">
-                <select class="select-field" id="algorithmSelect">
-                    <option value="jfa" selected>GPU (JFA) — fast</option>
-                    <option value="l2">exact L₂ — precise</option>
-                </select>
-            </div>
-            <div class="help-text">
-                JFA uses GPU for speed (approximate).<br>
-                L₂ exact uses half-space intersection (slow but perfect for Euclidean).
             </div>
         </div>
 
@@ -83,28 +43,6 @@
         </div>
 
         <div class="control-group">
-            <label class="control-label">styling</label>
-            <div class="slider-wrapper">
-                <label class="slider-label">cell opacity</label>
-                <input type="range" class="slider" id="opacitySlider"
-                       min="0" max="1" step="0.1" value="0.9">
-                <div class="slider-value" id="opacityValue">90%</div>
-            </div>
-            <div class="slider-wrapper">
-                <label class="slider-label">edge thickness</label>
-                <input type="range" class="slider" id="thicknessSlider"
-                       min="0.5" max="8" step="0.5" value="2">
-                <div class="slider-value" id="thicknessValue">2px</div>
-            </div>
-            <div class="slider-wrapper">
-                <label class="slider-label">site radius</label>
-                <input type="range" class="slider" id="radiusSlider"
-                       min="2" max="20" step="1" value="5">
-                <div class="slider-value" id="radiusValue">5px</div>
-            </div>
-        </div>
-
-        <div class="control-group">
             <label class="control-label">actions</label>
             <button class="action-btn" id="clearBtn">clear all</button>
             <button class="action-btn" id="randomBtn">add random points</button>
@@ -113,137 +51,53 @@
 
         <div class="control-group">
             <label class="control-label">interaction</label>
-            <div class="toggle-wrapper">
-                <div class="toggle active" id="draggingToggle"></div>
-                <span class="toggle-label">allow dragging</span>
-            </div>
-            <div class="toggle-wrapper">
-                <div class="toggle active" id="removeToggle"></div>
-                <span class="toggle-label">remove on right click</span>
-            </div>
             <div class="help-text">
                 click to add points<br>
-                right-click to remove<br>
                 drag to move points
             </div>
         </div>
     </div>
 
-    <script src="algorithms/voronoi-l2-exact.js?v=1.0.0"></script>
-    <script src="algorithms/voronoi-jfa.js?v=1.0.0"></script>
-    <script src="voronoi-math.js?v=1.1.0"></script>
-    <script src="voronoi-viewer.js?v=1.1.0"></script>
+    <script src="voronoi-viewer.js?v=1.2.0"></script>
     <script>
-        // Control setup
         const viewer = document.getElementById('viewer');
         const optionsBtn = document.getElementById('optionsBtn');
         const controlsPanel = document.getElementById('controlsPanel');
         
-        // Initialize panel state - starts hidden in HTML
         let panelVisible = false;
-        
-        // Panel starts hidden via inline style, so no jitter possible
         optionsBtn.textContent = 'options';
         
-        // Options panel toggle
         optionsBtn.addEventListener('click', () => {
             panelVisible = !panelVisible;
             if (panelVisible) {
                 controlsPanel.style.display = 'block';
-                // Force reflow before adding class for smooth animation
                 controlsPanel.offsetHeight;
                 controlsPanel.classList.add('expanded');
                 optionsBtn.textContent = 'close';
             } else {
                 controlsPanel.classList.remove('expanded');
-                // Wait for animation to complete before hiding
                 setTimeout(() => {
-                    if (!panelVisible) { // Check again in case user clicked during animation
+                    if (!panelVisible) {
                         controlsPanel.style.display = 'none';
                     }
-                }, 300); // Match CSS transition duration
+                }, 300);
                 optionsBtn.textContent = 'options';
             }
         });
         
-        // Toggle elements
-        const cellsToggle = document.getElementById('cellsToggle');
         const edgesToggle = document.getElementById('edgesToggle');
-        const sitesToggle = document.getElementById('sitesToggle');
-        const delaunayToggle = document.getElementById('delaunayToggle');
-        const draggingToggle = document.getElementById('draggingToggle');
-        const removeToggle = document.getElementById('removeToggle');
         const infinityToggle = document.getElementById('infinityToggle');
-
-        // Slider elements
         const metricSlider = document.getElementById('metricSlider');
         const metricValue = document.getElementById('metricValue');
-        const opacitySlider = document.getElementById('opacitySlider');
-        const opacityValue = document.getElementById('opacityValue');
-        const thicknessSlider = document.getElementById('thicknessSlider');
-        const thicknessValue = document.getElementById('thicknessValue');
-        const radiusSlider = document.getElementById('radiusSlider');
-        const radiusValue = document.getElementById('radiusValue');
-        
-        // Algorithm selector
-        const algorithmSelect = document.getElementById('algorithmSelect');
-        
-        // Color options
-        const colorGrid = document.getElementById('colorGrid');
-        
-        // Action buttons
         const clearBtn = document.getElementById('clearBtn');
         const randomBtn = document.getElementById('randomBtn');
         const gridBtn = document.getElementById('gridBtn');
 
-        // Toggle functionality
-        function setupToggle(toggle, attribute, defaultValue = false) {
-            if (defaultValue) toggle.classList.add('active');
-            
-            toggle.addEventListener('click', () => {
-                toggle.classList.toggle('active');
-                const isActive = toggle.classList.contains('active');
-                viewer.setAttribute(attribute, isActive ? 'true' : 'false');
-            });
-        }
-
-        // Setup all toggles
-        setupToggle(cellsToggle, 'show-cells', true);
-        setupToggle(edgesToggle, 'show-edges', true);
-        setupToggle(sitesToggle, 'show-sites', true);
-        setupToggle(delaunayToggle, 'show-delaunay', false);
-        setupToggle(draggingToggle, 'allow-dragging', true);
-        setupToggle(removeToggle, 'remove-on-right-click', true);
-
-        // Algorithm selection
-        algorithmSelect.addEventListener('change', (e) => {
-            const algo = e.target.value;
-            viewer.setAttribute('algorithm', algo);
-            
-            // Show helpful message about algorithm choice
-            const p = parseFloat(metricSlider.value);
-            if (algo === 'l2' && p !== 2) {
-                console.log('Note: L₂ exact algorithm only works for Euclidean (p=2). Setting p=2.');
-                metricSlider.value = 2;
-                infinityToggle.classList.remove('active');
-                updateMetricDisplay();
-            }
-        });
-
-        // Color palette selection
-        colorGrid.addEventListener('click', (e) => {
-            const colorOption = e.target.closest('.color-option');
-            if (!colorOption) return;
-            
-            // Update active state
-            colorGrid.querySelectorAll('.color-option').forEach(option => {
-                option.classList.remove('active');
-            });
-            colorOption.classList.add('active');
-            
-            // Update viewer
-            const palette = colorOption.dataset.palette;
-            viewer.setAttribute('color-palette', palette);
+        // Setup edges toggle
+        edgesToggle.addEventListener('click', () => {
+            edgesToggle.classList.toggle('active');
+            const isActive = edgesToggle.classList.contains('active');
+            viewer.setShowEdges(isActive);
         });
 
         // Metric slider
@@ -264,14 +118,6 @@
                 }
                 viewer.setAttribute('metric-p', p.toString());
             }
-            
-            // Auto-switch to JFA if not using p=2 with l2 algorithm
-            const currentAlgo = algorithmSelect.value;
-            if (currentAlgo === 'l2' && (p !== 2 || isInfinity)) {
-                algorithmSelect.value = 'jfa';
-                viewer.setAttribute('algorithm', 'jfa');
-                console.log('Switched to JFA algorithm (L₂ exact only supports p=2)');
-            }
         }
 
         metricSlider.addEventListener('input', (e) => {
@@ -282,28 +128,6 @@
         infinityToggle.addEventListener('click', () => {
             infinityToggle.classList.toggle('active');
             updateMetricDisplay();
-        });
-
-        // Opacity slider
-        opacitySlider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            const percentage = Math.round(value * 100);
-            opacityValue.textContent = `${percentage}%`;
-            viewer.setAttribute('cell-opacity', value.toString());
-        });
-
-        // Thickness slider
-        thicknessSlider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            thicknessValue.textContent = `${value}px`;
-            viewer.setAttribute('edge-thickness', value.toString());
-        });
-
-        // Radius slider
-        radiusSlider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            radiusValue.textContent = `${value}px`;
-            viewer.setAttribute('site-radius', value.toString());
         });
 
         // Action buttons
@@ -322,9 +146,6 @@
         // Initial setup
         document.addEventListener('DOMContentLoaded', () => {
             metricValue.textContent = 'L₂ (Euclidean)';
-            opacityValue.textContent = '90%';
-            thicknessValue.textContent = '2px';
-            radiusValue.textContent = '5px';
         });
     </script>
 </body>

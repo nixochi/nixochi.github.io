@@ -11,20 +11,14 @@ export class Renderer {
         this.pointRadius = 9;
         this.colorPalette = 'monochromatic';
 
-        // Color palettes - expanded to 50 colors to avoid repetition
+        // Color palettes
         this.palettes = {
             monochromatic: ['#957fef'],
             rainbow: [
-                '#ff0000', '#ff4500', '#ff8c00', '#ffd700', '#ffff00',
-                '#adff2f', '#7fff00', '#32cd32', '#00ff00', '#00fa9a',
-                '#00ffff', '#00bfff', '#1e90ff', '#0000ff', '#4169e1',
-                '#8a2be2', '#9370db', '#ba55d3', '#da70d6', '#ff00ff',
-                '#ff1493', '#ff69b4', '#dc143c', '#b22222', '#8b0000',
-                '#ff6347', '#ff7f50', '#ffa500', '#ffb347', '#f0e68c',
-                '#9acd32', '#66cdaa', '#20b2aa', '#48d1cc', '#40e0d0',
-                '#4682b4', '#5f9ea0', '#6495ed', '#7b68ee', '#9932cc',
-                '#8b008b', '#9400d3', '#a020f0', '#c71585', '#db7093',
-                '#cd5c5c', '#f08080', '#fa8072', '#e9967a', '#ffa07a'
+                '#ff0000', '#00ffff', '#ff8800', '#0066ff', '#ffff00',
+                '#bb00ff', '#88ff00', '#ff0088', '#00ff44', '#ff6699',
+                '#00ccaa', '#ffaa00', '#4400ff', '#99ff66', '#cc0044',
+                '#33ccff'
             ],
             pastel: [
                 '#ffb3ba', '#ffdfba', '#ffffba', '#baffc9', '#bae1ff',

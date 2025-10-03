@@ -259,14 +259,14 @@ class VoronoiViewer extends HTMLElement {
     // EXACT initializeSamplePoints from tezcatli
     initializeSamplePoints() {
         const { width, height } = this.getBoundingClientRect();
-        
+
         // Add a few sample points - EXACT positions from tezcatli
         this.sites = [
-            createVoronoiPoint(width * 0.3, height * 0.3, 0),
-            createVoronoiPoint(width * 0.7, height * 0.3, 1),
-            createVoronoiPoint(width * 0.5, height * 0.7, 2)
+            { ...createVoronoiPoint(width * 0.3, height * 0.3, 0), colorIndex: 0 },
+            { ...createVoronoiPoint(width * 0.7, height * 0.3, 1), colorIndex: 1 },
+            { ...createVoronoiPoint(width * 0.5, height * 0.7, 2), colorIndex: 2 }
         ];
-        
+
         console.log(`Initialized ${this.sites.length} sample points for dimensions ${width}x${height}`);
     }
     
@@ -292,10 +292,110 @@ class VoronoiViewer extends HTMLElement {
     
     // Site management - EXACT from tezcatli
     addSite(x, y) {
-        const newSite = createVoronoiPoint(x, y, this.sites.length);
+        const newSite = { ...createVoronoiPoint(x, y, this.sites.length), colorIndex: null };
+
+        // Select color index based on neighbors
+        newSite.colorIndex = this.selectColorIndexForNewSite(newSite);
+
         this.sites.push(newSite);
         this.updateVisualization();
-        console.log(`Added site at (${x.toFixed(1)}, ${y.toFixed(1)})`);
+        console.log(`Added site at (${x.toFixed(1)}, ${y.toFixed(1)}) with color index ${newSite.colorIndex}`);
+    }
+
+    selectColorIndexForNewSite(newSite) {
+        if (this.sites.length === 0) {
+            return 0;
+        }
+
+        // Create temporary diagram with all sites including the new one
+        const { width, height } = this.getBoundingClientRect();
+        const bounds = {
+            left: 0,
+            right: width,
+            top: 0,
+            bottom: height
+        };
+
+        const tempSites = [...this.sites, newSite];
+        const tempDiagram = createVoronoiDiagram(tempSites, bounds);
+
+        // Get Delaunay edges (which tell us which sites are neighbors)
+        const delaunayEdges = this.getDelaunayEdgesFromDiagram(tempDiagram);
+
+        // Find all neighbors of the new site via Delaunay edges
+        const neighborColorIndices = new Set();
+        for (const edge of delaunayEdges) {
+            let neighborSiteId = null;
+
+            // Check if this edge connects to our new site
+            if (edge.site1.id === newSite.id) {
+                neighborSiteId = edge.site2.id;
+            } else if (edge.site2.id === newSite.id) {
+                neighborSiteId = edge.site1.id;
+            }
+
+            // If this edge connects to the new site, record the neighbor's color
+            if (neighborSiteId !== null) {
+                const neighborSite = this.sites.find(s => s.id === neighborSiteId);
+                if (neighborSite && neighborSite.colorIndex !== undefined && neighborSite.colorIndex !== null) {
+                    neighborColorIndices.add(neighborSite.colorIndex);
+                }
+            }
+        }
+
+        console.log(`New site ${newSite.id}: Found ${neighborColorIndices.size} neighbors with colors:`, Array.from(neighborColorIndices));
+
+        // Find available color indices
+        const availableIndices = [];
+        for (let i = 0; i < this.colors.length; i++) {
+            if (!neighborColorIndices.has(i)) {
+                availableIndices.push(i);
+            }
+        }
+
+        // If there are available indices, pick one randomly
+        if (availableIndices.length > 0) {
+            const selected = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+            console.log(`Selected color ${selected} from ${availableIndices.length} available colors`);
+            return selected;
+        }
+
+        // If all indices are taken by neighbors, pick a random one
+        const selected = Math.floor(Math.random() * this.colors.length);
+        console.log(`All colors taken by neighbors, randomly selected ${selected}`);
+        return selected;
+    }
+
+    getDelaunayEdgesFromDiagram(diagram) {
+        if (!diagram) return [];
+
+        const delaunayEdges = [];
+        const edgeSet = new Set();
+
+        // For each pair of Voronoi cells, check if they share an edge
+        for (let i = 0; i < diagram.cells.length; i++) {
+            for (let j = i + 1; j < diagram.cells.length; j++) {
+                const cell1 = diagram.cells[i];
+                const cell2 = diagram.cells[j];
+
+                if (this.cellsShareEdge(cell1, cell2)) {
+                    // Create consistent edge key (smaller id first)
+                    const site1Id = cell1.site.id.toString();
+                    const site2Id = cell2.site.id.toString();
+                    const edgeKey = site1Id < site2Id ? `${site1Id}-${site2Id}` : `${site2Id}-${site1Id}`;
+
+                    if (!edgeSet.has(edgeKey)) {
+                        edgeSet.add(edgeKey);
+                        delaunayEdges.push({
+                            site1: cell1.site,
+                            site2: cell2.site
+                        });
+                    }
+                }
+            }
+        }
+
+        return delaunayEdges;
     }
     
     removeSite(site) {
@@ -332,7 +432,7 @@ class VoronoiViewer extends HTMLElement {
     addRandomPoints(count = 5) {
         const { width, height } = this.getBoundingClientRect();
         const margin = 50;
-        
+
         for (let i = 0; i < count; i++) {
             const x = margin + Math.random() * (width - 2 * margin);
             const y = margin + Math.random() * (height - 2 * margin);
@@ -411,20 +511,24 @@ class VoronoiViewer extends HTMLElement {
     // Drawing functions - EXACT from tezcatli
     drawCells() {
         if (!this.diagram || !this.cellsGroup) return;
-        
+
         const opacity = this.getParameter('cellOpacity');
-        
+
         this.diagram.cells.forEach((cell, index) => {
             if (cell.vertices.length < 3) return;
-            
-            const color = this.colors[index % this.colors.length];
-            
+
+            // Use colorIndex from site if available, otherwise fallback to array index
+            const colorIndex = cell.site.colorIndex !== undefined && cell.site.colorIndex !== null
+                ? cell.site.colorIndex
+                : index;
+            const color = this.colors[colorIndex % this.colors.length];
+
             // Create polygon for cell
             const points = [];
             cell.vertices.forEach(vertex => {
                 points.push(vertex.x, vertex.y);
             });
-            
+
             const polygon = new this.Konva.Line({
                 points: points,
                 closed: true,
@@ -433,7 +537,7 @@ class VoronoiViewer extends HTMLElement {
                 stroke: '',
                 listening: false
             });
-            
+
             this.cellsGroup.add(polygon);
         });
     }

@@ -7,28 +7,18 @@
     --border: #e7e7e7;
     --shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
     --backdrop-blur: rgba(255, 255, 255, 0.9);
-    --blue: #3b82f6;
-    --blue-hover: #2563eb;
-    --green: #10b981;
-    --green-hover: #059669;
-    --red: #ef4444;
-    --red-hover: #dc2626;
-    --purple: #8b5cf6;
-    --orange: #f97316;
-    --pink: #ec4899;
-    --cyan: #06b6d4;
     --radius: 12px;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg-primary: #0d0d0e;
-        --bg-secondary: #121214;
+        --bg-primary: #161617;
+        --bg-secondary: #1c1c1e;
         --fg-primary: #f3f3f3;
         --fg-secondary: #b9b9b9;
-        --border: #1a1a1a;
-        --shadow: none;
-        --backdrop-blur: rgba(18, 18, 20, 0.9);
+        --border: #222224;
+        --shadow: rgba(0,0,0,0.5);
+        --backdrop-blur: rgba(28, 28, 30, 0.9);
     }
 }
 
@@ -45,13 +35,16 @@
 
 html, body {
     height: 100vh;
+    height: -webkit-fill-available;
     height: 100svh;
     overflow: hidden;
     touch-action: none;
     -ms-touch-action: none;
+    -webkit-overflow-scrolling: touch;
 }
 
 body {
+    visibility: visible;
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg-primary);
     color: var(--fg-primary);
@@ -61,31 +54,35 @@ body {
 
 voronoi-viewer {
     width: 100vw;
+    width: -webkit-fill-available;
     width: 100svw;
     height: 100vh;
+    height: -webkit-fill-available;
     height: 100svh;
     display: block;
     position: relative;
 }
 
+/* Options button - Top Left */
 .options-button {
-    position: fixed;
+    position: absolute;
     top: 20px;
     left: 20px;
     background: var(--backdrop-blur);
     backdrop-filter: blur(16px);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 8px;
     box-shadow: var(--shadow);
-    padding: 12px 20px;
+    padding: 6px 12px;
     z-index: 1001;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--fg-primary);
     cursor: pointer;
     transition: all 0.2s ease;
     user-select: none;
-    min-width: 150px;
+    min-width: 80px;
+    text-align: center;
 }
 
 .options-button:hover {
@@ -93,8 +90,9 @@ voronoi-viewer {
     border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
 }
 
+/* Floating Panel */
 .floating-panel {
-    position: fixed;
+    position: absolute;
     background: var(--backdrop-blur);
     backdrop-filter: blur(16px);
     border: 1px solid var(--border);
@@ -102,10 +100,12 @@ voronoi-viewer {
     box-shadow: var(--shadow);
     padding: 16px;
     z-index: 1000;
-    min-width: 220px;
+    min-width: 200px;
     max-height: 80vh;
+    max-height: -webkit-fill-available;
     max-height: 80svh;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     transition: all 0.3s ease;
     opacity: 0;
     visibility: hidden;
@@ -119,13 +119,12 @@ voronoi-viewer {
 }
 
 .controls-panel {
-    top: 60px;
+    top: 68px;
     left: 20px;
-    min-width: 220px;
 }
 
 .control-group {
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .control-group:last-child {
@@ -133,24 +132,21 @@ voronoi-viewer {
 }
 
 .control-label {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--fg-primary);
-    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--fg-secondary);
+    margin-bottom: 4px;
     display: block;
 }
 
+/* Toggle wrapper */
 .toggle-wrapper {
-    display: -webkit-box;
-    display: -webkit-flex;
     display: flex;
-    -webkit-box-align: center;
-    -webkit-align-items: center;
     align-items: center;
     gap: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 }
 
+/* Toggle switch - Updated to match point-configuration style */
 .toggle {
     position: relative;
     width: 44px;
@@ -189,8 +185,9 @@ voronoi-viewer {
     user-select: none;
 }
 
+/* Slider wrapper */
 .slider-wrapper {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .slider-label {
@@ -201,8 +198,10 @@ voronoi-viewer {
     font-weight: normal;
 }
 
+/* Range slider styling - Updated to match point-configuration */
 .slider {
     width: 100%;
+    margin-bottom: 4px;
     height: 6px;
     background: var(--border);
     border-radius: 3px;
@@ -213,8 +212,8 @@ voronoi-viewer {
 
 .slider::-webkit-slider-thumb {
     appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
     border-radius: 50%;
     cursor: pointer;
@@ -228,8 +227,8 @@ voronoi-viewer {
 }
 
 .slider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
     border-radius: 50%;
     cursor: pointer;
@@ -241,32 +240,21 @@ voronoi-viewer {
     font-size: 12px;
     color: var(--fg-secondary);
     text-align: right;
-    margin-top: 4px;
 }
 
+/* Action buttons - Updated to match point-configuration */
 .action-btn {
     width: 100%;
-    padding: 10px 12px;
+    padding: 8px 12px;
     margin-bottom: 8px;
     background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--fg-primary);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
-}
-
-.action-btn.primary {
-    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
-    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
-    color: var(--fg-primary);
-}
-
-.action-btn.primary:hover {
-    background: color-mix(in srgb, var(--bg-secondary) 40%, var(--border) 60%);
-    border-color: color-mix(in srgb, var(--border) 50%, var(--fg-secondary) 50%);
 }
 
 .action-btn:hover {
@@ -278,17 +266,13 @@ voronoi-viewer {
     margin-bottom: 0;
 }
 
-.action-btn.danger:hover {
-    background: var(--red);
-    border-color: var(--red);
-}
-
+/* Help text */
 .help-text {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--fg-secondary);
     line-height: 1.4;
-    margin-top: 8px;
-    padding: 8px;
+    margin-top: 4px;
+    padding: 6px;
     background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);
     border-radius: 6px;
     border: 1px solid var(--border);
@@ -296,11 +280,10 @@ voronoi-viewer {
 
 /* Color picker styles */
 .color-grid {
-    display: -webkit-grid;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 6px;
-    margin-bottom: 8px;
+    margin-bottom: 0;
 }
 
 .color-option {
@@ -324,7 +307,7 @@ voronoi-viewer {
 
 /* Custom scrollbar for floating panels */
 .floating-panel::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
 }
 
 .floating-panel::-webkit-scrollbar-track {
@@ -333,46 +316,32 @@ voronoi-viewer {
 
 .floating-panel::-webkit-scrollbar-thumb {
     background: var(--border);
-    border-radius: 3px;
+    border-radius: 4px;
 }
 
 .floating-panel::-webkit-scrollbar-thumb:hover {
     background: var(--fg-secondary);
 }
 
-/* Animation keyframes for smooth interactions */
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.floating-panel {
-    animation: slideIn 0.3s ease;
-}
-
-/* Mobile responsiveness */
+/* Responsive */
 @media (max-width: 768px) {
     .floating-panel {
-        min-width: 160px;
+        min-width: 180px;
         max-height: 60vh;
+        max-height: -webkit-fill-available;
+        max-height: 60svh;
     }
 
     .controls-panel {
-        top: 55px;
+        top: 60px;
         left: 15px;
-        min-width: 160px;
+        padding: 12px;
     }
 
     .options-button {
         top: 15px;
         left: 15px;
-        padding: 6px 12px;
+        padding: 6px 10px;
         font-size: 12px;
     }
 
@@ -381,7 +350,7 @@ voronoi-viewer {
     }
 
     .color-option {
-        width: 20px;
-        height: 20px;
+        width: 24px;
+        height: 24px;
     }
 }

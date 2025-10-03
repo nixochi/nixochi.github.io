@@ -71,13 +71,11 @@
     </style>
 </head>
 <body>
-    <!-- Options Button -->
-    <button class="options-button" id="optionsBtn">options</button>
-
-    <!-- Top Right Select Button -->
-    <button class="select-polytope-btn" id="selectPolytopeBtn">
-        select polytope
-    </button>
+    <!-- Top Left Buttons Container -->
+    <div class="top-left-buttons">
+        <button class="options-button" id="optionsBtn">options</button>
+        <button class="select-polytope-btn" id="selectPolytopeBtn">library</button>
+    </div>
 
     <!-- Fullscreen polytope viewer -->
     <polytope-viewer id="viewer" style="position: relative;" vertices='[
@@ -116,15 +114,15 @@
     <!-- Left Controls Panel (Starts hidden) -->
     <div class="floating-panel controls-panel" id="controlsPanel" style="display: none;">
         <div class="control-group">
-            <label class="control-label">Display Mode</label>
+            <label class="control-label">display mode</label>
             <div class="toggle-wrapper">
                 <div class="toggle" id="wireframeToggle"></div>
-                <span class="toggle-label">Wireframe</span>
+                <span class="toggle-label">wireframe</span>
             </div>
         </div>
 
         <div class="control-group">
-            <label class="control-label">Opacity</label>
+            <label class="control-label">opacity</label>
             <div class="slider-wrapper">
                 <input type="range" class="slider" id="opacitySlider"
                        min="0" max="1" step="0.1" value="0.9">
@@ -137,7 +135,7 @@
     <div class="modal-overlay" id="polytopeModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title">Select Polytope</h2>
+                <h2 class="modal-title">select polytope</h2>
                 <button class="close-button" id="closeModal">&times;</button>
             </div>
             

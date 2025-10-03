@@ -284,7 +284,7 @@ class VoronoiViewer extends HTMLElement {
             case 'removeOnRightClick': return this.getAttribute('remove-on-right-click') !== 'false';
             case 'colorPalette': return this.getAttribute('color-palette') || 'default';
             case 'edgeColor': return '#333333';
-            case 'siteColor': return '#FF4444';
+            case 'siteColor': return '#000000';
             case 'delaunayColor': return '#4444FF';
             default: return defaultValue;
         }
@@ -563,7 +563,7 @@ class VoronoiViewer extends HTMLElement {
                 radius: radius,
                 fill: color,
                 stroke: '#ffffff',
-                strokeWidth: 2,
+                strokeWidth: 1,
                 listening: true
             });
             

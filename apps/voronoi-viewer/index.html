@@ -16,27 +16,27 @@
     <!-- Compact Controls Panel (Starts hidden in HTML, no CSS required) -->
     <div class="floating-panel controls-panel" id="controlsPanel" style="display: none;">
         <div class="control-group">
-            <label class="control-label">Display</label>
+            <label class="control-label">display</label>
             <div class="toggle-wrapper">
                 <div class="toggle active" id="cellsToggle"></div>
-                <span class="toggle-label">Show Cells</span>
+                <span class="toggle-label">show cells</span>
             </div>
             <div class="toggle-wrapper">
                 <div class="toggle active" id="edgesToggle"></div>
-                <span class="toggle-label">Show Edges</span>
+                <span class="toggle-label">show edges</span>
             </div>
             <div class="toggle-wrapper">
                 <div class="toggle active" id="sitesToggle"></div>
-                <span class="toggle-label">Show Sites</span>
+                <span class="toggle-label">show sites</span>
             </div>
             <div class="toggle-wrapper">
                 <div class="toggle" id="delaunayToggle"></div>
-                <span class="toggle-label">Show Delaunay</span>
+                <span class="toggle-label">show delaunay</span>
             </div>
         </div>
 
         <div class="control-group">
-            <label class="control-label">Colors</label>
+            <label class="control-label">colors</label>
             <div class="color-grid" id="colorGrid">
                 <div class="color-option active" data-palette="default" style="background: linear-gradient(45deg, #FF6B6B, #4ECDC4, #45B7D1, #96CEB4);"></div>
                 <div class="color-option" data-palette="warm" style="background: linear-gradient(45deg, #ff6b35, #f7931e, #ffb700, #c5d86d);"></div>
@@ -50,48 +50,48 @@
         </div>
 
         <div class="control-group">
-            <label class="control-label">Styling</label>
+            <label class="control-label">styling</label>
             <div class="slider-wrapper">
-                <label class="slider-label">Cell Opacity</label>
-                <input type="range" class="slider" id="opacitySlider" 
+                <label class="slider-label">cell opacity</label>
+                <input type="range" class="slider" id="opacitySlider"
                        min="0" max="1" step="0.1" value="0.9">
                 <div class="slider-value" id="opacityValue">90%</div>
             </div>
             <div class="slider-wrapper">
-                <label class="slider-label">Edge Thickness</label>
-                <input type="range" class="slider" id="thicknessSlider" 
+                <label class="slider-label">edge thickness</label>
+                <input type="range" class="slider" id="thicknessSlider"
                        min="0.5" max="8" step="0.5" value="2">
                 <div class="slider-value" id="thicknessValue">2px</div>
             </div>
             <div class="slider-wrapper">
-                <label class="slider-label">Site Radius</label>
-                <input type="range" class="slider" id="radiusSlider" 
+                <label class="slider-label">site radius</label>
+                <input type="range" class="slider" id="radiusSlider"
                        min="2" max="20" step="1" value="6">
                 <div class="slider-value" id="radiusValue">6px</div>
             </div>
         </div>
 
         <div class="control-group">
-            <label class="control-label">Actions</label>
-            <button class="action-btn" id="clearBtn">Clear All</button>
-            <button class="action-btn" id="randomBtn">Add Random Points</button>
-            <button class="action-btn" id="gridBtn">Generate Grid</button>
+            <label class="control-label">actions</label>
+            <button class="action-btn" id="clearBtn">clear all</button>
+            <button class="action-btn" id="randomBtn">add random points</button>
+            <button class="action-btn" id="gridBtn">generate grid</button>
         </div>
 
         <div class="control-group">
-            <label class="control-label">Interaction</label>
+            <label class="control-label">interaction</label>
             <div class="toggle-wrapper">
                 <div class="toggle active" id="draggingToggle"></div>
-                <span class="toggle-label">Allow Dragging</span>
+                <span class="toggle-label">allow dragging</span>
             </div>
             <div class="toggle-wrapper">
                 <div class="toggle active" id="removeToggle"></div>
-                <span class="toggle-label">Remove on Right Click</span>
+                <span class="toggle-label">remove on right click</span>
             </div>
             <div class="help-text">
-                Click to add points<br>
-                Right-click to remove<br>
-                Drag to move points
+                click to add points<br>
+                right-click to remove<br>
+                drag to move points
             </div>
         </div>
     </div>

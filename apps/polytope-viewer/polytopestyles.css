@@ -7,21 +7,18 @@
     --border: #e7e7e7;
     --shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
     --backdrop-blur: rgba(255, 255, 255, 0.9);
-    --blue: #3b82f6;
-    --blue-hover: #2563eb;
     --radius: 12px;
 }
 
-/* Dark mode support */
 @media (prefers-color-scheme: dark) {
     :root {
-        --bg-primary: #0d0d0e;
-        --bg-secondary: #121214;
+        --bg-primary: #161617;
+        --bg-secondary: #1c1c1e;
         --fg-primary: #f3f3f3;
         --fg-secondary: #b9b9b9;
-        --border: #1a1a1a;
-        --shadow: none;
-        --backdrop-blur: rgba(18, 18, 20, 0.9);
+        --border: #222224;
+        --shadow: rgba(0,0,0,0.5);
+        --backdrop-blur: rgba(28, 28, 30, 0.9);
     }
 }
 
@@ -38,13 +35,16 @@
 
 html, body {
     height: 100vh;
+    height: -webkit-fill-available;
     height: 100svh;
-    overflow: hidden; /* Prevent page scrolling */
-    touch-action: none; /* Prevent zoom gestures */
+    overflow: hidden;
+    touch-action: none;
     -ms-touch-action: none;
+    -webkit-overflow-scrolling: touch;
 }
 
 body {
+    visibility: visible;
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg-primary);
     color: var(--fg-primary);
@@ -54,26 +54,85 @@ body {
 
 polytope-viewer {
     width: 100vw;
+    width: -webkit-fill-available;
     width: 100svw;
     height: 100vh;
+    height: -webkit-fill-available;
     height: 100svh;
     display: block;
 }
 
-/* Floating panel base styles */
+/* Top Left Buttons Container */
+.top-left-buttons {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    z-index: 1001;
+}
+
+/* Options button */
+.options-button {
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    min-width: 80px;
+    text-align: center;
+}
+
+.options-button:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+/* Select polytope button (library) */
+.select-polytope-btn {
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.select-polytope-btn:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+/* Floating Panel */
 .floating-panel {
-    position: fixed;
+    position: absolute;
     background: var(--backdrop-blur);
     backdrop-filter: blur(16px);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    padding: 20px;
+    padding: 16px;
     z-index: 1000;
-    min-width: 280px;
+    min-width: 200px;
     max-height: 80vh;
+    max-height: -webkit-fill-available;
     max-height: 80svh;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     transition: all 0.3s ease;
     opacity: 0;
     visibility: hidden;
@@ -86,31 +145,13 @@ polytope-viewer {
     transform: translateY(0);
 }
 
-.floating-panel:hover {
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-}
-
-/* Left panel - Controls */
 .controls-panel {
-    top: 60px;
+    top: 68px;
     left: 20px;
-    min-width: 220px;
-    padding: 16px;
 }
 
-/* Panel headers */
-.panel-header {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--fg-primary);
-    margin-bottom: 16px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-}
-
-/* Control groups */
 .control-group {
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .control-group:last-child {
@@ -118,25 +159,20 @@ polytope-viewer {
 }
 
 .control-label {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--fg-primary);
-    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--fg-secondary);
+    margin-bottom: 4px;
     display: block;
 }
 
-/* Toggle switch styles */
+/* Toggle wrapper - Updated to match point-configuration */
 .toggle-wrapper {
-    display: -webkit-box;
-    display: -webkit-flex;
     display: flex;
-    -webkit-box-align: center;
-    -webkit-align-items: center;
     align-items: center;
     gap: 12px;
-    margin-bottom: 12px;
 }
 
+/* Toggle switch - Updated to match point-configuration style */
 .toggle {
     position: relative;
     width: 44px;
@@ -175,13 +211,15 @@ polytope-viewer {
     user-select: none;
 }
 
-/* Slider styles */
+/* Slider wrapper */
 .slider-wrapper {
-    margin-bottom: 16px;
+    margin-bottom: 0;
 }
 
+/* Range slider styling - Updated to match point-configuration */
 .slider {
     width: 100%;
+    margin-bottom: 4px;
     height: 6px;
     background: var(--border);
     border-radius: 3px;
@@ -192,8 +230,8 @@ polytope-viewer {
 
 .slider::-webkit-slider-thumb {
     appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
     border-radius: 50%;
     cursor: pointer;
@@ -207,8 +245,8 @@ polytope-viewer {
 }
 
 .slider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
     border-radius: 50%;
     cursor: pointer;
@@ -220,34 +258,29 @@ polytope-viewer {
     font-size: 12px;
     color: var(--fg-secondary);
     text-align: right;
-    margin-top: 4px;
+    margin-bottom: 12px;
 }
 
-/* Modal styles - Updated for scrolling */
+/* Modal styles */
 .modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
+    width: -webkit-fill-available;
     width: 100svw;
     height: 100vh;
+    height: -webkit-fill-available;
     height: 100svh;
     background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(8px);
-    display: -webkit-box;
-    display: -webkit-flex;
     display: flex;
-    -webkit-box-align: center;
-    -webkit-align-items: center;
     align-items: center;
-    -webkit-box-pack: center;
-    -webkit-justify-content: center;
     justify-content: center;
     z-index: 2000;
     opacity: 0;
     visibility: hidden;
     transition: all 0.3s ease;
-    /* Prevent scrolling on the overlay itself */
     overflow: hidden;
 }
 
@@ -262,22 +295,16 @@ polytope-viewer {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-    max-width: 600px;
+    max-width: 500px;
     width: 90%;
-    /* Fixed height with scrolling */
     height: 80vh;
+    height: -webkit-fill-available;
     height: 80svh;
-    max-height: 600px;
-    display: -webkit-box;
-    display: -webkit-flex;
+    max-height: 500px;
     display: flex;
-    -webkit-box-orient: vertical;
-    -webkit-box-direction: normal;
-    -webkit-flex-direction: column;
     flex-direction: column;
     transform: scale(0.9) translateY(20px);
     transition: all 0.3s ease;
-    /* Prevent the modal from overflowing */
     overflow: hidden;
 }
 
@@ -286,25 +313,20 @@ polytope-viewer {
 }
 
 .modal-header {
-    display: -webkit-box;
-    display: -webkit-flex;
     display: flex;
-    -webkit-box-align: center;
-    -webkit-align-items: center;
     align-items: center;
-    -webkit-box-pack: justify;
-    -webkit-justify-content: space-between;
     justify-content: space-between;
-    padding: 24px 24px 16px 24px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border);
-    /* Fixed header - doesn't scroll */
     flex-shrink: 0;
 }
 
 .modal-title {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--fg-primary);
+    text-transform: lowercase;
+    flex: 1;
 }
 
 .close-button {
@@ -323,20 +345,14 @@ polytope-viewer {
     color: var(--fg-primary);
 }
 
-/* Scrollable modal body */
 .modal-body {
-    -webkit-box-flex: 1;
-    -webkit-flex: 1;
     flex: 1;
     overflow-y: auto;
-    padding: 20px 24px 24px 24px;
+    padding: 16px;
 }
 
-/* Polytope grid - now inside scrollable area */
 .polytope-grid {
-    display: -webkit-grid;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 10px;
 }
 
@@ -348,17 +364,9 @@ polytope-viewer {
     cursor: pointer;
     transition: all 0.2s ease;
     text-align: center;
-    /* Ensure cards have consistent height */
-    min-height: 60px;
-    display: -webkit-box;
-    display: -webkit-flex;
+    min-height: 50px;
     display: flex;
-    -webkit-box-orient: vertical;
-    -webkit-box-direction: normal;
-    -webkit-flex-direction: column;
     flex-direction: column;
-    -webkit-box-pack: center;
-    -webkit-justify-content: center;
     justify-content: center;
 }
 
@@ -374,125 +382,18 @@ polytope-viewer {
 }
 
 .polytope-name {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--fg-primary);
-    margin-bottom: 4px;
 }
 
 .polytope-description {
     font-size: 11px;
     color: var(--fg-secondary);
     line-height: 1.3;
+    margin-top: 4px;
 }
 
-/* Options button (top left) */
-.options-button {
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    background: var(--backdrop-blur);
-    backdrop-filter: blur(16px);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 20px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--fg-primary);
-    cursor: pointer;
-    z-index: 1001;
-    box-shadow: var(--shadow);
-    transition: all 0.2s ease;
-    user-select: none;
-    min-width: 150px;
-}
-
-.options-button:hover {
-    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
-    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
-}
-
-/* Top right button */
-.select-polytope-btn {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: var(--backdrop-blur);
-    backdrop-filter: blur(16px);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 20px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--fg-primary);
-    cursor: pointer;
-    z-index: 1001;
-    box-shadow: var(--shadow);
-    transition: all 0.2s ease;
-    min-width: 150px;
-}
-
-.select-polytope-btn:hover {
-    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
-    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
-}
-
-/* Mobile responsiveness */
-@media (max-width: 768px) {
-    .floating-panel {
-        min-width: 200px;
-        max-height: 60vh;
-    }
-
-    .controls-panel {
-        top: 55px;
-        left: 15px;
-        padding: 12px;
-        min-width: 180px;
-    }
-
-    .options-button {
-        top: 15px;
-        left: 15px;
-        padding: 10px 16px;
-        font-size: 13px;
-    }
-
-    .select-polytope-btn {
-        top: 15px;
-        right: 15px;
-        padding: 10px 16px;
-        font-size: 13px;
-    }
-
-    .modal-content {
-        margin: 20px;
-        width: calc(100% - 40px);
-        height: calc(100vh - 40px);
-        height: calc(100svh - 40px);
-        max-height: none;
-    }
-
-    .modal-header {
-        padding: 20px 20px 12px 20px;
-    }
-
-    .modal-body {
-        padding: 16px 20px 20px 20px;
-    }
-
-    .polytope-grid {
-        grid-template-columns: 1fr;
-        gap: 8px;
-    }
-
-    .polytope-card {
-        min-height: 50px;
-        padding: 10px;
-    }
-}
-
-/* Custom scrollbar for modal */
 .modal-body::-webkit-scrollbar {
     width: 8px;
 }
@@ -510,41 +411,88 @@ polytope-viewer {
     background: var(--fg-secondary);
 }
 
-/* Custom scrollbar for floating panels */
-.floating-panel::-webkit-scrollbar {
-    width: 6px;
-}
-
-.floating-panel::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.floating-panel::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 3px;
-}
-
-.floating-panel::-webkit-scrollbar-thumb:hover {
-    background: var(--fg-secondary);
-}
-
-/* Animation keyframes for smooth interactions */
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.floating-panel {
-    animation: slideIn 0.3s ease;
-}
-
-/* Prevent body scrolling when modal is open */
 body.modal-open {
     overflow: hidden;
+}
+
+/* Loading skeleton */
+.skeleton-loader {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+    z-index: 999;
+    transition: opacity 0.3s ease;
+}
+
+.skeleton-loader.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.skeleton-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--fg-secondary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton-spinner {
+        animation: none;
+        border-top-color: var(--border);
+    }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.skeleton-text {
+    font-size: 14px;
+    color: var(--fg-secondary);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .floating-panel {
+        min-width: 180px;
+    }
+
+    .top-left-buttons {
+        top: 15px;
+        left: 15px;
+        gap: 6px;
+    }
+
+    .controls-panel {
+        top: 60px;
+        left: 15px;
+        padding: 12px;
+    }
+
+    .options-button,
+    .select-polytope-btn {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+
+    .modal-content {
+        width: calc(100% - 40px);
+        max-height: calc(100vh - 40px);
+        max-height: -webkit-fill-available;
+        max-height: calc(100svh - 40px);
+    }
+
+    .floating-panel {
+        max-height: 60vh;
+        max-height: -webkit-fill-available;
+        max-height: 60svh;
+    }
 }

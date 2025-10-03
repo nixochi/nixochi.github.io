@@ -265,8 +265,18 @@ uniform bool  uUseInf;
 
 float lp_cost(vec2 delta){
   vec2 ad = abs(delta);
-  return (uUseInf) ? max(ad.x, ad.y)
-                   : (pow(ad.x, uP) + pow(ad.y, uP));
+  if (uUseInf) return max(ad.x, ad.y);
+
+  // For numerical stability with large p
+  if (uP > 5.0) {
+    // Use max-norm approximation for large p
+    float maxVal = max(ad.x, ad.y);
+    if (maxVal < 0.001) return 0.0;
+    vec2 normalized = ad / maxVal;
+    return maxVal * pow(pow(normalized.x, uP) + pow(normalized.y, uP), 1.0 / uP);
+  }
+
+  return pow(pow(ad.x, uP) + pow(ad.y, uP), 1.0 / uP);
 }
 
 vec4 pickBetter(vec4 a, vec4 b, vec2 fragPix){

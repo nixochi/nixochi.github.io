@@ -24,6 +24,20 @@
         </div>
 
         <div class="control-group">
+            <label class="control-label">animation</label>
+            <div class="toggle-wrapper">
+                <div class="toggle" id="animateToggle"></div>
+                <span class="toggle-label">animate points</span>
+            </div>
+            <div class="slider-wrapper">
+                <label class="slider-label">animation speed</label>
+                <input type="range" class="slider" id="speedSlider"
+                       min="0.1" max="3" step="0.1" value="1">
+                <div class="slider-value" id="speedValue">1.0x</div>
+            </div>
+        </div>
+
+        <div class="control-group">
             <label class="control-label">metric</label>
             <div class="slider-wrapper">
                 <label class="slider-label">L_p metric (p value)</label>
@@ -86,6 +100,9 @@
         });
         
         const edgesToggle = document.getElementById('edgesToggle');
+        const animateToggle = document.getElementById('animateToggle');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
         const infinityToggle = document.getElementById('infinityToggle');
         const metricSlider = document.getElementById('metricSlider');
         const metricValue = document.getElementById('metricValue');
@@ -98,6 +115,20 @@
             edgesToggle.classList.toggle('active');
             const isActive = edgesToggle.classList.contains('active');
             viewer.setShowEdges(isActive);
+        });
+
+        // Setup animation toggle
+        animateToggle.addEventListener('click', () => {
+            animateToggle.classList.toggle('active');
+            const isActive = animateToggle.classList.contains('active');
+            viewer.setAnimation(isActive);
+        });
+
+        // Setup animation speed slider
+        speedSlider.addEventListener('input', () => {
+            const speed = parseFloat(speedSlider.value);
+            speedValue.textContent = `${speed.toFixed(1)}x`;
+            viewer.setAnimationSpeed(speed);
         });
 
         // Metric slider

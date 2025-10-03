@@ -1,6 +1,6 @@
 /**
  * Voronoi Diagram Viewer Web Component - WebGL Direct Rendering
- * No Konva, pure GPU rendering using JFA
+ * Optimized with RGBA16F and reduced JFA passes
  */
 class VoronoiViewer extends HTMLElement {
     static get observedAttributes() {
@@ -17,6 +17,12 @@ class VoronoiViewer extends HTMLElement {
         this.isDragging = false;
         this.lastRecomputeTime = 0;
         this.pendingRecompute = false;
+
+        // Animation state
+        this.isAnimating = false;
+        this.animationFrameId = null;
+        this.lastAnimationTime = 0;
+        this.animationSpeed = 1.0; // Multiplier for animation speed
         
         // WebGL objects
         this.gl = null;
@@ -69,7 +75,7 @@ class VoronoiViewer extends HTMLElement {
                     cursor: crosshair;
                 "></canvas>
             </div>
-            
+
             <div id="errorMessage" style="
                 position: absolute;
                 inset: 0;
@@ -103,15 +109,22 @@ class VoronoiViewer extends HTMLElement {
     
     disconnectedCallback() {
         console.log('🔌 VoronoiViewer disconnected from DOM');
-        
+
+        // Stop animation
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+        this.isAnimating = false;
+
         this.cleanup();
-        
+
         if (this._ro) {
             this._ro.disconnect();
         }
     }
 
-    attributeChangedCallback(name, oldValue, newValue) {
+    attributeChangedCallback(name, _oldValue, newValue) {
         console.log(`🔄 VoronoiViewer attribute changed: ${name} = ${newValue}`);
         
         if (name === 'metric-p') {
@@ -169,12 +182,13 @@ class VoronoiViewer extends HTMLElement {
             throw new Error('WebGL2 not available in this browser.');
         }
 
+        // Check for half-float support (most modern GPUs have this)
         const extCBF = this.gl.getExtension('EXT_color_buffer_float');
         if (!extCBF) {
-            throw new Error('Missing EXT_color_buffer_float. Your GPU/driver must support RGBA32F rendering.');
+            throw new Error('Missing EXT_color_buffer_float extension.');
         }
         
-        console.log('✅ WebGL2 initialized');
+        console.log('✅ WebGL2 initialized with half-float support');
     }
     
     compile(type, src) {
@@ -212,7 +226,8 @@ class VoronoiViewer extends HTMLElement {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, null);
+        // OPTIMIZATION: Use RGBA16F instead of RGBA32F for 2x bandwidth reduction
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.FLOAT, null);
         return tex;
     }
 
@@ -236,7 +251,6 @@ class VoronoiViewer extends HTMLElement {
     setupShaders() {
         const gl = this.gl;
         
-        // Shaders - EXACT from original
         const VERT = `#version 300 es
 precision highp float;
 out vec2 v_uv;
@@ -252,6 +266,7 @@ precision mediump float;
 out vec4 outColor;
 void main(){ outColor = vec4(-1.0, -1.0, -1.0, 0.0); }`;
 
+        // OPTIMIZATION: Optimized distance calculation for common cases
         const FRAG_JFA = `#version 300 es
 precision highp float;
 precision highp sampler2D;
@@ -267,17 +282,16 @@ uniform bool  uUseInf;
 float lp_cost(vec2 delta){
   vec2 ad = abs(delta);
   if (uUseInf) return max(ad.x, ad.y);
+  
+  // OPTIMIZATION: Fast paths for common metrics
+  if (uP == 1.0) return ad.x + ad.y;
+  if (uP == 2.0) return length(delta);
 
-  // For numerical stability with large p
-  if (uP > 5.0) {
-    // Use max-norm approximation for large p
-    float maxVal = max(ad.x, ad.y);
-    if (maxVal < 0.001) return 0.0;
-    vec2 normalized = ad / maxVal;
-    return maxVal * pow(pow(normalized.x, uP) + pow(normalized.y, uP), 1.0 / uP);
-  }
-
-  return pow(pow(ad.x, uP) + pow(ad.y, uP), 1.0 / uP);
+  // General case with stability
+  float maxVal = max(ad.x, ad.y);
+  if (maxVal < 0.001) return 0.0;
+  vec2 normalized = ad / maxVal;
+  return maxVal * pow(pow(normalized.x, uP) + pow(normalized.y, uP), 1.0 / uP);
 }
 
 vec4 pickBetter(vec4 a, vec4 b, vec2 fragPix){
@@ -344,7 +358,6 @@ void main(){
   float dotRadius = 5.0;
   float dist = distance(fragPix, seed);
   if (dist < dotRadius) {
-    // Black fill with white outline and anti-aliasing
     float outerEdge = smoothstep(dotRadius + 0.5, dotRadius - 0.5, dist);
     float innerEdge = smoothstep(dotRadius - 0.5, dotRadius - 1.5, dist);
     vec3 dotColor = mix(vec3(1.0), vec3(0.0), innerEdge);
@@ -364,7 +377,7 @@ void main(){
         this.fboA = this.createFBO(this.texA);
         this.fboB = this.createFBO(this.texB);
 
-        // Palette - EXACT from original
+        // Palette texture
         const PALETTE_SIZE = 4096;
         this.paletteTex = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, this.paletteTex);
@@ -434,7 +447,7 @@ void main(){
             this.dragIndex = this.findSeedAt(x, y);
             if (this.dragIndex >= 0) {
                 this.isDragging = false;
-                this.canvas.classList.add('dragging');
+                this.canvas.style.cursor = 'grabbing';
             }
         });
 
@@ -453,14 +466,14 @@ void main(){
         this.canvas.addEventListener('mouseup', () => {
             if (this.dragIndex >= 0) {
                 this.dragIndex = -1;
-                this.canvas.classList.remove('dragging');
+                this.canvas.style.cursor = 'crosshair';
             }
         });
 
         this.canvas.addEventListener('mouseleave', () => {
             if (this.dragIndex >= 0) {
                 this.dragIndex = -1;
-                this.canvas.classList.remove('dragging');
+                this.canvas.style.cursor = 'crosshair';
                 this.isDragging = false;
             }
         });
@@ -476,7 +489,15 @@ void main(){
             if (x >= 0 && x < W && y >= 0 && y < H) {
                 const existing = this.findSeedAt(x, y);
                 if (existing < 0) {
-                    this.sites.push({ x, y });
+                    const newSite = { x, y };
+                    // Initialize velocity if animation is active
+                    if (this.isAnimating) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = 20 + Math.random() * 30;
+                        newSite.vx = Math.cos(angle) * speed;
+                        newSite.vy = Math.sin(angle) * speed;
+                    }
+                    this.sites.push(newSite);
                     this.recompute();
                 }
             }
@@ -603,6 +624,7 @@ void main(){
         gl.uniform1f(this.jfa.loc.uP, this.p);
         gl.uniform1i(this.jfa.loc.uUseInf, this.useInf ? 1 : 0);
 
+        // OPTIMIZATION: Standard JFA passes (power-of-2 stepping)
         while (step >= 1) {
             gl.uniform1f(this.jfa.loc.uStep, step);
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboB);
@@ -615,15 +637,8 @@ void main(){
             step >>= 1;
         }
 
-        // JFA+2: extra passes at step=2 and step=1 to fill gaps
-        gl.uniform1f(this.jfa.loc.uStep, 2.0);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboB);
-        gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
-        this.bindTexAsInput(this.texA, 0);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-        let t2 = this.texA; this.texA = this.texB; this.texB = t2;
-        let f2 = this.fboA; this.fboA = this.fboB; this.fboB = f2;
-
+        // OPTIMIZATION: Only one extra pass at step=1 (JFA+1 instead of JFA+2)
+        // This balances quality and performance
         gl.uniform1f(this.jfa.loc.uStep, 1.0);
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboB);
         gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
@@ -660,7 +675,8 @@ void main(){
     throttledRecompute() {
         const now = performance.now();
         const timeSinceLastRecompute = now - this.lastRecomputeTime;
-        const minInterval = 1000 / 60; // 60fps max
+        // OPTIMIZATION: 30fps during drag for smoother interaction
+        const minInterval = this.isDragging ? 1000 / 30 : 1000 / 60;
 
         if (timeSinceLastRecompute >= minInterval) {
             this.lastRecomputeTime = now;
@@ -696,7 +712,17 @@ void main(){
         for (let i = 0; i < count; i++) {
             const x = margin + Math.random() * (W - 2 * margin);
             const y = margin + Math.random() * (H - 2 * margin);
-            this.sites.push({ x, y });
+            const newSite = { x, y };
+
+            // Initialize velocity if animation is active
+            if (this.isAnimating) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 20 + Math.random() * 30;
+                newSite.vx = Math.cos(angle) * speed;
+                newSite.vy = Math.sin(angle) * speed;
+            }
+
+            this.sites.push(newSite);
         }
         this.recompute();
     }
@@ -708,17 +734,27 @@ void main(){
         const margin = 80;
         const cols = 4;
         const rows = 3;
-        
+
         const cellWidth = (W - 2 * margin) / cols;
         const cellHeight = (H - 2 * margin) / rows;
-        
+
         for (let row = 0; row < rows; row++) {
             for (let col = 0; col < cols; col++) {
                 const x = margin + (col + 0.5) * cellWidth;
                 const y = margin + (row + 0.5) * cellHeight;
                 const jitterX = (Math.random() - 0.5) * cellWidth * 0.3;
                 const jitterY = (Math.random() - 0.5) * cellHeight * 0.3;
-                this.sites.push({ x: x + jitterX, y: y + jitterY });
+                const newSite = { x: x + jitterX, y: y + jitterY };
+
+                // Initialize velocity if animation is active
+                if (this.isAnimating) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 20 + Math.random() * 30;
+                    newSite.vx = Math.cos(angle) * speed;
+                    newSite.vy = Math.sin(angle) * speed;
+                }
+
+                this.sites.push(newSite);
             }
         }
         this.recompute();
@@ -728,7 +764,76 @@ void main(){
         this.showEdges = show;
         this.renderFinal();
     }
-    
+
+    setAnimation(enabled) {
+        this.isAnimating = enabled;
+
+        if (this.isAnimating) {
+            // Initialize velocities for each point
+            this.sites.forEach(site => {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 20 + Math.random() * 30; // 20-50 pixels per second
+                site.vx = Math.cos(angle) * speed;
+                site.vy = Math.sin(angle) * speed;
+            });
+
+            this.lastAnimationTime = performance.now();
+            this.animationLoop();
+        } else {
+            if (this.animationFrameId) {
+                cancelAnimationFrame(this.animationFrameId);
+                this.animationFrameId = null;
+            }
+        }
+    }
+
+    setAnimationSpeed(speed) {
+        this.animationSpeed = speed;
+    }
+
+    animationLoop() {
+        if (!this.isAnimating) return;
+
+        const now = performance.now();
+        const deltaTime = (now - this.lastAnimationTime) / 1000; // Convert to seconds
+
+        // 30fps = ~33.33ms per frame
+        if (deltaTime >= 1 / 30) {
+            this.lastAnimationTime = now;
+
+            const W = this.canvas.width;
+            const H = this.canvas.height;
+            const margin = 10; // Keep points 10 pixels from edge
+
+            this.sites.forEach(site => {
+                // Update position with speed multiplier
+                site.x += site.vx * deltaTime * this.animationSpeed;
+                site.y += site.vy * deltaTime * this.animationSpeed;
+
+                // Bounce off edges
+                if (site.x <= margin) {
+                    site.x = margin;
+                    site.vx = Math.abs(site.vx);
+                } else if (site.x >= W - margin) {
+                    site.x = W - margin;
+                    site.vx = -Math.abs(site.vx);
+                }
+
+                if (site.y <= margin) {
+                    site.y = margin;
+                    site.vy = Math.abs(site.vy);
+                } else if (site.y >= H - margin) {
+                    site.y = H - margin;
+                    site.vy = -Math.abs(site.vy);
+                }
+            });
+
+            this.recompute();
+        }
+
+        this.animationFrameId = requestAnimationFrame(() => this.animationLoop());
+    }
+
     showError(message) {
         const error = this.querySelector('#errorMessage');
         const details = this.querySelector('#errorDetails');

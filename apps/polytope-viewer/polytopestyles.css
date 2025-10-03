@@ -282,11 +282,13 @@ polytope-viewer {
     visibility: hidden;
     transition: all 0.3s ease;
     overflow: hidden;
+    pointer-events: none;
 }
 
 .modal-overlay.active {
     opacity: 1;
     visibility: visible;
+    pointer-events: auto;
 }
 
 .modal-content {

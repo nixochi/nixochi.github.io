@@ -603,7 +603,7 @@
         id="gaussianViewer"
         n="20352"
         omega="319"
-        point-size="1.5"
+        point-size="2.0"
         show-grid="false"
         color-scheme="time-based"
         plot-mode="animated"
@@ -639,8 +639,8 @@
             <div class="slider-wrapper">
                 <label class="slider-label">Point Size</label>
                 <input type="range" class="slider" id="pointSizeSlider"
-                       min="0.1" max="4.0" step="0.1" value="1.5">
-                <div class="slider-value" id="pointSizeValue">1.5</div>
+                       min="0.1" max="4.0" step="0.1" value="2.0">
+                <div class="slider-value" id="pointSizeValue">2.0</div>
             </div>
         </div>
 
@@ -713,8 +713,8 @@
             <div class="slider-wrapper">
                 <label class="slider-label">Point Size</label>
                 <input type="range" class="slider" id="pointSizeSliderDesktop"
-                       min="0.1" max="4.0" step="0.1" value="1.5">
-                <div class="slider-value" id="pointSizeValueDesktop">1.5</div>
+                       min="0.1" max="4.0" step="0.1" value="2.0">
+                <div class="slider-value" id="pointSizeValueDesktop">2.0</div>
             </div>
         </div>
 
@@ -789,9 +789,95 @@
     </div>
 
     <script type="module">
+        // URL State Management
+        function loadStateFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            const viewer = document.getElementById('gaussianViewer');
+
+            if (params.has('n')) {
+                const n = parseInt(params.get('n'));
+                if (!isNaN(n)) {
+                    viewer.setAttribute('n', n.toString());
+                    document.getElementById('nInput').value = n;
+                    document.getElementById('nInputMobile').value = n;
+                }
+            }
+
+            if (params.has('w')) {
+                const w = parseInt(params.get('w'));
+                if (!isNaN(w)) {
+                    viewer.setAttribute('omega', w.toString());
+                    document.getElementById('omegaInput').value = w;
+                    document.getElementById('omegaInputMobile').value = w;
+                }
+            }
+
+            if (params.has('lutz')) {
+                const lutz = parseInt(params.get('lutz'));
+                if (!isNaN(lutz)) {
+                    viewer.setAttribute('lutz-c', lutz.toString());
+                    viewer.setAttribute('color-scheme', 'lutz');
+                    document.getElementById('colorSchemeSelect').value = 'lutz';
+                    document.getElementById('colorSchemeSelectDesktop').value = 'lutz';
+                    document.getElementById('lutzCSlider').value = lutz;
+                    document.getElementById('lutzCSliderDesktop').value = lutz;
+                    document.getElementById('lutzCValue').textContent = lutz;
+                    document.getElementById('lutzCValueDesktop').textContent = lutz;
+
+                    // Show lutz controls, hide color pickers
+                    document.getElementById('lutzSliderWrapper').style.display = 'block';
+                    document.getElementById('lutzSliderWrapperDesktop').style.display = 'block';
+                    document.getElementById('colorPickers').style.display = 'none';
+                    document.getElementById('colorPickersDesktop').style.display = 'none';
+                }
+            }
+        }
+
+        function updateURLState() {
+            const viewer = document.getElementById('gaussianViewer');
+            const params = new URLSearchParams(window.location.search);
+
+            const n = viewer.getAttribute('n');
+            const omega = viewer.getAttribute('omega');
+            const colorScheme = viewer.getAttribute('color-scheme');
+
+            params.set('n', n);
+            params.set('w', omega);
+
+            if (colorScheme === 'lutz') {
+                const lutzC = viewer.getAttribute('lutz-c');
+                params.set('lutz', lutzC);
+            } else {
+                params.delete('lutz');
+            }
+
+            const newURL = `${window.location.pathname}?${params.toString()}`;
+            window.history.replaceState({}, '', newURL);
+        }
+
         // Wait for the component to be defined
         customElements.whenDefined('gaussian-periods-viewer').then(() => {
             const viewer = document.getElementById('gaussianViewer');
+
+            // Load initial state from URL
+            loadStateFromURL();
+
+            // Watch for attribute changes and update URL
+            const observer = new MutationObserver((mutations) => {
+                for (const mutation of mutations) {
+                    if (mutation.type === 'attributes') {
+                        const attrName = mutation.attributeName;
+                        if (attrName === 'n' || attrName === 'omega' || attrName === 'color-scheme' || attrName === 'lutz-c') {
+                            updateURLState();
+                        }
+                    }
+                }
+            });
+
+            observer.observe(viewer, {
+                attributes: true,
+                attributeFilter: ['n', 'omega', 'color-scheme', 'lutz-c']
+            });
 
             // Remove loading skeleton
             const skeleton = viewer.querySelector('.skeleton-loader');

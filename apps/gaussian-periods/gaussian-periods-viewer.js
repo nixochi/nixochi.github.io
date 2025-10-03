@@ -52,7 +52,7 @@ class GaussianPeriodsViewer extends HTMLElement {
     
     connectedCallback() {
         console.log('🔗 GaussianPeriodsViewer connected to DOM');
-        
+
         this.innerHTML = `
             <div style="
                 width: 100%;
@@ -67,7 +67,7 @@ class GaussianPeriodsViewer extends HTMLElement {
                     display: block;
                     background: transparent;
                 "></canvas>
-                
+
                 <div id="errorMessage" style="
                     position: absolute;
                     inset: 0;
@@ -89,13 +89,13 @@ class GaussianPeriodsViewer extends HTMLElement {
                 </div>
             </div>
         `;
-        
+
         this.parseAttributes();
         this.initialize().catch(err => {
             console.error('❌ GaussianPeriodsViewer initialization error:', err);
             this.showError(err.message || 'Unknown error occurred');
         });
-        
+
         console.log('✅ GaussianPeriodsViewer HTML rendered successfully');
     }
     
@@ -123,9 +123,9 @@ class GaussianPeriodsViewer extends HTMLElement {
 
     attributeChangedCallback(name, oldValue, newValue) {
         console.log(`🔄 GaussianPeriodsViewer attribute changed: ${name} = ${newValue}`);
-        
+
         if (!this.THREE) return;
-        
+
         if (name === 'n' || name === 'omega') {
             this.computePeriods();
         } else if (name === 'point-size') {
@@ -155,7 +155,7 @@ class GaussianPeriodsViewer extends HTMLElement {
         switch (name) {
             case 'n': return parseInt(this.getAttribute('n')) || 91205;
             case 'omega': return parseInt(this.getAttribute('omega')) || 2337;
-            case 'pointSize': return parseFloat(this.getAttribute('point-size')) || 0.2;
+            case 'pointSize': return parseFloat(this.getAttribute('point-size')) || 2.0;
             case 'showGrid': return this.getAttribute('show-grid') === 'true';
             case 'colorScheme': return this.getAttribute('color-scheme') || 'time-based';
             case 'plotMode': return this.getAttribute('plot-mode') || 'animated';
@@ -312,14 +312,14 @@ class GaussianPeriodsViewer extends HTMLElement {
     async computePeriods() {
         const n = Math.min(this.getParameter('n'), 200000);
         const omega = this.getParameter('omega');
-        
+
         console.log(`Computing Gaussian Periods for n=${n}, omega=${omega}...`);
-        
+
         if (this.gcd(omega, n) !== 1) {
             console.error(`Invalid parameters: omega=${omega} must be coprime to n=${n}`);
             return;
         }
-        
+
         this.clearVisualization();
         
         const d = this.multiplicativeOrder(omega, n);

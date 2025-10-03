@@ -25,6 +25,7 @@ class VoronoiViewer extends HTMLElement {
         this.updateTimeout = null;
         this.isDragInProgress = false;
         this.dragUpdateDelay = 10; // ms delay for updates during drag
+        this.rafPending = false; // requestAnimationFrame tracking
         
         // Color palettes
         this.colorPalettes = {
@@ -279,7 +280,7 @@ class VoronoiViewer extends HTMLElement {
             case 'showDelaunay': return this.getAttribute('show-delaunay') === 'true';
             case 'cellOpacity': return parseFloat(this.getAttribute('cell-opacity')) || 0.9;
             case 'edgeThickness': return parseFloat(this.getAttribute('edge-thickness')) || 2;
-            case 'siteRadius': return parseFloat(this.getAttribute('site-radius')) || 6;
+            case 'siteRadius': return parseFloat(this.getAttribute('site-radius')) || 5;
             case 'allowDragging': return this.getAttribute('allow-dragging') !== 'false';
             case 'removeOnRightClick': return this.getAttribute('remove-on-right-click') !== 'false';
             case 'colorPalette': return this.getAttribute('color-palette') || 'default';
@@ -667,8 +668,9 @@ class VoronoiViewer extends HTMLElement {
                 radius: radius,
                 fill: color,
                 stroke: '#ffffff',
-                strokeWidth: 1,
-                listening: true
+                strokeWidth: 0.5,
+                listening: true,
+                hitStrokeWidth: 20
             });
             
             // Set up dragging if enabled
@@ -694,13 +696,21 @@ class VoronoiViewer extends HTMLElement {
         
         siteShape.on('dragmove', () => {
             if (!this.isDragInProgress) return;
-            
+
             // Update site position immediately
             site.x = siteShape.x();
             site.y = siteShape.y();
-            
-            // Debounce the visualization update to avoid too frequent recomputation
-            this.scheduleVisualizationUpdate();
+
+            // Use requestAnimationFrame to batch updates at screen refresh rate
+            if (!this.rafPending) {
+                this.rafPending = true;
+                requestAnimationFrame(() => {
+                    this.rafPending = false;
+                    if (this.isDragInProgress) {
+                        this.updateVisualizationDuringDrag();
+                    }
+                });
+            }
         });
         
         siteShape.on('dragend', () => {

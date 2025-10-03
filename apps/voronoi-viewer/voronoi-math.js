@@ -1,8 +1,5 @@
 // Voronoi implementation from tezcatli
-// Supports both EXACT L_2 and APPROXIMATE L_p metrics
-
-// Import algorithm implementations
-// Note: In browser, these are loaded via script tags in the HTML
+// Supports EXACT L_2, APPROXIMATE L_p, and GPU-accelerated JFA
 
 /**
  * Point class for Voronoi calculations
@@ -103,16 +100,17 @@ class VoronoiCell {
 
 /**
  * Voronoi Diagram - Unified API
- * Dispatches to appropriate algorithm based on metric parameter
+ * Dispatches to appropriate algorithm based on parameters
  */
 class VoronoiDiagram {
-    constructor(sites, bounds, p = 2, resolution = 200) {
+    constructor(sites, bounds, p = 2, resolution = 200, algorithm = 'auto') {
         this.sites = sites.map((site, index) =>
             site instanceof VoronoiPoint ? site : new VoronoiPoint(site.x, site.y, index)
         );
         this.bounds = bounds;
         this.p = p;
         this.resolution = resolution;
+        this.algorithm = algorithm;
         this.cells = [];
 
         this.compute();
@@ -124,18 +122,49 @@ class VoronoiDiagram {
             return;
         }
 
-        // Choose algorithm based on metric
-        if (this.p === 2 && typeof VoronoiDiagramL2 !== 'undefined') {
-            // Use exact L_2 algorithm
-            const l2Diagram = new VoronoiDiagramL2(this.sites, this.bounds);
-            this.cells = l2Diagram.cells.map(cell => new VoronoiCell(cell.site, new Polygon(cell.region)));
-        } else if (typeof VoronoiDiagramLp !== 'undefined') {
-            // Use approximate L_p algorithm
-            const lpDiagram = new VoronoiDiagramLp(this.sites, this.bounds, this.p, this.resolution);
-            this.cells = lpDiagram.cells.map(cell => new VoronoiCell(cell.site, new Polygon(cell.region)));
-        } else {
-            console.error('No Voronoi algorithm implementation available');
-            this.cells = [];
+        // Algorithm selection
+        let chosenAlgo = this.algorithm;
+        
+        if (chosenAlgo === 'auto') {
+            // Auto-select: Use JFA if available, fallback to L2 for p=2, else Lp
+            if (typeof VoronoiDiagramJFA !== 'undefined') {
+                chosenAlgo = 'jfa';
+            } else if (this.p === 2 && typeof VoronoiDiagramL2 !== 'undefined') {
+                chosenAlgo = 'l2';
+            } else {
+                chosenAlgo = 'lp';
+            }
+        }
+
+        console.log(`Using Voronoi algorithm: ${chosenAlgo} (p=${this.p})`);
+
+        try {
+            if (chosenAlgo === 'jfa' && typeof VoronoiDiagramJFA !== 'undefined') {
+                // GPU-accelerated JFA
+                const jfaDiagram = new VoronoiDiagramJFA(this.sites, this.bounds, this.p);
+                this.cells = jfaDiagram.cells.map(cell => new VoronoiCell(cell.site, new Polygon(cell.region)));
+            } else if (chosenAlgo === 'l2' && this.p === 2 && typeof VoronoiDiagramL2 !== 'undefined') {
+                // Exact L_2 algorithm
+                const l2Diagram = new VoronoiDiagramL2(this.sites, this.bounds);
+                this.cells = l2Diagram.cells.map(cell => new VoronoiCell(cell.site, new Polygon(cell.region)));
+            } else if (typeof VoronoiDiagramLp !== 'undefined') {
+                // Approximate L_p algorithm
+                const lpDiagram = new VoronoiDiagramLp(this.sites, this.bounds, this.p, this.resolution);
+                this.cells = lpDiagram.cells.map(cell => new VoronoiCell(cell.site, new Polygon(cell.region)));
+            } else {
+                console.error('No Voronoi algorithm implementation available');
+                this.cells = [];
+            }
+        } catch (error) {
+            console.error('Voronoi computation failed:', error);
+            // Fallback to safer algorithm
+            if (chosenAlgo === 'jfa' && typeof VoronoiDiagramL2 !== 'undefined' && this.p === 2) {
+                console.log('Falling back to L2 exact');
+                const l2Diagram = new VoronoiDiagramL2(this.sites, this.bounds);
+                this.cells = l2Diagram.cells.map(cell => new VoronoiCell(cell.site, new Polygon(cell.region)));
+            } else {
+                this.cells = [];
+            }
         }
     }
 
@@ -201,8 +230,8 @@ class VoronoiDiagram {
 }
 
 // Public API functions
-function createVoronoiDiagram(sites, bounds, p = 2, resolution = 200) {
-    return new VoronoiDiagram(sites, bounds, p, resolution);
+function createVoronoiDiagram(sites, bounds, p = 2, resolution = 200, algorithm = 'auto') {
+    return new VoronoiDiagram(sites, bounds, p, resolution, algorithm);
 }
 
 function createVoronoiPoint(x, y, id) {

@@ -577,18 +577,32 @@ void main(){
         const gl = this.gl;
         const W = this.canvas.width;
         const H = this.canvas.height;
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        const seedPixel = new Float32Array(4);
+
+        // Create a full buffer initialized to "no seed"
+        const buffer = new Float32Array(W * H * 4);
+        for (let i = 0; i < buffer.length; i += 4) {
+            buffer[i] = -1;     // x
+            buffer[i + 1] = -1; // y
+            buffer[i + 2] = -1; // seed index
+            buffer[i + 3] = 0;  // unused
+        }
+
+        // Write all seeds to the buffer
         for (let si = 0; si < this.sites.length; si++) {
             const sx = Math.max(0, Math.min(W - 1, Math.round(this.sites[si].x)));
             const syTop = Math.max(0, Math.min(H - 1, Math.round(this.sites[si].y)));
             const sy = (H - 1 - syTop);
-            seedPixel[0] = sx;
-            seedPixel[1] = sy;
-            seedPixel[2] = si;
-            seedPixel[3] = 1.0;
-            gl.texSubImage2D(gl.TEXTURE_2D, 0, sx, sy, 1, 1, gl.RGBA, gl.FLOAT, seedPixel);
+
+            const idx = (sy * W + sx) * 4;
+            buffer[idx] = sx;
+            buffer[idx + 1] = sy;
+            buffer[idx + 2] = si;
+            buffer[idx + 3] = 1.0;
         }
+
+        // Single texture upload - MUCH FASTER!
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, W, H, 0, gl.RGBA, gl.FLOAT, buffer);
     }
 
     bindTexAsInput(tex, unit) {
@@ -610,7 +624,6 @@ void main(){
         gl.viewport(0, 0, W, H);
 
         // init A with seeds
-        this.clearTexture(this.fboA, W, H);
         this.writeSeedPixels(this.texA);
 
         const maxDim = Math.max(W, H);
@@ -797,8 +810,8 @@ void main(){
         const now = performance.now();
         const deltaTime = (now - this.lastAnimationTime) / 1000; // Convert to seconds
 
-        // 30fps = ~33.33ms per frame
-        if (deltaTime >= 1 / 30) {
+        // 60fps = ~16.67ms per frame
+        if (deltaTime >= 1 / 60) {
             this.lastAnimationTime = now;
 
             const W = this.canvas.width;

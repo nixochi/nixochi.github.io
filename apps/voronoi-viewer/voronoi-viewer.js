@@ -15,6 +15,8 @@ class VoronoiViewer extends HTMLElement {
         this.sites = [];
         this.dragIndex = -1;
         this.isDragging = false;
+        this.lastRecomputeTime = 0;
+        this.pendingRecompute = false;
         
         // WebGL objects
         this.gl = null;
@@ -150,9 +152,8 @@ class VoronoiViewer extends HTMLElement {
     
     initWebGL() {
         const { width, height } = this.getBoundingClientRect();
-        // Use 2x resolution for anti-aliasing
-        this.canvas.width = Math.floor(width * 2);
-        this.canvas.height = Math.floor(height * 2);
+        this.canvas.width = Math.floor(width);
+        this.canvas.height = Math.floor(height);
         
         try {
             this.gl = this.canvas.getContext('webgl2', {
@@ -445,7 +446,7 @@ void main(){
                 const H = this.canvas.height;
                 this.sites[this.dragIndex].x = Math.max(0, Math.min(W - 1, x));
                 this.sites[this.dragIndex].y = Math.max(0, Math.min(H - 1, y));
-                this.recompute();
+                this.throttledRecompute();
             }
         });
 
@@ -488,10 +489,9 @@ void main(){
         const handleResize = () => {
             const { width, height } = this.getBoundingClientRect();
             if (!width || !height || !this.gl) return;
-            
-            // Use 2x resolution for anti-aliasing
-            const W = Math.floor(width * 2);
-            const H = Math.floor(height * 2);
+
+            const W = Math.floor(width);
+            const H = Math.floor(height);
 
             if (this.canvas.width === W && this.canvas.height === H) return;
 
@@ -614,15 +614,23 @@ void main(){
             let f = this.fboA; this.fboA = this.fboB; this.fboB = f;
             step >>= 1;
         }
-        
-        // JFA+1
-        gl.uniform1f(this.jfa.loc.uStep, 1.0);
+
+        // JFA+2: extra passes at step=2 and step=1 to fill gaps
+        gl.uniform1f(this.jfa.loc.uStep, 2.0);
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboB);
         gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
         this.bindTexAsInput(this.texA, 0);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         let t2 = this.texA; this.texA = this.texB; this.texB = t2;
         let f2 = this.fboA; this.fboA = this.fboB; this.fboB = f2;
+
+        gl.uniform1f(this.jfa.loc.uStep, 1.0);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboB);
+        gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+        this.bindTexAsInput(this.texA, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        let t3 = this.texA; this.texA = this.texB; this.texB = t3;
+        let f3 = this.fboA; this.fboA = this.fboB; this.fboB = f3;
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         this.renderFinal();
@@ -647,6 +655,25 @@ void main(){
         this.bindTexAsInput(this.paletteTex, 1);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+
+    throttledRecompute() {
+        const now = performance.now();
+        const timeSinceLastRecompute = now - this.lastRecomputeTime;
+        const minInterval = 1000 / 60; // 60fps max
+
+        if (timeSinceLastRecompute >= minInterval) {
+            this.lastRecomputeTime = now;
+            this.recompute();
+            this.pendingRecompute = false;
+        } else if (!this.pendingRecompute) {
+            this.pendingRecompute = true;
+            setTimeout(() => {
+                this.pendingRecompute = false;
+                this.lastRecomputeTime = performance.now();
+                this.recompute();
+            }, minInterval - timeSinceLastRecompute);
+        }
     }
 
     recompute() {

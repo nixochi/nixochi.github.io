@@ -2,8 +2,8 @@
  * Voronoi Diagram Viewer Web Component - Using tezcatli math
  */
 class VoronoiViewer extends HTMLElement {
-    static get observedAttributes() { 
-        return ['show-cells', 'show-edges', 'show-sites', 'show-delaunay', 'cell-opacity', 'edge-thickness', 'site-radius', 'allow-dragging', 'remove-on-right-click', 'color-palette']; 
+    static get observedAttributes() {
+        return ['show-cells', 'show-edges', 'show-sites', 'show-delaunay', 'cell-opacity', 'edge-thickness', 'site-radius', 'allow-dragging', 'remove-on-right-click', 'color-palette', 'metric-p', 'metric-resolution'];
     }
 
     constructor() {
@@ -284,6 +284,12 @@ class VoronoiViewer extends HTMLElement {
             case 'allowDragging': return this.getAttribute('allow-dragging') !== 'false';
             case 'removeOnRightClick': return this.getAttribute('remove-on-right-click') !== 'false';
             case 'colorPalette': return this.getAttribute('color-palette') || 'default';
+            case 'metricP': {
+                const p = this.getAttribute('metric-p');
+                if (p === 'infinity') return Infinity;
+                return parseFloat(p) || 2;
+            }
+            case 'metricResolution': return parseInt(this.getAttribute('metric-resolution')) || 200;
             case 'edgeColor': return '#333333';
             case 'siteColor': return '#000000';
             case 'delaunayColor': return '#4444FF';
@@ -318,7 +324,9 @@ class VoronoiViewer extends HTMLElement {
         };
 
         const tempSites = [...this.sites, newSite];
-        const tempDiagram = createVoronoiDiagram(tempSites, bounds);
+        const p = this.getParameter('metricP');
+        const resolution = this.getParameter('metricResolution');
+        const tempDiagram = createVoronoiDiagram(tempSites, bounds, p, resolution);
 
         // Get Delaunay edges (which tell us which sites are neighbors)
         const delaunayEdges = this.getDelaunayEdgesFromDiagram(tempDiagram);
@@ -466,18 +474,18 @@ class VoronoiViewer extends HTMLElement {
     // EXACT updateVisualization from tezcatli using proper Voronoi math
     updateVisualization() {
         if (!this.mainGroup || !this.cellsGroup || !this.edgesGroup || !this.delaunayGroup || !this.sitesGroup) return;
-        
+
         // Clear all groups
         this.cellsGroup.destroyChildren();
         this.edgesGroup.destroyChildren();
         this.delaunayGroup.destroyChildren();
         this.sitesGroup.destroyChildren();
-        
+
         if (this.sites.length === 0) {
             this.layer.draw();
             return;
         }
-        
+
         // Create Voronoi diagram using tezcatli's exact math
         const { width, height } = this.getBoundingClientRect();
         const bounds = {
@@ -486,8 +494,10 @@ class VoronoiViewer extends HTMLElement {
             top: 0,
             bottom: height
         };
-        
-        this.diagram = createVoronoiDiagram(this.sites, bounds);
+
+        const p = this.getParameter('metricP');
+        const resolution = this.getParameter('metricResolution');
+        this.diagram = createVoronoiDiagram(this.sites, bounds, p, resolution);
         
         // Draw different elements based on parameters
         if (this.getParameter('showCells')) {
@@ -776,17 +786,17 @@ class VoronoiViewer extends HTMLElement {
     
     updateVisualizationDuringDrag() {
         if (!this.mainGroup || !this.cellsGroup || !this.edgesGroup || !this.delaunayGroup) return;
-        
+
         // Only update cells and edges during drag, leave sites alone to preserve dragging
         this.cellsGroup.destroyChildren();
         this.edgesGroup.destroyChildren();
         this.delaunayGroup.destroyChildren();
-        
+
         if (this.sites.length === 0) {
             this.layer.draw();
             return;
         }
-        
+
         // Create Voronoi diagram using tezcatli's exact math
         const { width, height } = this.getBoundingClientRect();
         const bounds = {
@@ -795,8 +805,10 @@ class VoronoiViewer extends HTMLElement {
             top: 0,
             bottom: height
         };
-        
-        this.diagram = createVoronoiDiagram(this.sites, bounds);
+
+        const p = this.getParameter('metricP');
+        const resolution = this.getParameter('metricResolution');
+        this.diagram = createVoronoiDiagram(this.sites, bounds, p, resolution);
         
         // Draw different elements based on parameters
         if (this.getParameter('showCells')) {

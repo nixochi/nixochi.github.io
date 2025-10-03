@@ -1,4 +1,8 @@
-// EXACT Voronoi implementation from tezcatli - Half-Space Intersection
+// Voronoi implementation from tezcatli
+// Supports both EXACT L_2 and APPROXIMATE L_p metrics
+
+// Import algorithm implementations
+// Note: In browser, these are loaded via script tags in the HTML
 
 /**
  * Point class for Voronoi calculations
@@ -14,6 +18,15 @@ class VoronoiPoint {
         const dx = this.x - other.x;
         const dy = this.y - other.y;
         return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    lpDistance(other, p = 2) {
+        const dx = Math.abs(this.x - other.x);
+        const dy = Math.abs(this.y - other.y);
+        if (p === 1) return dx + dy;
+        if (p === Infinity) return Math.max(dx, dy);
+        if (p === 2) return this.distanceTo(other);
+        return Math.pow(Math.pow(dx, p) + Math.pow(dy, p), 1 / p);
     }
 
     equals(other) {
@@ -89,171 +102,41 @@ class VoronoiCell {
 }
 
 /**
- * Half-Space Intersection Voronoi Implementation - EXACT from tezcatli
+ * Voronoi Diagram - Unified API
+ * Dispatches to appropriate algorithm based on metric parameter
  */
 class VoronoiDiagram {
-    constructor(sites, bounds) {
-        this.sites = sites.map((site, index) => 
+    constructor(sites, bounds, p = 2, resolution = 200) {
+        this.sites = sites.map((site, index) =>
             site instanceof VoronoiPoint ? site : new VoronoiPoint(site.x, site.y, index)
         );
         this.bounds = bounds;
+        this.p = p;
+        this.resolution = resolution;
         this.cells = [];
-        
+
         this.compute();
     }
 
     compute() {
-        this.cells = [];
-        
-        if (this.sites.length === 0) return;
-        
-        // Handle single site case
-        if (this.sites.length === 1) {
-            const boundingPolygon = this.createBoundingPolygon();
-            this.cells = [new VoronoiCell(this.sites[0], boundingPolygon)];
+        if (this.sites.length === 0) {
+            this.cells = [];
             return;
         }
-        
-        // Compute Voronoi cell for each site using half-space intersection
-        for (const site of this.sites) {
-            const cell = this.computeCellForSite(site);
-            if (!cell.region.isEmpty()) {
-                this.cells.push(cell);
-            }
-        }
-    }
 
-    computeCellForSite(site) {
-        // Start with the entire bounding region
-        let currentRegion = this.createBoundingPolygon();
-        
-        // For each other site, intersect with the half-space closer to our site
-        for (const otherSite of this.sites) {
-            if (otherSite.id === site.id) continue;
-            
-            // Create perpendicular bisector
-            const bisector = this.createPerpendicularBisector(site, otherSite);
-            
-            // Create half-space containing points closer to our site
-            const halfSpace = this.createHalfSpaceCloserTo(bisector, site);
-            
-            // Clip current region with this half-space
-            currentRegion = this.clipPolygonWithHalfSpace(currentRegion, halfSpace);
-            
-            // Early exit if region becomes empty
-            if (currentRegion.isEmpty()) {
-                break;
-            }
-        }
-        
-        return new VoronoiCell(site, currentRegion);
-    }
-
-    createBoundingPolygon() {
-        return new Polygon([
-            { x: this.bounds.left, y: this.bounds.top },
-            { x: this.bounds.right, y: this.bounds.top },
-            { x: this.bounds.right, y: this.bounds.bottom },
-            { x: this.bounds.left, y: this.bounds.bottom }
-        ]);
-    }
-
-    createPerpendicularBisector(p1, p2) {
-        // Midpoint between the two sites
-        const midX = (p1.x + p2.x) / 2;
-        const midY = (p1.y + p2.y) / 2;
-        
-        // Direction vector from p1 to p2
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
-        
-        // Perpendicular bisector equation: dx(x - midX) + dy(y - midY) = 0
-        // Expanded: dx*x + dy*y - (dx*midX + dy*midY) = 0
-        // Standard form: ax + by + c = 0
-        const a = dx;
-        const b = dy;
-        const c = -(dx * midX + dy * midY);
-        
-        return { a, b, c };
-    }
-
-    createHalfSpaceCloserTo(line, site) {
-        // Test which side of the line the site is on
-        const siteValue = line.a * site.x + line.b * site.y + line.c;
-        
-        if (siteValue < 0) {
-            // Site is on negative side, keep negative half-space: ax + by + c ≤ 0
-            return { a: line.a, b: line.b, c: line.c };
+        // Choose algorithm based on metric
+        if (this.p === 2 && typeof VoronoiDiagramL2 !== 'undefined') {
+            // Use exact L_2 algorithm
+            const l2Diagram = new VoronoiDiagramL2(this.sites, this.bounds);
+            this.cells = l2Diagram.cells.map(cell => new VoronoiCell(cell.site, new Polygon(cell.region)));
+        } else if (typeof VoronoiDiagramLp !== 'undefined') {
+            // Use approximate L_p algorithm
+            const lpDiagram = new VoronoiDiagramLp(this.sites, this.bounds, this.p, this.resolution);
+            this.cells = lpDiagram.cells.map(cell => new VoronoiCell(cell.site, new Polygon(cell.region)));
         } else {
-            // Site is on positive side, keep positive half-space: -ax - by - c ≤ 0
-            return { a: -line.a, b: -line.b, c: -line.c };
+            console.error('No Voronoi algorithm implementation available');
+            this.cells = [];
         }
-    }
-
-    clipPolygonWithHalfSpace(polygon, halfSpace) {
-        if (polygon.isEmpty()) return polygon;
-        
-        // Sutherland-Hodgman polygon clipping algorithm
-        const vertices = polygon.vertices;
-        const newVertices = [];
-        const n = vertices.length;
-        
-        for (let i = 0; i < n; i++) {
-            const currentVertex = vertices[i];
-            const nextVertex = vertices[(i + 1) % n];
-            
-            const currentInside = this.isPointInHalfSpace(currentVertex, halfSpace);
-            const nextInside = this.isPointInHalfSpace(nextVertex, halfSpace);
-            
-            if (currentInside && nextInside) {
-                // Both inside - add next vertex
-                newVertices.push({ x: nextVertex.x, y: nextVertex.y });
-                
-            } else if (currentInside && !nextInside) {
-                // Leaving half-space - add intersection point
-                const intersection = this.computeLineIntersection(currentVertex, nextVertex, halfSpace);
-                if (intersection) {
-                    newVertices.push(intersection);
-                }
-                
-            } else if (!currentInside && nextInside) {
-                // Entering half-space - add intersection and next vertex
-                const intersection = this.computeLineIntersection(currentVertex, nextVertex, halfSpace);
-                if (intersection) {
-                    newVertices.push(intersection);
-                }
-                newVertices.push({ x: nextVertex.x, y: nextVertex.y });
-            }
-            // Both outside - add nothing
-        }
-        
-        return new Polygon(newVertices);
-    }
-
-    isPointInHalfSpace(point, halfSpace) {
-        const value = halfSpace.a * point.x + halfSpace.b * point.y + halfSpace.c;
-        return value <= 1e-10; // Use small epsilon for numerical stability
-    }
-
-    computeLineIntersection(p1, p2, halfSpace) {
-        // Line segment: P = p1 + t(p2 - p1), t ∈ [0,1]
-        // Half-space boundary: ax + by + c = 0
-        
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
-        
-        const denominator = halfSpace.a * dx + halfSpace.b * dy;
-        if (Math.abs(denominator) < 1e-10) {
-            return null; // Parallel lines
-        }
-        
-        const t = -(halfSpace.a * p1.x + halfSpace.b * p1.y + halfSpace.c) / denominator;
-        
-        // We don't need to check t bounds here because Sutherland-Hodgman handles it
-        const x = p1.x + t * dx;
-        const y = p1.y + t * dy;
-        
-        return { x, y };
     }
 
     // Public API methods
@@ -268,18 +151,18 @@ class VoronoiDiagram {
 
     getNearestSite(point) {
         if (this.sites.length === 0) return null;
-        
+
         let nearest = this.sites[0];
-        let minDistance = nearest.distanceTo(point);
-        
+        let minDistance = nearest.lpDistance(point, this.p);
+
         for (let i = 1; i < this.sites.length; i++) {
-            const distance = this.sites[i].distanceTo(point);
+            const distance = this.sites[i].lpDistance(point, this.p);
             if (distance < minDistance) {
                 minDistance = distance;
                 nearest = this.sites[i];
             }
         }
-        
+
         return nearest;
     }
 
@@ -303,7 +186,7 @@ class VoronoiDiagram {
     // Get edges for visualization (boundaries between cells)
     getEdges() {
         const edges = [];
-        
+
         for (const cell of this.cells) {
             const vertices = cell.vertices;
             for (let i = 0; i < vertices.length; i++) {
@@ -312,14 +195,14 @@ class VoronoiDiagram {
                 edges.push({ start: { x: start.x, y: start.y }, end: { x: end.x, y: end.y } });
             }
         }
-        
+
         return edges;
     }
 }
 
 // Public API functions
-function createVoronoiDiagram(sites, bounds) {
-    return new VoronoiDiagram(sites, bounds);
+function createVoronoiDiagram(sites, bounds, p = 2, resolution = 200) {
+    return new VoronoiDiagram(sites, bounds, p, resolution);
 }
 
 function createVoronoiPoint(x, y, id) {

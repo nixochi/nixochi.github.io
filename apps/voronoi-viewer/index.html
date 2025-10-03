@@ -50,6 +50,26 @@
         </div>
 
         <div class="control-group">
+            <label class="control-label">metric</label>
+            <div class="slider-wrapper">
+                <label class="slider-label">L_p metric (p value)</label>
+                <input type="range" class="slider" id="metricSlider"
+                       min="1" max="10" step="0.5" value="2">
+                <div class="slider-value" id="metricValue">L₂ (Euclidean)</div>
+            </div>
+            <div class="toggle-wrapper">
+                <div class="toggle" id="infinityToggle"></div>
+                <span class="toggle-label">L_∞ (Chebyshev)</span>
+            </div>
+            <div class="slider-wrapper">
+                <label class="slider-label">resolution (L_p only)</label>
+                <input type="range" class="slider" id="resolutionSlider"
+                       min="50" max="400" step="50" value="200">
+                <div class="slider-value" id="resolutionValue">200</div>
+            </div>
+        </div>
+
+        <div class="control-group">
             <label class="control-label">styling</label>
             <div class="slider-wrapper">
                 <label class="slider-label">cell opacity</label>
@@ -96,6 +116,9 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/martinez-polygon-clipping@0.7.4/dist/martinez.umd.min.js"></script>
+    <script src="algorithms/voronoi-l2-exact.js?v=1.0.0"></script>
+    <script src="algorithms/voronoi-lp-approximate.js?v=1.0.0"></script>
     <script src="voronoi-math.js?v=1.0.0"></script>
     <script src="voronoi-viewer.js?v=1.0.0"></script>
     <script>
@@ -138,8 +161,13 @@
         const delaunayToggle = document.getElementById('delaunayToggle');
         const draggingToggle = document.getElementById('draggingToggle');
         const removeToggle = document.getElementById('removeToggle');
-        
+        const infinityToggle = document.getElementById('infinityToggle');
+
         // Slider elements
+        const metricSlider = document.getElementById('metricSlider');
+        const metricValue = document.getElementById('metricValue');
+        const resolutionSlider = document.getElementById('resolutionSlider');
+        const resolutionValue = document.getElementById('resolutionValue');
         const opacitySlider = document.getElementById('opacitySlider');
         const opacityValue = document.getElementById('opacityValue');
         const thicknessSlider = document.getElementById('thicknessSlider');
@@ -190,6 +218,43 @@
             viewer.setAttribute('color-palette', palette);
         });
 
+        // Metric slider
+        function updateMetricDisplay() {
+            const p = parseFloat(metricSlider.value);
+            const isInfinity = infinityToggle.classList.contains('active');
+
+            if (isInfinity) {
+                metricValue.textContent = 'L∞ (Chebyshev)';
+                viewer.setAttribute('metric-p', 'infinity');
+            } else {
+                if (p === 1) {
+                    metricValue.textContent = 'L₁ (Manhattan)';
+                } else if (p === 2) {
+                    metricValue.textContent = 'L₂ (Euclidean)';
+                } else {
+                    metricValue.textContent = `L_${p}`;
+                }
+                viewer.setAttribute('metric-p', p.toString());
+            }
+        }
+
+        metricSlider.addEventListener('input', (e) => {
+            infinityToggle.classList.remove('active');
+            updateMetricDisplay();
+        });
+
+        infinityToggle.addEventListener('click', () => {
+            infinityToggle.classList.toggle('active');
+            updateMetricDisplay();
+        });
+
+        // Resolution slider
+        resolutionSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            resolutionValue.textContent = value.toString();
+            viewer.setAttribute('metric-resolution', value.toString());
+        });
+
         // Opacity slider
         opacitySlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
@@ -227,6 +292,8 @@
 
         // Initial setup
         document.addEventListener('DOMContentLoaded', () => {
+            metricValue.textContent = 'L₂ (Euclidean)';
+            resolutionValue.textContent = '200';
             opacityValue.textContent = '90%';
             thicknessValue.textContent = '2px';
             radiusValue.textContent = '5px';

@@ -578,13 +578,15 @@ export class EventHandler {
 
         // End of two-finger gesture
         if (this.stateManager.interactionState.type === 'two-finger-gesture') {
+            this.stateManager.currentMousePos = null; // Clear stale position
             this.stateManager.transitionState('idle');
             this.canvas.style.cursor = 'crosshair';
             if (this.onDraw) this.onDraw();
             return;
         }
 
-        // Single touch - treat as mouse up
+        // Single touch - clear position then treat as mouse up
+        this.stateManager.currentMousePos = null; // Clear before mouseUp
         this.handleMouseUp(e);
     }
 

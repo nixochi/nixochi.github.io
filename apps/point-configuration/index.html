@@ -168,11 +168,13 @@ body {
 .palette-switch {
     display: inline-flex;
     width: 100%;
-    background: var(--bg-primary);
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 2px;
     position: relative;
+    box-shadow: var(--shadow);
 }
 
 .palette-switch-option {
@@ -196,7 +198,7 @@ body {
 .palette-switch-indicator {
     position: absolute;
     background: color-mix(in srgb, var(--bg-secondary) 70%, var(--fg-primary) 30%);
-    border-radius: 4px;
+    border-radius: 6px;
     transition: transform 0.2s ease, width 0.2s ease;
     height: calc(100% - 4px);
     top: 2px;
@@ -255,10 +257,17 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* Shadcn-style switch */
-.mode-switch {
+.mode-switch-container {
     position: absolute;
     top: 20px;
     left: 20px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    z-index: 1000;
+}
+
+.mode-switch {
     display: inline-flex;
     background: var(--backdrop-blur);
     backdrop-filter: blur(16px);
@@ -266,7 +275,6 @@ input[type="range"]::-moz-range-thumb {
     border-radius: 8px;
     padding: 2px;
     box-shadow: var(--shadow);
-    z-index: 1000;
 }
 
 .mode-switch-option {
@@ -295,6 +303,35 @@ input[type="range"]::-moz-range-thumb {
     top: 2px;
     left: 2px;
     z-index: 0;
+}
+
+/* History buttons */
+.history-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.history-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    color: var(--fg-primary);
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.history-btn:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
 }
 
 /* Controls Toggle Button */
@@ -710,11 +747,21 @@ body.resizing .resize-handle {
         <div class="canvas-container">
             <canvas id="canvas"></canvas>
 
-            <!-- Input Mode Switch -->
-            <div class="mode-switch" id="modeSwitch">
-                <div class="mode-switch-indicator" id="switchIndicator"></div>
-                <button class="mode-switch-option active" id="pointBtn">point</button>
-                <button class="mode-switch-option" id="lineBtn">line</button>
+            <!-- Input Mode Switch and History Buttons -->
+            <div class="mode-switch-container">
+                <div class="mode-switch" id="modeSwitch">
+                    <div class="mode-switch-indicator" id="switchIndicator"></div>
+                    <button class="mode-switch-option active" id="pointBtn">point</button>
+                    <button class="mode-switch-option" id="lineBtn">line</button>
+                </div>
+                <div class="history-buttons">
+                    <button class="history-btn" id="undoBtn" title="undo (Ctrl/Cmd+Z)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+                    </button>
+                    <button class="history-btn" id="redoBtn" title="redo (Ctrl/Cmd+Y)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/></svg>
+                    </button>
+                </div>
             </div>
 
             <!-- Options Button (Top Right) -->
@@ -722,13 +769,6 @@ body.resizing .resize-handle {
 
             <!-- Options Panel (Starts hidden) -->
             <div class="floating-panel options-panel" id="optionsPanel" style="display: none;">
-                <div class="control-group">
-                    <label style="font-size: 12px; color: var(--fg-secondary); margin-bottom: 4px; display: block;">history</label>
-                    <div style="display: flex; gap: 8px;">
-                        <button class="action-btn" id="undoBtn" title="undo last action (Ctrl/Cmd+Z)" style="flex: 1;">undo</button>
-                        <button class="action-btn" id="redoBtn" title="redo last action (Ctrl/Cmd+Y)" style="flex: 1;">redo</button>
-                    </div>
-                </div>
                 <div class="control-group">
                     <label style="font-size: 12px; color: var(--fg-secondary); margin-bottom: 4px; display: block;">color palette</label>
                     <div class="palette-switch" id="paletteSwitch">

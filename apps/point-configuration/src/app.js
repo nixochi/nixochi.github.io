@@ -34,6 +34,20 @@ lineBtn.addEventListener('click', () => {
     updateSwitchIndicator(lineBtn);
 });
 
+// Color palette switch
+const monoBtn = document.getElementById('monoBtn');
+const rainbowBtn = document.getElementById('rainbowBtn');
+const pastelBtn = document.getElementById('pastelBtn');
+const paletteSwitchIndicator = document.getElementById('paletteSwitchIndicator');
+
+function updatePaletteSwitchIndicator(activeBtn) {
+    const btnRect = activeBtn.getBoundingClientRect();
+    const switchRect = activeBtn.parentElement.getBoundingClientRect();
+    const offset = btnRect.left - switchRect.left - 2;
+    paletteSwitchIndicator.style.width = `${btnRect.width}px`;
+    paletteSwitchIndicator.style.transform = `translateX(${offset}px)`;
+}
+
 // Options panel toggle
 const optionsBtn = document.getElementById('optionsBtn');
 const optionsPanel = document.getElementById('optionsPanel');
@@ -47,6 +61,8 @@ optionsBtn.addEventListener('click', () => {
         optionsPanel.offsetHeight;
         optionsPanel.classList.add('expanded');
         optionsBtn.textContent = 'close';
+        // Update palette switch indicator position now that panel is visible
+        updatePaletteSwitchIndicator(monoBtn);
     } else {
         optionsPanel.classList.remove('expanded');
         // Wait for animation to complete before hiding
@@ -98,23 +114,6 @@ document.addEventListener('keydown', (e) => {
         updateHistoryButtons();
     }
 });
-
-// Color palette switch
-const monoBtn = document.getElementById('monoBtn');
-const rainbowBtn = document.getElementById('rainbowBtn');
-const pastelBtn = document.getElementById('pastelBtn');
-const paletteSwitchIndicator = document.getElementById('paletteSwitchIndicator');
-
-function updatePaletteSwitchIndicator(activeBtn) {
-    const btnRect = activeBtn.getBoundingClientRect();
-    const switchRect = activeBtn.parentElement.getBoundingClientRect();
-    const offset = btnRect.left - switchRect.left - 2;
-    paletteSwitchIndicator.style.width = `${btnRect.width}px`;
-    paletteSwitchIndicator.style.transform = `translateX(${offset}px)`;
-}
-
-// Initialize indicator position
-updatePaletteSwitchIndicator(monoBtn);
 
 monoBtn.addEventListener('click', () => {
     canvasManager.setColorPalette('monochromatic');

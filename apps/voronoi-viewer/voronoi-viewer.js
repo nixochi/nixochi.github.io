@@ -50,7 +50,8 @@ class VoronoiViewer extends HTMLElement {
         this.useInf = false;
         this.showEdges = true;
         this.showSites = true;
-        
+        this.resolutionScale = 0.5; // 0.25x, 0.5x, or 1x
+
         // Resource tracking
         this._ro = null;
     }
@@ -167,8 +168,8 @@ class VoronoiViewer extends HTMLElement {
     initWebGL() {
         const { width, height } = this.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
-        this.canvas.width = Math.floor(width * dpr);
-        this.canvas.height = Math.floor(height * dpr);
+        this.canvas.width = Math.floor(width * dpr * this.resolutionScale);
+        this.canvas.height = Math.floor(height * dpr * this.resolutionScale);
         
         try {
             this.gl = this.canvas.getContext('webgl2', {
@@ -518,8 +519,8 @@ void main(){
             if (!width || !height || !this.gl) return;
 
             const dpr = window.devicePixelRatio || 1;
-            const W = Math.floor(width * dpr);
-            const H = Math.floor(height * dpr);
+            const W = Math.floor(width * dpr * this.resolutionScale);
+            const H = Math.floor(height * dpr * this.resolutionScale);
 
             if (this.canvas.width === W && this.canvas.height === H) return;
 
@@ -789,6 +790,43 @@ void main(){
     setShowSites(show) {
         this.showSites = show;
         this.renderFinal();
+    }
+
+    setResolutionScale(scale) {
+        // Validate scale (0.25x, 0.5x, or 1x)
+        if (scale !== 0.25 && scale !== 0.5 && scale !== 1.0) {
+            console.warn('Invalid resolution scale. Must be 0.25, 0.5, or 1.0');
+            return;
+        }
+
+        this.resolutionScale = scale;
+
+        // Recreate canvas and textures with new resolution
+        const { width, height } = this.getBoundingClientRect();
+        if (!width || !height || !this.gl) return;
+
+        const dpr = window.devicePixelRatio || 1;
+        const W = Math.floor(width * dpr * this.resolutionScale);
+        const H = Math.floor(height * dpr * this.resolutionScale);
+
+        this.canvas.width = W;
+        this.canvas.height = H;
+
+        // Recreate textures/FBOs for new size
+        const gl = this.gl;
+        if (this.texA) gl.deleteTexture(this.texA);
+        if (this.texB) gl.deleteTexture(this.texB);
+        if (this.fboA) gl.deleteFramebuffer(this.fboA);
+        if (this.fboB) gl.deleteFramebuffer(this.fboB);
+
+        this.texA = this.createTex(W, H);
+        this.texB = this.createTex(W, H);
+        this.fboA = this.createFBO(this.texA);
+        this.fboB = this.createFBO(this.texB);
+
+        this.recompute();
+
+        console.log(`📐 Resolution scale changed to ${scale}x (${W}x${H})`);
     }
 
     setAnimation(enabled) {

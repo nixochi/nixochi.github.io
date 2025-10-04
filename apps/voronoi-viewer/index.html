@@ -17,13 +17,26 @@
     <div class="floating-panel controls-panel" id="controlsPanel" style="display: none;">
         <div class="control-group">
             <label class="control-label">display</label>
-            <div class="toggle-wrapper">
-                <div class="toggle active" id="edgesToggle"></div>
-                <span class="toggle-label">edges</span>
+            <div style="display: flex; gap: 16px;">
+                <div class="toggle-wrapper" style="margin-bottom: 0;">
+                    <div class="toggle active" id="edgesToggle"></div>
+                    <span class="toggle-label">edges</span>
+                </div>
+                <div class="toggle-wrapper" style="margin-bottom: 0;">
+                    <div class="toggle active" id="sitesToggle"></div>
+                    <span class="toggle-label">sites</span>
+                </div>
             </div>
-            <div class="toggle-wrapper">
-                <div class="toggle active" id="sitesToggle"></div>
-                <span class="toggle-label">sites</span>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">quality</label>
+            <div class="resolution-switch" id="resolutionSwitch">
+                <div class="resolution-switch-indicator" id="resolutionSwitchIndicator"></div>
+                <button class="resolution-switch-option" data-resolution="0.25">0.25x</button>
+                <button class="resolution-switch-option active" data-resolution="0.5">0.5x</button>
+                <button class="resolution-switch-option" data-resolution="0.75">0.75x</button>
+                <button class="resolution-switch-option" data-resolution="1">1x</button>
             </div>
         </div>
 
@@ -92,6 +105,9 @@
         
         const edgesToggle = document.getElementById('edgesToggle');
         const sitesToggle = document.getElementById('sitesToggle');
+        const resolutionSwitch = document.getElementById('resolutionSwitch');
+        const resolutionSwitchIndicator = document.getElementById('resolutionSwitchIndicator');
+        const resolutionOptions = document.querySelectorAll('.resolution-switch-option');
         const animateToggle = document.getElementById('animateToggle');
         const speedSlider = document.getElementById('speedSlider');
         const speedValue = document.getElementById('speedValue');
@@ -115,6 +131,35 @@
             const isActive = sitesToggle.classList.contains('active');
             viewer.setShowSites(isActive);
         });
+
+        // Setup resolution switch
+        function updateResolutionIndicator(activeOption) {
+            const index = Array.from(resolutionOptions).indexOf(activeOption);
+            const optionWidth = activeOption.offsetWidth;
+            const optionLeft = activeOption.offsetLeft;
+            resolutionSwitchIndicator.style.width = `${optionWidth}px`;
+            resolutionSwitchIndicator.style.transform = `translateX(${optionLeft - 2}px)`;
+        }
+
+        resolutionOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                // Remove active class from all options
+                resolutionOptions.forEach(opt => opt.classList.remove('active'));
+                // Add active class to clicked option
+                option.classList.add('active');
+                // Update indicator position
+                updateResolutionIndicator(option);
+                // Update viewer resolution
+                const resolution = parseFloat(option.dataset.resolution);
+                viewer.setResolutionScale(resolution);
+            });
+        });
+
+        // Initialize indicator position
+        const activeResolution = document.querySelector('.resolution-switch-option.active');
+        if (activeResolution) {
+            updateResolutionIndicator(activeResolution);
+        }
 
         // Setup animation toggle
         animateToggle.addEventListener('click', () => {

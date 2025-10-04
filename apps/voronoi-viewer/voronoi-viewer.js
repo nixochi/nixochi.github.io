@@ -331,6 +331,7 @@ uniform bool uEdges;
 uniform bool uShowSites;
 uniform float uP;
 uniform bool  uUseInf;
+uniform float uResolutionScale;
 
 void main(){
   vec4 texel = texture(uSeedTex, v_uv);
@@ -338,13 +339,13 @@ void main(){
   if (sid < 0.0){ outColor = vec4(0.05,0.06,0.07,1.0); return; }
   vec2 seed = texel.xy;
   vec2 fragPix = v_uv * uResolution;
-  
+
   float idx = mod(max(sid, 0.0), float(uPaletteSize));
   float u = (idx + 0.5) / float(uPaletteSize);
   vec3 base = texture(uPalette, vec2(u, 0.5)).rgb;
 
   if (uEdges){
-    vec2 texelS = 1.0 / uResolution;
+    vec2 texelS = 0.7 * (1.0 / uResolution) * (uResolutionScale / 0.25);
     float idc = sid;
     float diff = 0.0;
     diff += float(texture(uSeedTex, v_uv + vec2( texelS.x, 0.0)).z != idc);
@@ -360,7 +361,7 @@ void main(){
   }
 
   if (uShowSites) {
-    float dotRadius = 5.0;
+    float dotRadius = 3.5 * (uResolutionScale / 0.25);
     float dist = distance(fragPix, seed);
     if (dist < dotRadius) {
       float outerEdge = smoothstep(dotRadius + 0.5, dotRadius - 0.5, dist);
@@ -437,6 +438,7 @@ void main(){
                 uShowSites: gl.getUniformLocation(this.progRender, 'uShowSites'),
                 uP: gl.getUniformLocation(this.progRender, 'uP'),
                 uUseInf: gl.getUniformLocation(this.progRender, 'uUseInf'),
+                uResolutionScale: gl.getUniformLocation(this.progRender, 'uResolutionScale'),
             }
         };
 
@@ -676,7 +678,7 @@ void main(){
         const gl = this.gl;
         const W = this.canvas.width;
         const H = this.canvas.height;
-        
+
         gl.viewport(0, 0, W, H);
         gl.bindVertexArray(this.quadVAO);
         gl.useProgram(this.progRender);
@@ -688,6 +690,7 @@ void main(){
         gl.uniform1i(this.rnd.loc.uShowSites, this.showSites ? 1 : 0);
         gl.uniform1f(this.rnd.loc.uP, this.p);
         gl.uniform1i(this.rnd.loc.uUseInf, this.useInf ? 1 : 0);
+        gl.uniform1f(this.rnd.loc.uResolutionScale, this.resolutionScale);
         this.bindTexAsInput(this.texA, 0);
         this.bindTexAsInput(this.paletteTex, 1);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -793,11 +796,15 @@ void main(){
     }
 
     setResolutionScale(scale) {
-        // Validate scale (0.25x, 0.5x, or 1x)
-        if (scale !== 0.25 && scale !== 0.5 && scale !== 1.0) {
-            console.warn('Invalid resolution scale. Must be 0.25, 0.5, or 1.0');
+        // Validate scale (0.25x, 0.5x, 0.75x, or 1x)
+        if (scale !== 0.25 && scale !== 0.5 && scale !== 0.75 && scale !== 1.0) {
+            console.warn('Invalid resolution scale. Must be 0.25, 0.5, 0.75, or 1.0');
             return;
         }
+
+        // Save old canvas dimensions
+        const oldW = this.canvas.width;
+        const oldH = this.canvas.height;
 
         this.resolutionScale = scale;
 
@@ -811,6 +818,14 @@ void main(){
 
         this.canvas.width = W;
         this.canvas.height = H;
+
+        // Scale all site positions to maintain relative position
+        const scaleX = W / oldW;
+        const scaleY = H / oldH;
+        this.sites.forEach(site => {
+            site.x *= scaleX;
+            site.y *= scaleY;
+        });
 
         // Recreate textures/FBOs for new size
         const gl = this.gl;

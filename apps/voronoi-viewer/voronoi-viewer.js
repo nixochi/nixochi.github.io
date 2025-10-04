@@ -49,6 +49,7 @@ class VoronoiViewer extends HTMLElement {
         this.p = 2.0;
         this.useInf = false;
         this.showEdges = true;
+        this.showSites = true;
         
         // Resource tracking
         this._ro = null;
@@ -325,6 +326,7 @@ uniform sampler2D uPalette;
 uniform vec2 uResolution;
 uniform int  uPaletteSize;
 uniform bool uEdges;
+uniform bool uShowSites;
 uniform float uP;
 uniform bool  uUseInf;
 
@@ -355,13 +357,15 @@ void main(){
     base = mix(base, vec3(0.0), edge);
   }
 
-  float dotRadius = 5.0;
-  float dist = distance(fragPix, seed);
-  if (dist < dotRadius) {
-    float outerEdge = smoothstep(dotRadius + 0.5, dotRadius - 0.5, dist);
-    float innerEdge = smoothstep(dotRadius - 0.5, dotRadius - 1.5, dist);
-    vec3 dotColor = mix(vec3(1.0), vec3(0.0), innerEdge);
-    base = mix(base, dotColor, outerEdge);
+  if (uShowSites) {
+    float dotRadius = 5.0;
+    float dist = distance(fragPix, seed);
+    if (dist < dotRadius) {
+      float outerEdge = smoothstep(dotRadius + 0.5, dotRadius - 0.5, dist);
+      float innerEdge = smoothstep(dotRadius - 0.5, dotRadius - 1.5, dist);
+      vec3 dotColor = mix(vec3(1.0), vec3(0.0), innerEdge);
+      base = mix(base, dotColor, outerEdge);
+    }
   }
   outColor = vec4(base, 1.0);
 }`;
@@ -428,6 +432,7 @@ void main(){
                 uResolution: gl.getUniformLocation(this.progRender, 'uResolution'),
                 uPaletteSize: gl.getUniformLocation(this.progRender, 'uPaletteSize'),
                 uEdges: gl.getUniformLocation(this.progRender, 'uEdges'),
+                uShowSites: gl.getUniformLocation(this.progRender, 'uShowSites'),
                 uP: gl.getUniformLocation(this.progRender, 'uP'),
                 uUseInf: gl.getUniformLocation(this.progRender, 'uUseInf'),
             }
@@ -677,6 +682,7 @@ void main(){
         gl.uniform1i(this.rnd.loc.uPalette, 1);
         gl.uniform1i(this.rnd.loc.uPaletteSize, 4096);
         gl.uniform1i(this.rnd.loc.uEdges, this.showEdges ? 1 : 0);
+        gl.uniform1i(this.rnd.loc.uShowSites, this.showSites ? 1 : 0);
         gl.uniform1f(this.rnd.loc.uP, this.p);
         gl.uniform1i(this.rnd.loc.uUseInf, this.useInf ? 1 : 0);
         this.bindTexAsInput(this.texA, 0);
@@ -775,6 +781,11 @@ void main(){
     
     setShowEdges(show) {
         this.showEdges = show;
+        this.renderFinal();
+    }
+
+    setShowSites(show) {
+        this.showSites = show;
         this.renderFinal();
     }
 

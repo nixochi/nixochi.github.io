@@ -19,7 +19,11 @@
             <label class="control-label">display</label>
             <div class="toggle-wrapper">
                 <div class="toggle active" id="edgesToggle"></div>
-                <span class="toggle-label">show edges</span>
+                <span class="toggle-label">edges</span>
+            </div>
+            <div class="toggle-wrapper">
+                <div class="toggle active" id="sitesToggle"></div>
+                <span class="toggle-label">sites</span>
             </div>
         </div>
 
@@ -27,10 +31,10 @@
             <label class="control-label">animation</label>
             <div class="toggle-wrapper">
                 <div class="toggle" id="animateToggle"></div>
-                <span class="toggle-label">animate points</span>
+                <span class="toggle-label">animate</span>
             </div>
             <div class="slider-wrapper">
-                <label class="slider-label">animation speed</label>
+                <label class="slider-label">speed</label>
                 <input type="range" class="slider" id="speedSlider"
                        min="0.1" max="3" step="0.1" value="1">
                 <div class="slider-value" id="speedValue">1.0x</div>
@@ -40,35 +44,22 @@
         <div class="control-group">
             <label class="control-label">metric</label>
             <div class="slider-wrapper">
-                <label class="slider-label">L_p metric (p value)</label>
+                <label class="slider-label">p value</label>
                 <input type="range" class="slider" id="metricSlider"
                        min="1" max="10" step="0.1" value="2">
                 <div class="slider-value" id="metricValue">L₂ (Euclidean)</div>
             </div>
             <div class="toggle-wrapper">
                 <div class="toggle" id="infinityToggle"></div>
-                <span class="toggle-label">L_∞ (Chebyshev)</span>
-            </div>
-            <div class="help-text">
-                L₁: Manhattan distance<br>
-                L₂: Euclidean distance<br>
-                L_∞: Chebyshev (max of dimensions)
+                <span class="toggle-label">L_∞</span>
             </div>
         </div>
 
         <div class="control-group">
             <label class="control-label">actions</label>
             <button class="action-btn" id="clearBtn">clear all</button>
-            <button class="action-btn" id="randomBtn">add random points</button>
-            <button class="action-btn" id="gridBtn">generate grid</button>
-        </div>
-
-        <div class="control-group">
-            <label class="control-label">interaction</label>
-            <div class="help-text">
-                click to add points<br>
-                drag to move points
-            </div>
+            <button class="action-btn" id="randomBtn">add random</button>
+            <button class="action-btn" id="gridBtn">grid</button>
         </div>
     </div>
 
@@ -100,6 +91,7 @@
         });
         
         const edgesToggle = document.getElementById('edgesToggle');
+        const sitesToggle = document.getElementById('sitesToggle');
         const animateToggle = document.getElementById('animateToggle');
         const speedSlider = document.getElementById('speedSlider');
         const speedValue = document.getElementById('speedValue');
@@ -115,6 +107,13 @@
             edgesToggle.classList.toggle('active');
             const isActive = edgesToggle.classList.contains('active');
             viewer.setShowEdges(isActive);
+        });
+
+        // Setup sites toggle
+        sitesToggle.addEventListener('click', () => {
+            sitesToggle.classList.toggle('active');
+            const isActive = sitesToggle.classList.contains('active');
+            viewer.setShowSites(isActive);
         });
 
         // Setup animation toggle

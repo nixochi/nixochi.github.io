@@ -166,8 +166,9 @@ class VoronoiViewer extends HTMLElement {
     
     initWebGL() {
         const { width, height } = this.getBoundingClientRect();
-        this.canvas.width = Math.floor(width);
-        this.canvas.height = Math.floor(height);
+        const dpr = window.devicePixelRatio || 1;
+        this.canvas.width = Math.floor(width * dpr);
+        this.canvas.height = Math.floor(height * dpr);
         
         try {
             this.gl = this.canvas.getContext('webgl2', {
@@ -516,8 +517,9 @@ void main(){
             const { width, height } = this.getBoundingClientRect();
             if (!width || !height || !this.gl) return;
 
-            const W = Math.floor(width);
-            const H = Math.floor(height);
+            const dpr = window.devicePixelRatio || 1;
+            const W = Math.floor(width * dpr);
+            const H = Math.floor(height * dpr);
 
             if (this.canvas.width === W && this.canvas.height === H) return;
 

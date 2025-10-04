@@ -51,6 +51,7 @@ class VoronoiViewer extends HTMLElement {
         this.showEdges = true;
         this.showSites = true;
         this.resolutionScale = 0.5; // 0.25x, 0.5x, or 1x
+        this.jfaExtraPasses = 1; // Number of extra refinement passes (0-4)
 
         // Resource tracking
         this._ro = null;
@@ -128,7 +129,7 @@ class VoronoiViewer extends HTMLElement {
 
     attributeChangedCallback(name, _oldValue, newValue) {
         console.log(`🔄 VoronoiViewer attribute changed: ${name} = ${newValue}`);
-        
+
         if (name === 'metric-p') {
             if (newValue === 'infinity') {
                 this.p = 2.0;
@@ -143,16 +144,16 @@ class VoronoiViewer extends HTMLElement {
     
     async initialize() {
         console.log('🚀 Initializing VoronoiViewer...');
-        
+
         // Initialize WebGL
         this.initWebGL();
-        
+
         // Setup shaders and resources
         this.setupShaders();
-        
+
         // Setup interactions
         this.setupInteractions();
-        
+
         // Setup resize handling
         this.setupResizeObserver();
 
@@ -285,7 +286,7 @@ uniform bool  uUseInf;
 float lp_cost(vec2 delta){
   vec2 ad = abs(delta);
   if (uUseInf) return max(ad.x, ad.y);
-  
+
   // OPTIMIZATION: Fast paths for common metrics
   if (uP == 1.0) return ad.x + ad.y;
   if (uP == 2.0) return length(delta);
@@ -636,7 +637,7 @@ void main(){
         }
         return -1;
     }
-    
+
     clearTexture(fbo, w, h) {
         const gl = this.gl;
         gl.bindVertexArray(this.quadVAO);
@@ -725,15 +726,18 @@ void main(){
             step >>= 1;
         }
 
-        // OPTIMIZATION: Only one extra pass at step=1 (JFA+1 instead of JFA+2)
-        // This balances quality and performance
-        gl.uniform1f(this.jfa.loc.uStep, 1.0);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboB);
-        gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
-        this.bindTexAsInput(this.texA, 0);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-        let t3 = this.texA; this.texA = this.texB; this.texB = t3;
-        let f3 = this.fboA; this.fboA = this.fboB; this.fboB = f3;
+        // Extra refinement passes (JFA+N)
+        // N=0: no extra passes, N=1: step 1, N=2: steps 2,1, N=3: steps 3,2,1, N=4: steps 4,3,2,1
+        for (let i = this.jfaExtraPasses; i >= 1; i--) {
+            gl.uniform1f(this.jfa.loc.uStep, i);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.fboB);
+            gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+            this.bindTexAsInput(this.texA, 0);
+            gl.drawArrays(gl.TRIANGLES, 0, 3);
+            // swap
+            let t = this.texA; this.texA = this.texB; this.texB = t;
+            let f = this.fboA; this.fboA = this.fboB; this.fboB = f;
+        }
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         this.renderFinal();
@@ -907,6 +911,18 @@ void main(){
         this.recompute();
 
         console.log(`📐 Resolution scale changed to ${scale}x (${W}x${H})`);
+    }
+
+    setJFAExtraPasses(passes) {
+        // Validate passes (0-4)
+        if (passes < 0 || passes > 4) {
+            console.warn('Invalid extra passes. Must be 0-4');
+            return;
+        }
+
+        this.jfaExtraPasses = passes;
+        this.recompute();
+        console.log(`🔧 JFA extra passes set to ${passes}`);
     }
 
     setAnimation(enabled) {

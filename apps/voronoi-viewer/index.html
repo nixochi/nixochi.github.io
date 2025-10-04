@@ -69,6 +69,20 @@
         </div>
 
         <div class="control-group">
+            <label class="control-label">algorithm</label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 13px; color: #8b949e;">jfa +</span>
+                <select class="algorithm-select" id="algorithmSelect">
+                    <option value="0">0</option>
+                    <option value="1" selected>1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="control-group">
             <label class="control-label">actions</label>
             <button class="action-btn" id="clearBtn">clear all</button>
             <button class="action-btn" id="randomBtn">add random</button>
@@ -117,6 +131,7 @@
         const clearBtn = document.getElementById('clearBtn');
         const randomBtn = document.getElementById('randomBtn');
         const gridBtn = document.getElementById('gridBtn');
+        const algorithmSelect = document.getElementById('algorithmSelect');
 
         // Setup edges toggle
         edgesToggle.addEventListener('click', () => {
@@ -203,6 +218,12 @@
         infinityToggle.addEventListener('click', () => {
             infinityToggle.classList.toggle('active');
             updateMetricDisplay();
+        });
+
+        // Algorithm selector
+        algorithmSelect.addEventListener('change', () => {
+            const extraPasses = parseInt(algorithmSelect.value);
+            viewer.setJFAExtraPasses(extraPasses);
         });
 
         // Action buttons

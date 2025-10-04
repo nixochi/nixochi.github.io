@@ -448,6 +448,7 @@ void main(){
     }
     
     setupInteractions() {
+        // Mouse events
         this.canvas.addEventListener('mousedown', (e) => {
             const { x, y } = this.getCanvasCoords(e);
             const W = this.canvas.width;
@@ -511,7 +512,71 @@ void main(){
                 }
             }
         });
-        
+
+        // Touch events for iOS/mobile support
+        this.canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent scrolling
+            const touch = e.touches[0];
+            const { x, y } = this.getCanvasCoords(touch);
+            const W = this.canvas.width;
+            const H = this.canvas.height;
+            if (x < 0 || x >= W || y < 0 || y >= H) return;
+            this.dragIndex = this.findSeedAt(x, y);
+            if (this.dragIndex >= 0) {
+                this.isDragging = false;
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchmove', (e) => {
+            if (this.dragIndex >= 0) {
+                e.preventDefault(); // Prevent scrolling while dragging
+                this.isDragging = true;
+                const touch = e.touches[0];
+                const { x, y } = this.getCanvasCoords(touch);
+                const W = this.canvas.width;
+                const H = this.canvas.height;
+                this.sites[this.dragIndex].x = Math.max(0, Math.min(W - 1, x));
+                this.sites[this.dragIndex].y = Math.max(0, Math.min(H - 1, y));
+                this.throttledRecompute();
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchend', (e) => {
+            if (this.dragIndex >= 0) {
+                e.preventDefault();
+                this.dragIndex = -1;
+                this.isDragging = false;
+            } else if (e.changedTouches.length > 0) {
+                // Handle tap to add new point
+                const touch = e.changedTouches[0];
+                const { x, y } = this.getCanvasCoords(touch);
+                const W = this.canvas.width;
+                const H = this.canvas.height;
+                if (x >= 0 && x < W && y >= 0 && y < H) {
+                    const existing = this.findSeedAt(x, y);
+                    if (existing < 0) {
+                        const newSite = { x, y };
+                        // Initialize velocity if animation is active
+                        if (this.isAnimating) {
+                            const angle = Math.random() * Math.PI * 2;
+                            const speed = 20 + Math.random() * 30;
+                            newSite.vx = Math.cos(angle) * speed;
+                            newSite.vy = Math.sin(angle) * speed;
+                        }
+                        this.sites.push(newSite);
+                        this.recompute();
+                    }
+                }
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchcancel', () => {
+            if (this.dragIndex >= 0) {
+                this.dragIndex = -1;
+                this.isDragging = false;
+            }
+        });
+
         console.log('✅ Interactions setup complete');
     }
     
@@ -561,7 +626,7 @@ void main(){
     }
 
     findSeedAt(x, y) {
-        const threshold = 15;
+        const threshold = 25; // Increased for better touch detection
         for (let i = 0; i < this.sites.length; i++) {
             const dx = this.sites[i].x - x;
             const dy = this.sites[i].y - y;

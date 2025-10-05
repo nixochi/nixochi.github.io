@@ -39,46 +39,69 @@ class PolytopeViewer extends HTMLElement {
     connectedCallback() {
         console.log('🔗 PolytopeViewer connected to DOM');
         
-        this.innerHTML = `
-            <div style="
-                width: 100%;
-                height: 100%;
-                position: relative;
-                overflow: hidden;
-                background: transparent;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            ">
-                <canvas id="polytopeCanvas" style="
-                    width: 100%;
-                    height: 100%;
-                    display: block;
-                    background: transparent;
-                "></canvas>
-                
-                <div id="errorMessage" style="
-                    position: absolute;
-                    inset: 0;
-                    display: none;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 12px;
-                    color: #dc3545;
-                    text-align: center;
-                    background: rgba(248, 249, 250, 0.95);
-                    backdrop-filter: blur(4px);
-                    border-radius: 8px;
-                    padding: 20px;
-                ">
-                    <div style="font-size: 32px;">⚠️</div>
-                    <div style="font-size: 14px; font-weight: 500;">Failed to load 3D viewer</div>
-                    <div id="errorDetails" style="font-size: 12px; opacity: 0.8;"></div>
-                </div>
-            </div>
+        // ✅ Preserve existing skeleton, don't overwrite it
+        const existingSkeleton = this.querySelector('.skeleton-loader');
+        
+        // Create container div
+        const container = document.createElement('div');
+        container.style.cssText = `
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         `;
+        
+        // Create canvas
+        const canvas = document.createElement('canvas');
+        canvas.id = 'polytopeCanvas';
+        canvas.style.cssText = `
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: transparent;
+        `;
+        
+        // Create error message
+        const errorDiv = document.createElement('div');
+        errorDiv.id = 'errorMessage';
+        errorDiv.style.cssText = `
+            position: absolute;
+            inset: 0;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: #dc3545;
+            text-align: center;
+            background: rgba(248, 249, 250, 0.95);
+            backdrop-filter: blur(4px);
+            border-radius: 8px;
+            padding: 20px;
+        `;
+        errorDiv.innerHTML = `
+            <div style="font-size: 32px;">⚠️</div>
+            <div style="font-size: 14px; font-weight: 500;">Failed to load 3D viewer</div>
+            <div id="errorDetails" style="font-size: 12px; opacity: 0.8;"></div>
+        `;
+        
+        // Assemble
+        container.appendChild(canvas);
+        container.appendChild(errorDiv);
+        
+        // Clear and rebuild (this removes skeleton temporarily)
+        this.innerHTML = '';
+        this.appendChild(container);
+        
+        // ✅ Re-add skeleton on top if it existed
+        if (existingSkeleton) {
+            this.appendChild(existingSkeleton);
+        }
         
         this.setupEventListeners();
         this.parseAttributes();
@@ -187,6 +210,19 @@ class PolytopeViewer extends HTMLElement {
         this.startAnimationLoop();
         
         console.log('✅ PolytopeViewer initialization complete');
+        
+        // ✅ OPTION 2: Remove skeleton after everything is ready
+        this.removeLoadingSkeleton();
+    }
+    
+    removeLoadingSkeleton() {
+        // Find skeleton in parent document (outside shadow DOM)
+        const skeleton = this.querySelector('.skeleton-loader');
+        if (skeleton) {
+            console.log('🎨 Removing loading skeleton - polytope is ready');
+            skeleton.classList.add('fade-out');
+            setTimeout(() => skeleton.remove(), 300);
+        }
     }
     
     async loadDependencies() {
@@ -591,20 +627,19 @@ class PolytopeViewer extends HTMLElement {
     
     // Hull computation helpers - UPDATED to use tezcatli approach
     getFacesFromVertices(vertices, options = {}) {
-  if (!vertices || vertices.length < 4) return [];
-  const opts = {
-    skipTriangulation: true,     // keep n-gon faces
-    ...options
-  };
-  try {
-    const faces = this._qh(vertices, opts);
-    return Array.isArray(faces) ? faces : [];
-  } catch (e) {
-    console.error('QuickHull error:', e);
-    return [];
-  }
-}
-
+        if (!vertices || vertices.length < 4) return [];
+        const opts = {
+            skipTriangulation: true,     // keep n-gon faces
+            ...options
+        };
+        try {
+            const faces = this._qh(vertices, opts);
+            return Array.isArray(faces) ? faces : [];
+        } catch (e) {
+            console.error('QuickHull error:', e);
+            return [];
+        }
+    }
     
     // Extract edges from face data - same as tezcatli
     getEdgesFromFaces(faces) {

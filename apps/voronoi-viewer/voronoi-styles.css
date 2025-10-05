@@ -426,3 +426,37 @@ voronoi-viewer {
         height: 24px;
     }
 }
+
+/* Palette grid */
+.palette-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.palette-swatch {
+    position: relative;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    overflow: hidden;
+    display: flex;
+}
+
+.palette-swatch:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.palette-swatch.active {
+    border-color: var(--fg-primary);
+    box-shadow: 0 0 0 1px var(--fg-primary);
+}
+
+.palette-swatch-color {
+    flex: 1;
+    height: 100%;
+}

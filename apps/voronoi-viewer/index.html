@@ -2,16 +2,422 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Voronoi Diagram Viewer</title>
     <link rel="stylesheet" href="voronoi-styles.css?v=1.2.0">
+    <style>
+        /* Metric Picker Modal Styles */
+        .metric-modal-root {
+            position: fixed;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            z-index: 10000;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        .metric-modal-root.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .metric-backdrop {
+            position: fixed;
+            inset: 0;
+            background: color-mix(in srgb, var(--bg-primary) 85%, transparent 15%);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            z-index: 1;
+        }
+
+        .metric-modal {
+            position: relative;
+            z-index: 2;
+            width: min(1400px, 98vw);
+            height: 94vh;
+            height: 94svh;
+            border-radius: 18px;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            transform: scale(1);
+            transition: transform 0.3s ease;
+        }
+
+        .metric-modal-root.hidden .metric-modal {
+            transform: scale(0.95);
+        }
+
+        .metric-modal .top {
+            padding: 18px 20px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .metric-modal .top .label {
+            margin-bottom: 8px;
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--fg-secondary);
+        }
+
+        .metric-grid {
+            display: grid;
+            gap: 8px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        @media(min-width: 560px) { .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media(min-width: 768px) { .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+        @media(min-width: 1024px) { .metric-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+        @media(min-width: 1280px) { .metric-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+
+        .metric-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1.5px solid color-mix(in srgb, var(--border) 80%, var(--fg-secondary) 20%);
+            background: color-mix(in srgb, var(--bg-secondary) 95%, var(--fg-primary) 5%);
+            color: var(--fg-primary);
+            padding: 8px 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+
+        .metric-chip:hover {
+            background: color-mix(in srgb, var(--bg-secondary) 85%, var(--fg-primary) 15%);
+            border-color: color-mix(in srgb, var(--border) 60%, var(--fg-secondary) 40%);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            transform: translateY(-1px);
+        }
+
+        .metric-chip.active {
+            background: color-mix(in srgb, var(--fg-secondary) 40%, var(--bg-secondary) 60%);
+            border-color: var(--fg-secondary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .metric-chip svg {
+            width: 22px;
+            height: 22px;
+            color: var(--fg-primary);
+        }
+
+        .metric-chip span {
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .metric-body {
+            padding: 18px 20px;
+            height: calc(94vh - 64px - 64px);
+            height: calc(94svh - 64px - 64px);
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .metric-cols {
+            display: grid;
+            gap: 16px;
+        }
+
+        @media(min-width: 900px) { .metric-cols { grid-template-columns: 3fr 4fr; } }
+
+        .metric-example {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);
+            aspect-ratio: 4/3;
+            overflow: hidden;
+        }
+
+        .metric-example-note {
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--fg-secondary);
+        }
+
+        .metric-title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .metric-unit-tag {
+            font-size: 10px;
+            padding: 2px 6px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: var(--fg-secondary);
+        }
+
+        .metric-desc {
+            color: var(--fg-secondary);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .metric-notes {
+            color: var(--fg-secondary);
+            font-size: 12px;
+        }
+
+        .metric-notes ul {
+            margin: 6px 0 0 18px;
+        }
+
+        .metric-footer {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            border-top: 1px solid var(--border);
+            padding: 12px 20px;
+            background: var(--backdrop-blur);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        .metric-toggle {
+            display: inline-flex;
+            gap: 4px;
+            padding: 4px;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--bg-secondary) 95%, var(--fg-primary) 5%);
+            border: 1.5px solid color-mix(in srgb, var(--border) 80%, var(--fg-secondary) 20%);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+
+        .metric-toggle button {
+            border: 0;
+            background: transparent;
+            color: var(--fg-secondary);
+            padding: 6px 12px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .metric-toggle button.active {
+            background: color-mix(in srgb, var(--fg-secondary) 40%, var(--bg-secondary) 60%);
+            color: var(--fg-primary);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            font-weight: 600;
+        }
+
+        .metric-btn {
+            border: 1.5px solid color-mix(in srgb, var(--border) 80%, var(--fg-secondary) 20%);
+            background: color-mix(in srgb, var(--bg-secondary) 95%, var(--fg-primary) 5%);
+            color: var(--fg-primary);
+            padding: 8px 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+
+        .metric-btn:hover {
+            background: color-mix(in srgb, var(--bg-secondary) 85%, var(--fg-primary) 15%);
+            border-color: color-mix(in srgb, var(--border) 60%, var(--fg-secondary) 40%);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+
+        .metric-btn.primary {
+            background: color-mix(in srgb, var(--fg-secondary) 75%, var(--bg-secondary) 25%);
+            color: var(--fg-primary);
+            border-color: var(--fg-secondary);
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .metric-btn.primary:hover {
+            background: color-mix(in srgb, var(--fg-secondary) 85%, var(--bg-secondary) 15%);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            transform: translateY(-1px);
+        }
+
+        .metric-glyph {
+            width: 24px;
+            height: 24px;
+            color: var(--fg-primary);
+        }
+
+        /* Metric button - Top Right */
+        .metric-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--backdrop-blur);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 6px 12px;
+            z-index: 1001;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--fg-primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .metric-button:hover {
+            background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+            border-color: color-mix(in srgb, var(--border) 60%, var(--fg-secondary) 40%);
+        }
+
+        /* Hide options button when metric modal is visible */
+        .metric-modal-root:not(.hidden) ~ .options-button,
+        .metric-modal-root:not(.hidden) ~ .metric-button {
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        /* Hide controls panel when metric modal is visible */
+        .metric-modal-root:not(.hidden) ~ .floating-panel {
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        /* Responsive adjustments for mobile */
+        @media (max-width: 768px) {
+            .metric-button {
+                top: max(15px, env(safe-area-inset-top, 15px));
+                right: max(15px, env(safe-area-inset-right, 15px));
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+        }
+    </style>
+    <style>
+        /* Loading screen */
+        #loadingScreen {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            z-index: 20000;
+            transition: opacity 0.3s ease;
+        }
+
+        #loadingScreen.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--fg-primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-    <!-- Options Button -->
-    <button class="options-button" id="optionsBtn">options</button>
+    <!-- Loading Screen -->
+    <div id="loadingScreen">
+        <div class="loading-spinner"></div>
+    </div>
 
-    <!-- Fullscreen voronoi viewer -->
-    <voronoi-viewer id="viewer"></voronoi-viewer>
+    <!-- Metric Picker Modal -->
+    <div id="metricPickerRoot" class="metric-modal-root" style="display: none;">
+        <div class="metric-backdrop" id="metricBackdrop"></div>
+        <section class="metric-modal">
+            <div class="top">
+                <div class="label">Welcome to Voronoi Viewer</div>
+                <p style="margin: 8px 0 16px; font-size: 14px; color: var(--fg-secondary);">
+                    Choose a distance metric to begin exploring Voronoi diagrams
+                </p>
+                <div id="metricChipGrid" class="metric-grid"></div>
+            </div>
+
+            <div class="metric-body">
+                <div class="metric-cols">
+                    <div>
+                        <div class="metric-example">
+                            <svg viewBox="0 0 400 300" width="100%" height="100%">
+                                <rect x="0" y="0" width="400" height="300" fill="#161617" />
+                                <polygon points="10,40 120,20 120,120 40,160" fill="#1c1c1e" stroke="#222224"/>
+                          <polygon points="120,20 230,40 220,140 120,120" fill="#24242d6" stroke="#222224"/>
+                                <polygon points="40,160 120,120 200,200 80,260" fill="#1c1c1e" stroke="#222224"/>
+                                <polygon points="230,40 390,30 380,150 220,140" fill="#1c1c1e" stroke="#222224"/>
+                                <polygon points="200,200 320,170 380,280 140,280" fill="#242426" stroke="#222224"/>
+                                <circle cx="60" cy="80" r="3" fill="#b9b9b9"/>
+                                <circle cx="170" cy="70" r="3" fill="#b9b9b9"/>
+                                <circle cx="260" cy="110" r="3" fill="#b9b9b9"/>
+                                <circle cx="130" cy="200" r="3" fill="#b9b9b9"/>
+                                <circle cx="330" cy="220" r="3" fill="#b9b9b9"/>
+                                <text x="14" y="24" font-family="ui-sans-serif" font-size="12" fill="#b9b9b9">Example diagram</text>
+                            </svg>
+                        </div>
+                        <div class="metric-example-note">Representative example (not computed).</div>
+                    </div>
+
+                    <div>
+                        <div class="metric-title-row">
+                            <span id="metricDetailGlyph"></span>
+                            <h2 id="metricDetailTitle" style="margin:0; font-size:20px; font-weight:700"></h2>
+                            <span class="metric-unit-tag">unit ball</span>
+                        </div>
+                        <p id="metricDetailNotes" class="metric-desc" style="margin-top:8px"></p>
+                        <div class="metric-notes">
+                            <p style="margin:10px 0 4px 0; font-weight:500">Notes</p>
+                            <ul>
+                                <li>Stability: placeholder blurb about numerical stability.</li>
+                                <li>Complexity: placeholder blurb about algorithmic cost.</li>
+                                <li>Use cases: placeholder blurb with typical scenarios.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metric-footer">
+                <div class="metric-toggle">
+                    <button id="metricExact" class="active">Exact</button>
+                    <button id="metricApprox">Approximate</button>
+                </div>
+                <div>
+                    <button id="metricCancelBtn" class="metric-btn" style="margin-right:6px">Use Default</button>
+                    <button id="metricSelectBtn" class="metric-btn primary">Start</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Options Button -->
+    <button class="options-button" id="optionsBtn" style="display: none;">options</button>
+
+    <!-- Metric Button - Top Right -->
+    <button class="metric-button" id="metricBtn" style="display: none;">metric</button>
+
+    <!-- Fullscreen voronoi viewer (hidden until metric is selected) -->
+    <voronoi-viewer id="viewer" style="opacity: 0; pointer-events: none;"></voronoi-viewer>
     
     <!-- Compact Controls Panel -->
     <div class="floating-panel controls-panel" id="controlsPanel" style="display: none;">
@@ -30,7 +436,7 @@
         </div>
 
         <div class="control-group">
-            <label class="control-label">quality</label>
+            <label class="control-label">resolution scale</label>
             <div class="resolution-switch" id="resolutionSwitch">
                 <div class="resolution-switch-indicator" id="resolutionSwitchIndicator"></div>
                 <button class="resolution-switch-option" data-resolution="0.25">0.25x</button>
@@ -83,6 +489,11 @@
         </div>
 
         <div class="control-group">
+            <label class="control-label">color palette</label>
+            <div id="paletteGrid" class="palette-grid"></div>
+        </div>
+
+        <div class="control-group">
             <label class="control-label">actions</label>
             <button class="action-btn" id="clearBtn">clear all</button>
             <button class="action-btn" id="randomBtn">add random</button>
@@ -90,9 +501,48 @@
         </div>
     </div>
 
-    <script src="voronoi-viewer.js?v=1.2.0"></script>
-    <script>
+    <script type="module">
+        // Import components
+        import './components/voronoi-viewer.js';
+        import { MetricPicker } from './components/metric-picker.js';
+        import { PALETTES } from './lib/palette.js';
+
+        // Initialize metric picker
+        const metricPicker = new MetricPicker();
+        metricPicker.init();
+
+        // ======================== VORONOI VIEWER ========================
         const viewer = document.getElementById('viewer');
+
+        // Setup palette selector
+        const paletteGrid = document.getElementById('paletteGrid');
+        let currentPaletteId = 'vibrant';
+
+        PALETTES.forEach(palette => {
+            const swatch = document.createElement('div');
+            swatch.className = 'palette-swatch' + (palette.id === currentPaletteId ? ' active' : '');
+            swatch.title = palette.name;
+
+            // Create color stripes
+            palette.colors.forEach(color => {
+                const colorDiv = document.createElement('div');
+                colorDiv.className = 'palette-swatch-color';
+                colorDiv.style.backgroundColor = color;
+                swatch.appendChild(colorDiv);
+            });
+
+            swatch.addEventListener('click', () => {
+                // Update active state
+                document.querySelectorAll('.palette-swatch').forEach(s => s.classList.remove('active'));
+                swatch.classList.add('active');
+                currentPaletteId = palette.id;
+
+                // Update viewer palette
+                viewer.setPalette(palette.id);
+            });
+
+            paletteGrid.appendChild(swatch);
+        });
         const optionsBtn = document.getElementById('optionsBtn');
         const controlsPanel = document.getElementById('controlsPanel');
         

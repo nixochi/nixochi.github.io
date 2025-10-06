@@ -15,8 +15,6 @@
 
     <!-- Module Preload - download critical modules early -->
     <link rel="modulepreload" href="gaussian-periods-viewer.js">
-    <link rel="modulepreload" href="https://esm.sh/three@0.160.0" crossorigin>
-    <link rel="modulepreload" href="https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js" crossorigin>
 
     <style>
         /* CSS Variables */
@@ -578,7 +576,7 @@
             <div class="input-row">
                 <div class="input-wrapper">
                     <label class="input-label">Modulus (n)</label>
-                    <input type="number" class="input-field" id="nInputMobile" value="20352" min="2" max="200000">
+                    <input type="number" class="input-field" id="nInputMobile" value="20352" min="2" max="5000000">
                 </div>
                 <div class="input-wrapper">
                     <label class="input-label">Generator (ω)</label>
@@ -587,7 +585,8 @@
             </div>
             <div class="button-row">
                 <button class="action-btn" id="computePlotBtnMobile">Compute</button>
-                <button class="action-btn" id="nextCoprimeBtnMobile">Next Coprime</button>
+                <button class="action-btn" id="prevCoprimeBtnMobile">Prev</button>
+                <button class="action-btn" id="nextCoprimeBtnMobile">Next</button>
             </div>
         </div>
     </div>
@@ -631,6 +630,10 @@
             <div class="toggle-wrapper">
                 <div class="toggle active" id="autoZoomToggle"></div>
                 <span class="toggle-label">Auto Zoom</span>
+            </div>
+            <div class="toggle-wrapper">
+                <div class="toggle active" id="gpuToggle"></div>
+                <span class="toggle-label">Use GPU</span>
             </div>
         </div>
 
@@ -706,6 +709,10 @@
                 <div class="toggle active" id="autoZoomToggleDesktop"></div>
                 <span class="toggle-label">Auto Zoom</span>
             </div>
+            <div class="toggle-wrapper">
+                <div class="toggle active" id="gpuToggleDesktop"></div>
+                <span class="toggle-label">Use GPU</span>
+            </div>
         </div>
 
         <div class="control-group">
@@ -774,7 +781,7 @@
             <div class="input-row">
                 <div class="input-wrapper">
                     <label class="input-label">Modulus (n)</label>
-                    <input type="number" class="input-field" id="nInput" value="20352" min="2" max="200000">
+                    <input type="number" class="input-field" id="nInput" value="20352" min="2" max="5000000">
                 </div>
                 <div class="input-wrapper">
                     <label class="input-label">Generator (ω)</label>
@@ -783,7 +790,8 @@
             </div>
             <div class="button-row">
                 <button class="action-btn" id="computePlotBtn">Compute</button>
-                <button class="action-btn" id="nextCoprimeBtn">Next Coprime</button>
+                <button class="action-btn" id="prevCoprimeBtn">Prev</button>
+                <button class="action-btn" id="nextCoprimeBtn">Next</button>
             </div>
         </div>
     </div>
@@ -985,6 +993,59 @@
             setupToggle('autoZoomToggle', 'auto-zoom', true);
             setupToggle('autoZoomToggleDesktop', 'auto-zoom', true);
 
+            // Setup GPU toggle (special handling - directly modifies viewer state)
+            const gpuToggle = document.getElementById('gpuToggle');
+            const gpuToggleDesktop = document.getElementById('gpuToggleDesktop');
+
+            function syncGPUToggle(isActive) {
+                if (viewer && viewer.gpuCompute) {
+                    viewer.useGPU = isActive;
+                    console.log(`GPU computation ${isActive ? 'enabled' : 'disabled'}`);
+                }
+            }
+
+            // Listen for GPU unavailable event
+            viewer.addEventListener('gpu-unavailable', () => {
+                if (gpuToggle) {
+                    gpuToggle.classList.remove('active');
+                    gpuToggle.style.opacity = '0.5';
+                    gpuToggle.style.pointerEvents = 'none';
+                }
+                if (gpuToggleDesktop) {
+                    gpuToggleDesktop.classList.remove('active');
+                    gpuToggleDesktop.style.opacity = '0.5';
+                    gpuToggleDesktop.style.pointerEvents = 'none';
+                }
+            });
+
+            if (gpuToggle) {
+                gpuToggle.addEventListener('click', () => {
+                    const isActive = gpuToggle.classList.toggle('active');
+                    if (gpuToggleDesktop) {
+                        if (isActive) {
+                            gpuToggleDesktop.classList.add('active');
+                        } else {
+                            gpuToggleDesktop.classList.remove('active');
+                        }
+                    }
+                    syncGPUToggle(isActive);
+                });
+            }
+
+            if (gpuToggleDesktop) {
+                gpuToggleDesktop.addEventListener('click', () => {
+                    const isActive = gpuToggleDesktop.classList.toggle('active');
+                    if (gpuToggle) {
+                        if (isActive) {
+                            gpuToggle.classList.add('active');
+                        } else {
+                            gpuToggle.classList.remove('active');
+                        }
+                    }
+                    syncGPUToggle(isActive);
+                });
+            }
+
             // GCD helper
             function gcd(a, b) {
                 while (b !== 0) {
@@ -1005,6 +1066,22 @@
                     candidate = 2;
                     while (candidate <= start && gcd(candidate, n) !== 1) {
                         candidate++;
+                    }
+                }
+
+                return candidate;
+            }
+
+            function findPreviousCoprime(n, start) {
+                let candidate = start - 1;
+                while (candidate > 1 && gcd(candidate, n) !== 1) {
+                    candidate--;
+                }
+
+                if (candidate <= 1) {
+                    candidate = n - 1;
+                    while (candidate >= start && gcd(candidate, n) !== 1) {
+                        candidate--;
                     }
                 }
 
@@ -1059,6 +1136,24 @@
                 viewer.setAttribute('omega', omega.toString());
             }
 
+            // Previous coprime handler for both mobile and desktop
+            function handlePreviousCoprime(nInputId, omegaInputId) {
+                const n = parseInt(document.getElementById(nInputId).value);
+                let omega = parseInt(document.getElementById(omegaInputId).value);
+
+                omega = findPreviousCoprime(n, omega);
+
+                // Update all omega inputs
+                ['omegaInput', 'omegaInputMobile'].forEach(id => {
+                    const input = document.getElementById(id);
+                    if (input) input.value = omega;
+                });
+
+                // Auto-compute with new coprime
+                viewer.setAttribute('n', n.toString());
+                viewer.setAttribute('omega', omega.toString());
+            }
+
             // Desktop compute buttons
             document.getElementById('computePlotBtn')?.addEventListener('click', () => {
                 handleCompute('nInput', 'omegaInput');
@@ -1068,6 +1163,10 @@
                 handleNextCoprime('nInput', 'omegaInput');
             });
 
+            document.getElementById('prevCoprimeBtn')?.addEventListener('click', () => {
+                handlePreviousCoprime('nInput', 'omegaInput');
+            });
+
             // Mobile compute buttons
             document.getElementById('computePlotBtnMobile')?.addEventListener('click', () => {
                 handleCompute('nInputMobile', 'omegaInputMobile');
@@ -1075,6 +1174,10 @@
 
             document.getElementById('nextCoprimeBtnMobile')?.addEventListener('click', () => {
                 handleNextCoprime('nInputMobile', 'omegaInputMobile');
+            });
+
+            document.getElementById('prevCoprimeBtnMobile')?.addEventListener('click', () => {
+                handlePreviousCoprime('nInputMobile', 'omegaInputMobile');
             });
 
             // Point size slider for both panels

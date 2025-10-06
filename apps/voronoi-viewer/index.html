@@ -411,7 +411,7 @@
     </div>
 
     <!-- Options Button -->
-    <button class="options-button" id="optionsBtn" style="display: none;">options</button>
+    <button class="options-button" id="optionsBtn" style="display: none;">Options</button>
 
     <!-- Metric Button - Top Right -->
     <button class="metric-button" id="metricBtn" style="display: none;">metric</button>
@@ -547,7 +547,7 @@
         const controlsPanel = document.getElementById('controlsPanel');
         
         let panelVisible = false;
-        optionsBtn.textContent = 'options';
+        optionsBtn.textContent = 'Options';
         
         optionsBtn.addEventListener('click', () => {
             panelVisible = !panelVisible;
@@ -555,7 +555,7 @@
                 controlsPanel.style.display = 'block';
                 controlsPanel.offsetHeight;
                 controlsPanel.classList.add('expanded');
-                optionsBtn.textContent = 'close';
+                optionsBtn.textContent = 'Close';
             } else {
                 controlsPanel.classList.remove('expanded');
                 setTimeout(() => {
@@ -563,7 +563,7 @@
                         controlsPanel.style.display = 'none';
                     }
                 }, 300);
-                optionsBtn.textContent = 'options';
+                optionsBtn.textContent = 'Options';
             }
         });
         

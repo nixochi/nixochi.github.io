@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGPU Check</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #f0f0f0;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .pass { background: #2d5016; color: #90ee90; }
+        .fail { background: #501616; color: #ff6b6b; }
+        .info { background: #163850; color: #87ceeb; }
+        h1 { color: #87ceeb; }
+        .big { font-size: 32px; text-align: center; margin: 30px 0; }
+    </style>
+</head>
+<body>
+    <h1>WebGPU Diagnostics</h1>
+    <div id="results">Checking...</div>
+
+    <script>
+        const resultsDiv = document.getElementById('results');
+
+        function show(message, type) {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = message;
+            resultsDiv.appendChild(div);
+        }
+
+        resultsDiv.innerHTML = '';
+
+        // 1. Browser check
+        const ua = navigator.userAgent;
+        let browserName = 'Unknown';
+        if (ua.includes('Safari') && !ua.includes('Chrome')) {
+            browserName = '✅ Safari';
+        } else if (ua.includes('CriOS')) {
+            browserName = '❌ Chrome (on iOS)';
+        } else if (ua.includes('FxiOS')) {
+            browserName = '❌ Firefox (on iOS)';
+        } else if (ua.includes('Chrome')) {
+            browserName = '❌ Chrome';
+        }
+
+        show(`<strong>Browser:</strong> ${browserName}`,
+             browserName.includes('Safari') ? 'pass' : 'fail');
+
+        // 2. iOS/iPadOS version
+        let iOSMatch = ua.match(/OS (\d+)_(\d+)/);
+        if (!iOSMatch) {
+            // iPadOS 13+ reports as Mac OS, check for touch
+            iOSMatch = ua.match(/Version\/(\d+)\.(\d+)/);
+        }
+        const iOSVersion = iOSMatch ? `${iOSMatch[1]}.${iOSMatch[2]}` : 'Unknown';
+        const isPad = ua.includes('iPad') || (ua.includes('Macintosh') && navigator.maxTouchPoints > 1);
+        show(`<strong>${isPad ? 'iPadOS' : 'iOS'} Version:</strong> ${iOSVersion}`,
+             iOSVersion >= '17.0' ? 'pass' : (iOSVersion === 'Unknown' ? 'info' : 'fail'));
+
+        // Full user agent for debugging
+        show(`<strong>Full User Agent:</strong><br><small>${ua}</small>`, 'info');
+
+        // 3. Secure context
+        const isSecure = window.isSecureContext;
+        show(`<strong>Secure Context (HTTPS):</strong> ${isSecure ? '✅ Yes' : '❌ No'}`,
+             isSecure ? 'pass' : 'fail');
+
+        // 4. URL
+        show(`<strong>URL:</strong> ${window.location.href}`, 'info');
+
+        // 5. navigator.gpu check
+        const hasGPU = !!navigator.gpu;
+        show(`<strong>navigator.gpu exists:</strong> ${hasGPU ? '✅ Yes' : '❌ No'}`,
+             hasGPU ? 'pass' : 'fail');
+
+        // 6. Try to get adapter
+        if (hasGPU) {
+            navigator.gpu.requestAdapter().then(adapter => {
+                if (adapter) {
+                    show(`<strong>GPU Adapter:</strong> ✅ Found!`, 'pass');
+                    show(`<div class="big">🎉 WebGPU is WORKING! 🎉</div>`, 'pass');
+                } else {
+                    show(`<strong>GPU Adapter:</strong> ❌ Not available`, 'fail');
+                }
+            }).catch(err => {
+                show(`<strong>GPU Adapter Error:</strong> ${err.message}`, 'fail');
+            });
+        } else {
+            show(`<div class="big">❌ WebGPU NOT available</div>`, 'fail');
+
+            // Provide help
+            if (!browserName.includes('Safari')) {
+                show(`<strong>Solution:</strong> Open this page in Safari (not Chrome/Firefox)`, 'info');
+            } else if (iOSVersion < '17.0' && iOSVersion !== 'Unknown') {
+                show(`<strong>Solution:</strong> Update to iOS/iPadOS 17.0 or later`, 'info');
+            } else if (!isSecure) {
+                show(`<strong>Solution:</strong> Use HTTPS (not HTTP)`, 'info');
+            } else if (browserName.includes('Safari')) {
+                show(`<strong>Possible Issue:</strong> WebGPU might need to be enabled in Safari settings`, 'info');
+                show(`<strong>Try:</strong><br>
+                      1. Settings → Safari → Advanced → Experimental Features<br>
+                      2. Enable "WebGPU" if it exists<br>
+                      3. Or check if Safari version is actually 17+`, 'info');
+            }
+        }
+    </script>
+</body>
+</html>

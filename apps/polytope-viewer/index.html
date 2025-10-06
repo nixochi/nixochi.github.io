@@ -5,15 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Polytope Viewer</title>
 
-    <!-- DNS Prefetch - resolve domain names early -->
     <link rel="dns-prefetch" href="https://esm.sh">
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-
-    <!-- Preconnect - establish full connection (DNS + TLS) -->
     <link rel="preconnect" href="https://esm.sh" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 
-    <!-- Critical CSS inline for instant first paint -->
     <style>
         /* CSS Variables for theming */
         :root {
@@ -79,7 +75,6 @@
             display: block;
         }
 
-        /* Loading skeleton - critical for first paint */
         .skeleton-loader {
             position: absolute;
             inset: 0;
@@ -173,56 +168,31 @@
 <body>
     <!-- Top Left Buttons Container -->
     <div class="top-left-buttons">
-        <button class="options-button" id="optionsBtn">options</button>
-        <button class="select-polytope-btn" id="selectPolytopeBtn">library</button>
+        <button class="options-button" id="optionsBtn">Options</button>
+        <button class="select-polytope-btn" id="selectPolytopeBtn">Library</button>
     </div>
 
     <!-- Fullscreen polytope viewer -->
-    <polytope-viewer id="viewer" style="position: relative;" vertices='[
-  [-2.121320343559642, -0.408248290463863,  0.577350269189626],
-  [-2.121320343559642,  0.408248290463863, -0.577350269189626],
-  [-1.414213562373095, -1.632993161855452,  0.577350269189626],
-  [-1.414213562373095,  0.000000000000000, -1.732050807568877],
-  [-1.414213562373095,  0.000000000000000,  1.732050807568877],
-  [-1.414213562373095,  1.632993161855452, -0.577350269189626],
-  [-0.707106781186548, -2.041241452319315, -0.577350269189626],
-  [-0.707106781186548, -1.224744871391589, -1.732050807568877],
-  [-0.707106781186548, -1.224744871391589,  1.732050807568877],
-  [-0.707106781186548,  1.224744871391589, -1.732050807568877],
-  [-0.707106781186548,  1.224744871391589,  1.732050807568877],
-  [-0.707106781186548,  2.041241452319315,  0.577350269189626],
-  [ 0.707106781186548, -2.041241452319315, -0.577350269189626],
-  [ 0.707106781186548, -1.224744871391589, -1.732050807568877],
-  [ 0.707106781186548, -1.224744871391589,  1.732050807568877],
-  [ 0.707106781186548,  1.224744871391589, -1.732050807568877],
-  [ 0.707106781186548,  1.224744871391589,  1.732050807568877],
-  [ 0.707106781186548,  2.041241452319315,  0.577350269189626],
-  [ 1.414213562373095, -1.632993161855452,  0.577350269189626],
-  [ 1.414213562373095,  0.000000000000000, -1.732050807568877],
-  [ 1.414213562373095,  0.000000000000000,  1.732050807568877],
-  [ 1.414213562373095,  1.632993161855452, -0.577350269189626],
-  [ 2.121320343559642, -0.408248290463863,  0.577350269189626],
-  [ 2.121320343559642,  0.408248290463863, -0.577350269189626]
-]'>
+    <polytope-viewer id="viewer" style="position: relative;">
         <!-- Loading skeleton - shows immediately, removed by component when ready -->
         <div class="skeleton-loader" aria-live="polite" aria-label="Loading polytope visualization">
             <div class="skeleton-spinner"></div>
-            <div class="skeleton-text">loading viewer...</div>
+            <div class="skeleton-text">Loading Viewer...</div>
         </div>
     </polytope-viewer>
     
     <!-- Left Controls Panel (Starts hidden) -->
     <div class="floating-panel controls-panel" id="controlsPanel">
         <div class="control-group">
-            <label class="control-label">display mode</label>
+            <label class="control-label">Display Mode</label>
             <div class="toggle-wrapper">
                 <div class="toggle" id="wireframeToggle"></div>
-                <span class="toggle-label">wireframe</span>
+                <span class="toggle-label">Wireframe</span>
             </div>
         </div>
 
         <div class="control-group">
-            <label class="control-label">opacity</label>
+            <label class="control-label">Opacity</label>
             <div class="slider-wrapper">
                 <input type="range" class="slider" id="opacitySlider"
                        min="0" max="1" step="0.1" value="0.9">
@@ -235,7 +205,7 @@
     <div class="modal-overlay" id="polytopeModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="modal-title">select polytope</h2>
+                <h2 class="modal-title">Select Polytope</h2>
                 <button class="close-button" id="closeModal">&times;</button>
             </div>
             
@@ -266,6 +236,10 @@
             const polytopeGrid = document.getElementById('polytopeGrid');
             const optionsBtn = document.getElementById('optionsBtn');
             const controlsPanel = document.getElementById('controlsPanel');
+
+            // Set default vertices (truncated icosahedron)
+            const defaultVertices = getPolytopeVertices('truncated_icosahedron');
+            viewer.setAttribute('vertices', JSON.stringify(defaultVertices));
 
             // Generate polytope cards from data
             function generatePolytopeCards() {
@@ -325,7 +299,7 @@
                     // Force reflow before adding class for smooth animation
                     controlsPanel.offsetHeight;
                     controlsPanel.classList.add('expanded');
-                    optionsBtn.textContent = 'close';
+                    optionsBtn.textContent = 'Close';
                 } else {
                     controlsPanel.classList.remove('expanded');
                     // Wait for animation to complete before hiding
@@ -334,7 +308,7 @@
                             controlsPanel.style.display = 'none';
                         }
                     }, 300); // Match CSS transition duration
-                    optionsBtn.textContent = 'options';
+                    optionsBtn.textContent = 'Options';
                 }
             });
 

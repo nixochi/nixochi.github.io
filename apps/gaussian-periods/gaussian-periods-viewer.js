@@ -1,55 +1,46 @@
 /**
  * Gaussian Periods Viewer Web Component
- * With corrected container-aware auto-zoom
+ * Canvas-based rendering with WebGPU acceleration
  */
+import { GaussianPeriodsGPUCompute } from './gaussian-compute-gpu.js';
+
 class GaussianPeriodsViewer extends HTMLElement {
-    static get observedAttributes() { 
-        return ['n', 'omega', 'point-size', 'show-grid', 'color-scheme', 'plot-mode', 'lutz-c', 'time-first-color', 'time-last-color']; 
+    static get observedAttributes() {
+        return ['n', 'omega', 'point-size', 'show-grid', 'color-scheme', 'plot-mode', 'lutz-c', 'time-first-color', 'time-last-color'];
     }
 
     constructor() {
         super();
         console.log('🎯 GaussianPeriodsViewer constructor called');
-        
+
         // Core state
         this.computedPoints = [];
         this.animationIndex = 0;
         this.isPaused = false;
-        
-        // Three.js objects
-        this.THREE = null;
-        this.OrbitControls = null;
-        this.scene = null;
-        this.camera = null;
-        this.renderer = null;
-        this.controls = null;
-        
-        // Point cloud objects
-        this.pointCloud = null;
-        this.pointGeometry = null;
-        this.pointMaterial = null;
-        this.gridHelper = null;
-        
-        // Pre-allocated arrays
-        this.positionArray = null;
-        this.colorArray = null;
-        
-        // Auto-zoom state
+
+        // Canvas rendering
+        this.canvas = null;
+        this.ctx = null;
+
+        // View state
+        this.scale = 1.0;
+        this.offsetX = 0;
+        this.offsetY = 0;
         this.computedScaleFactor = 0.1;
-        
-        // Lutz coloring data
+
+        // Lutz coloring cache
         this.lutzColoring = null;
 
-        // Animation and resize
+        // Animation
         this.animationId = null;
         this._ro = null;
-        
-        // Resource tracking
-        this._objects = new Set();
-        this._materials = new Set();
-        this._geometries = new Set();
+
+        // WebGPU compute
+        this.gpuCompute = null;
+        this.gpuAvailable = false;
+        this.useGPU = false;
     }
-    
+
     connectedCallback() {
         console.log('🔗 GaussianPeriodsViewer connected to DOM');
 
@@ -59,13 +50,13 @@ class GaussianPeriodsViewer extends HTMLElement {
                 height: 100%;
                 position: relative;
                 overflow: hidden;
-                background: transparent;
+                background: #0a0a0a;
             ">
                 <canvas id="gaussianCanvas" style="
                     width: 100%;
                     height: 100%;
                     display: block;
-                    background: transparent;
+                    image-rendering: crisp-edges;
                 "></canvas>
 
                 <div id="errorMessage" style="
@@ -87,6 +78,22 @@ class GaussianPeriodsViewer extends HTMLElement {
                     <div style="font-size: 14px; font-weight: 500;">Failed to load Gaussian Periods viewer</div>
                     <div id="errorDetails" style="font-size: 12px; opacity: 0.8;"></div>
                 </div>
+
+                <div id="debugInfo" style="
+                    position: absolute;
+                    bottom: 8px;
+                    right: 8px;
+                    font-family: monospace;
+                    font-size: 12px;
+                    background: rgba(0, 0, 0, 0.85);
+                    color: #00ff00;
+                    padding: 8px 12px;
+                    border-radius: 4px;
+                    pointer-events: none;
+                    z-index: 10000;
+                    white-space: pre-wrap;
+                    max-width: 400px;
+                ">Initializing...</div>
             </div>
         `;
 
@@ -98,59 +105,56 @@ class GaussianPeriodsViewer extends HTMLElement {
 
         console.log('✅ GaussianPeriodsViewer HTML rendered successfully');
     }
-    
+
     disconnectedCallback() {
         console.log('🔌 GaussianPeriodsViewer disconnected from DOM');
-        
+
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
         }
-        
-        if (this.controls) {
-            this.controls.dispose();
-        }
-        
-        this.disposeAllResources();
-        
-        if (this.renderer) {
-            this.renderer.dispose();
-        }
-        
+
         if (this._ro) {
             this._ro.disconnect();
+        }
+
+        if (this.gpuCompute) {
+            this.gpuCompute.destroy();
+            this.gpuCompute = null;
         }
     }
 
     attributeChangedCallback(name, oldValue, newValue) {
         console.log(`🔄 GaussianPeriodsViewer attribute changed: ${name} = ${newValue}`);
 
-        if (!this.THREE) return;
+        if (!this.canvas) return;
 
         if (name === 'n' || name === 'omega') {
             this.computePeriods();
         } else if (name === 'point-size') {
-            this.updatePointSize(parseFloat(newValue));
+            this.redrawAll();
         } else if (name === 'show-grid') {
-            this.updateGridVisibility(newValue === 'true');
+            this.redrawAll();
         } else if (name === 'color-scheme') {
-            this.updateColors();
+            this.lutzColoring = null; // Clear cache
+            this.redrawAll();
         } else if (name === 'lutz-c') {
             if (this.getParameter('colorScheme') === 'lutz') {
-                this.updateColors();
+                this.lutzColoring = null;
+                this.redrawAll();
             }
         } else if (name === 'time-first-color' || name === 'time-last-color') {
             if (this.getParameter('colorScheme') === 'time-based') {
-                this.updateColors();
+                this.redrawAll();
             }
         } else if (name === 'plot-mode') {
             this.updatePlotMode(newValue);
         }
     }
-    
+
     parseAttributes() {
         console.log('📝 Parsing attributes');
     }
-    
+
     getParameter(name, defaultValue = null) {
         switch (name) {
             case 'n': return parseInt(this.getAttribute('n')) || 91205;
@@ -167,150 +171,90 @@ class GaussianPeriodsViewer extends HTMLElement {
             default: return defaultValue;
         }
     }
-    
+
     async initialize() {
         console.log('🚀 Initializing GaussianPeriodsViewer...');
-        
-        await this.loadDependencies();
-        this.setupScene();
+
+        // Initialize WebGPU compute
+        this.gpuCompute = new GaussianPeriodsGPUCompute();
+        this.gpuAvailable = await this.gpuCompute.initialize();
+        this.useGPU = this.gpuAvailable;
+
+        if (this.gpuAvailable) {
+            console.log('✅ WebGPU available - GPU acceleration ready');
+        } else {
+            console.log('⚠️ WebGPU not available - using CPU computation');
+            this.dispatchEvent(new CustomEvent('gpu-unavailable'));
+        }
+
+        this.setupCanvas();
         this.setupResizeObserver();
         this.startAnimationLoop();
-        
+
         await this.computePeriods();
-        
+
         console.log('✅ GaussianPeriodsViewer initialization complete');
     }
-    
-    async loadDependencies() {
-        console.log('📦 Loading THREE.js dependencies...');
-        
-        const threeMod = await this.importFirst([
-            'https://esm.sh/three@0.160.0',
-            'https://cdn.jsdelivr.net/npm/three@0.160.0/+esm'
-        ]);
-        this.THREE = threeMod;
-        
-        const orbitMod = await this.importFirst([
-            'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js',
-            'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js'
-        ]);
-        this.OrbitControls = orbitMod.OrbitControls;
-        
-        console.log('✅ Dependencies loaded successfully');
-    }
-    
-    async importFirst(urls) {
-        let lastError;
-        for (const url of urls) {
-            try {
-                console.log(`📥 Attempting to load: ${url}`);
-                return await import(/* @vite-ignore */ url);
-            } catch (error) {
-                lastError = error;
-                console.warn(`❌ Failed to load ${url}:`, error);
-            }
+
+    setupCanvas() {
+        this.canvas = this.querySelector('#gaussianCanvas');
+        if (!this.canvas) {
+            throw new Error('Canvas element not found');
         }
-        throw lastError || new Error('All module imports failed');
+
+        this.ctx = this.canvas.getContext('2d', { alpha: true });
+        this.resizeCanvas();
+
+        console.log('✅ Canvas setup complete');
     }
-    
-    setupScene() {
-        const THREE = this.THREE;
-        const canvas = this.querySelector('#gaussianCanvas');
 
-        this.scene = new THREE.Scene();
+    resizeCanvas() {
+        const rect = this.canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
 
-        this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
-        this.camera.position.set(0, 0, 10);
-        this.camera.lookAt(0, 0, 0);
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
 
-        this.renderer = new THREE.WebGLRenderer({
-            canvas: canvas,
-            antialias: true,
-            alpha: true
-        });
-        this.renderer.setClearColor(0x000000, 0);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        this.ctx.scale(dpr, dpr);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-        directionalLight.position.set(0, 0, 10);
-        this.scene.add(ambientLight, directionalLight);
+        console.log(`📐 Canvas resized to ${rect.width}x${rect.height} (${this.canvas.width}x${this.canvas.height} actual)`);
 
-        this.controls = new this.OrbitControls(this.camera, canvas);
-        this.controls.enableRotate = false;
-        this.controls.enablePan = true;
-        this.controls.enableZoom = true;
-        this.controls.enableDamping = true;
-        this.controls.dampingFactor = 0.08;
-        this.controls.minDistance = 1;
-        this.controls.maxDistance = 200;
-
-        console.log('🎬 3D scene setup complete');
+        // Redraw if we have points
+        if (this.computedPoints.length > 0) {
+            this.redrawAll();
+        }
     }
-    
+
     setupResizeObserver() {
-        const handleResize = () => {
-            const { width, height } = this.getBoundingClientRect();
-            if (!width || !height) return;
-            
-            this.renderer.setSize(width, height, false);
-            this.camera.aspect = width / height;
-            this.camera.updateProjectionMatrix();
-            
-            // Recalculate auto-zoom on resize if enabled and we have points
-            if (this.getParameter('autoZoom') && this.computedPoints.length > 0) {
-                this.computedScaleFactor = this.calculateAutoZoom(this.computedPoints);
-                this.fillArraysWithPoints();
-                if (this.pointGeometry) {
-                    this.pointGeometry.attributes.position.needsUpdate = true;
-                }
-            }
-            
-            console.log(`📐 GaussianPeriodsViewer resized to: ${width}x${height}`);
-        };
-        
-        handleResize();
-        this._ro = new ResizeObserver(handleResize);
-        this._ro.observe(this);
+        this._ro = new ResizeObserver(() => {
+            this.resizeCanvas();
+        });
+        this._ro.observe(this.canvas);
     }
-    
+
     startAnimationLoop() {
         const animate = () => {
             this.animationId = requestAnimationFrame(animate);
-            
-            const plotMode = this.getParameter('plotMode');
-            if (plotMode === 'animated' && !this.isPaused && this.pointCloud) {
-                const maxPoints = this.computedPoints.length;
-                if (this.animationIndex < maxPoints) {
-                    const speed = this.getParameter('animationSpeed');
-                    const pointsToAdd = Math.min(speed, maxPoints - this.animationIndex);
-                    this.animationIndex += pointsToAdd;
-                    
-                    if (pointsToAdd > 0) {
-                        this.updateVisiblePoints();
-                    }
-                }
-            }
-            
-            const showGrid = this.getParameter('showGrid');
-            if (showGrid && !this.gridHelper) {
-                this.createGrid();
-            } else if (!showGrid && this.gridHelper) {
-                this.scene.remove(this.gridHelper);
-                this.gridHelper.geometry.dispose();
-                this.gridHelper.material.dispose();
-                this.gridHelper = null;
-            }
-            
-            this.controls.update();
-            this.renderer.render(this.scene, this.camera);
+            this.renderFrame();
         };
         animate();
         console.log('🎬 Animation loop started');
     }
-    
+
+    renderFrame() {
+        const plotMode = this.getParameter('plotMode');
+
+        if (plotMode === 'animated' && !this.isPaused && this.animationIndex < this.computedPoints.length) {
+            const speed = this.getParameter('animationSpeed');
+            const pointsToDraw = Math.min(speed, this.computedPoints.length - this.animationIndex);
+
+            this.drawPointsBatch(this.animationIndex, this.animationIndex + pointsToDraw);
+            this.animationIndex += pointsToDraw;
+        }
+    }
+
     async computePeriods() {
-        const n = Math.min(this.getParameter('n'), 200000);
+        const n = this.getParameter('n');
         const omega = this.getParameter('omega');
 
         console.log(`Computing Gaussian Periods for n=${n}, omega=${omega}...`);
@@ -321,16 +265,16 @@ class GaussianPeriodsViewer extends HTMLElement {
         }
 
         this.clearVisualization();
-        
+
         const d = this.multiplicativeOrder(omega, n);
         console.log(`Multiplicative order d = ${d}`);
-        
+
         const omegaPowers = new Uint32Array(d);
         omegaPowers[0] = 1;
         for (let j = 1; j < d; j++) {
             omegaPowers[j] = (omegaPowers[j - 1] * omega) % n;
         }
-        
+
         const cosValues = new Float32Array(n);
         const sinValues = new Float32Array(n);
         for (let i = 0; i < n; i++) {
@@ -338,25 +282,81 @@ class GaussianPeriodsViewer extends HTMLElement {
             cosValues[i] = Math.cos(angle);
             sinValues[i] = Math.sin(angle);
         }
-        
+
         const gcdND = this.gcd(n, d);
         const bound = Math.min(n, Math.floor(n / gcdND * d));
-        
-        this.computedPoints = [];
-        
+
+        // Track computation timing and method
+        const startTime = performance.now();
+        let computeMethod = '';
+
+        // Use GPU computation if available, otherwise fall back to CPU
+        let errorMessage = null;
+        if (this.useGPU && this.gpuAvailable) {
+            try {
+                this.computedPoints = await this.gpuCompute.computePeriods(
+                    n, omega, omegaPowers, cosValues, sinValues, bound, d
+                );
+                computeMethod = 'GPU';
+                console.log(`✅ GPU computed ${this.computedPoints.length} points`);
+            } catch (error) {
+                console.error('❌ GPU computation failed:', error);
+                console.error('Error details:', error.message, error.stack);
+                errorMessage = error.message || 'Unknown GPU error';
+                this.computedPoints = this.computePeriodsOnCPU(n, omegaPowers, cosValues, sinValues, bound, d);
+                computeMethod = 'CPU (GPU error)';
+            }
+        } else {
+            this.computedPoints = this.computePeriodsOnCPU(n, omegaPowers, cosValues, sinValues, bound, d);
+            if (!this.gpuAvailable) {
+                computeMethod = 'CPU (no GPU)';
+            } else {
+                computeMethod = 'CPU (GPU off)';
+            }
+        }
+
+        const computeTime = performance.now() - startTime;
+
+        // Update debug display
+        this.updateDebugInfo(computeMethod, computeTime, bound, errorMessage);
+
+        if (this.getParameter('autoZoom')) {
+            this.computedScaleFactor = this.calculateAutoZoom(this.computedPoints);
+            console.log(`Auto-zoom scale factor: ${this.computedScaleFactor}`);
+        } else {
+            this.computedScaleFactor = 0.1;
+        }
+
+        const plotMode = this.getParameter('plotMode');
+        if (plotMode === 'animated') {
+            this.animationIndex = 0;
+        } else {
+            this.animationIndex = this.computedPoints.length;
+            this.redrawAll();
+        }
+    }
+
+    /**
+     * CPU-based Gaussian periods computation (fallback)
+     */
+    computePeriodsOnCPU(n, omegaPowers, cosValues, sinValues, bound, d) {
+        console.log(`🖥️ Computing ${bound} points on CPU...`);
+        const startTime = performance.now();
+
+        const points = [];
         for (let k = 0; k < bound; k++) {
             let sumReal = 0;
             let sumImag = 0;
-            
+
             for (let j = 0; j < d; j++) {
                 const omegaPower = omegaPowers[j];
                 const exponent = (k * omegaPower) % n;
-                
+
                 sumReal += cosValues[exponent];
                 sumImag += sinValues[exponent];
             }
-            
-            this.computedPoints.push({
+
+            points.push({
                 x: sumReal,
                 y: sumImag,
                 k: k,
@@ -366,29 +366,249 @@ class GaussianPeriodsViewer extends HTMLElement {
                 argument: Math.atan2(sumImag, sumReal)
             });
         }
-        
-        console.log(`Computed ${this.computedPoints.length} points`);
-        
-        if (this.getParameter('autoZoom')) {
-            this.computedScaleFactor = this.calculateAutoZoom(this.computedPoints);
-            console.log(`Auto-zoom scale factor: ${this.computedScaleFactor}`);
-        } else {
-            this.computedScaleFactor = 0.1;
-        }
-        
-        this.allocateArrays(this.computedPoints.length);
-        this.fillArraysWithPoints();
-        this.createPointCloud();
-        
-        const plotMode = this.getParameter('plotMode');
-        if (plotMode === 'animated') {
-            this.animationIndex = 0;
-        } else {
-            this.animationIndex = this.computedPoints.length;
-        }
-        this.updateVisiblePoints();
+
+        const elapsed = performance.now() - startTime;
+        console.log(`✅ CPU computation completed in ${elapsed.toFixed(2)}ms`);
+
+        return points;
     }
-    
+
+    calculateAutoZoom(points) {
+        if (points.length === 0) return 0.1;
+
+        let maxDist = 0;
+        for (const point of points) {
+            const dist = Math.sqrt(point.real * point.real + point.imag * point.imag);
+            if (dist > maxDist) maxDist = dist;
+        }
+
+        const rect = this.canvas.getBoundingClientRect();
+        const canvasSize = Math.min(rect.width, rect.height);
+        const targetSize = canvasSize * 0.8;
+
+        return maxDist > 0 ? targetSize / (2 * maxDist) : 0.1;
+    }
+
+    /**
+     * Clear canvas and redraw all visible points
+     */
+    redrawAll() {
+        this.clearCanvas();
+
+        if (this.getParameter('showGrid')) {
+            this.drawGrid();
+        }
+
+        this.drawPointsBatch(0, this.animationIndex);
+    }
+
+    /**
+     * Clear the canvas
+     */
+    clearCanvas() {
+        const rect = this.canvas.getBoundingClientRect();
+        this.ctx.clearRect(0, 0, rect.width, rect.height);
+    }
+
+    /**
+     * Draw grid
+     */
+    drawGrid() {
+        const rect = this.canvas.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        this.ctx.lineWidth = 1;
+
+        // Draw axes
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, centerY);
+        this.ctx.lineTo(rect.width, centerY);
+        this.ctx.moveTo(centerX, 0);
+        this.ctx.lineTo(centerX, rect.height);
+        this.ctx.stroke();
+
+        // Draw grid lines
+        const gridSpacing = 50;
+        for (let x = centerX % gridSpacing; x < rect.width; x += gridSpacing) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, 0);
+            this.ctx.lineTo(x, rect.height);
+            this.ctx.stroke();
+        }
+        for (let y = centerY % gridSpacing; y < rect.height; y += gridSpacing) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, y);
+            this.ctx.lineTo(rect.width, y);
+            this.ctx.stroke();
+        }
+    }
+
+    /**
+     * Draw a batch of points additively
+     */
+    drawPointsBatch(startIndex, endIndex) {
+        const rect = this.canvas.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        const pointSize = this.getParameter('pointSize');
+        const scale = this.computedScaleFactor;
+
+        for (let i = startIndex; i < endIndex; i++) {
+            const point = this.computedPoints[i];
+
+            // Transform to canvas coordinates
+            const canvasX = centerX + point.real * scale;
+            const canvasY = centerY - point.imag * scale; // Flip Y axis
+
+            // Get color
+            const color = this.getPointColor(point, i);
+
+            // Draw point
+            this.ctx.fillStyle = color;
+            this.ctx.fillRect(canvasX - pointSize/2, canvasY - pointSize/2, pointSize, pointSize);
+        }
+    }
+
+    /**
+     * Get color for a point based on current color scheme
+     */
+    getPointColor(point, index) {
+        const colorScheme = this.getParameter('colorScheme');
+
+        if (colorScheme === 'monochrome') {
+            return '#ffffff';
+        } else if (colorScheme === 'time-based') {
+            return this.getTimeBasedColor(index);
+        } else if (colorScheme === 'lutz') {
+            return this.getLutzColor(point);
+        }
+
+        return '#ffffff';
+    }
+
+    /**
+     * Get time-based color (gradient from first to last color)
+     */
+    getTimeBasedColor(index) {
+        const t = index / Math.max(1, this.computedPoints.length - 1);
+        const firstColor = this.hexToRgb(this.getParameter('timeFirstColor'));
+        const lastColor = this.hexToRgb(this.getParameter('timeLastColor'));
+
+        const r = Math.round(firstColor.r + (lastColor.r - firstColor.r) * t);
+        const g = Math.round(firstColor.g + (lastColor.g - firstColor.g) * t);
+        const b = Math.round(firstColor.b + (lastColor.b - firstColor.b) * t);
+
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    /**
+     * Get Lutz color
+     */
+    getLutzColor(point) {
+        // Compute Lutz coloring if not cached
+        if (!this.lutzColoring) {
+            this.computeLutzColoring();
+        }
+
+        const colorIndex = this.lutzColoring.get(point.k) || 0;
+        const hue = (colorIndex * 137.508) % 360; // Golden angle for distribution
+        return `hsl(${hue}, 70%, 50%)`;
+    }
+
+    /**
+     * Compute Lutz coloring for all points
+     */
+    computeLutzColoring() {
+        console.log('🎨 Computing Lutz coloring...');
+        const c = this.getParameter('lutzC');
+        this.lutzColoring = new Map();
+
+        for (const point of this.computedPoints) {
+            const real = point.real;
+            const imag = point.imag;
+            const mag = point.magnitude;
+
+            if (mag < 0.01) {
+                this.lutzColoring.set(point.k, 0);
+                continue;
+            }
+
+            const arg = Math.atan2(imag, real);
+            const colorIndex = Math.floor((arg / (2 * Math.PI) + 0.5) * c) % c;
+            this.lutzColoring.set(point.k, colorIndex);
+        }
+    }
+
+    /**
+     * Convert hex color to RGB
+     */
+    hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 255, g: 255, b: 255 };
+    }
+
+    updatePlotMode(mode) {
+        if (mode === 'all-at-once') {
+            this.animationIndex = this.computedPoints.length;
+            this.redrawAll();
+        } else {
+            this.animationIndex = 0;
+            this.clearCanvas();
+            if (this.getParameter('showGrid')) {
+                this.drawGrid();
+            }
+        }
+    }
+
+    updateDebugInfo(method, timeMs, numPoints, errorMessage = null) {
+        const debugDiv = this.querySelector('#debugInfo');
+        if (debugDiv) {
+            let text = `${method} | ${timeMs.toFixed(1)}ms | ${numPoints} pts`;
+            if (errorMessage) {
+                text += `\n⚠️ ${errorMessage}`;
+            }
+            debugDiv.textContent = text;
+            debugDiv.style.display = 'block';
+
+            // Change color if there's an error
+            if (errorMessage) {
+                debugDiv.style.color = '#ff6b6b';
+            } else {
+                debugDiv.style.color = '#00ff00';
+            }
+        }
+    }
+
+    clearVisualization() {
+        this.computedPoints = [];
+        this.animationIndex = 0;
+        this.isPaused = false;
+        this.lutzColoring = null;
+        this.clearCanvas();
+    }
+
+    togglePause() {
+        this.isPaused = !this.isPaused;
+        console.log(`Animation ${this.isPaused ? 'paused' : 'resumed'}`);
+    }
+
+    showError(message) {
+        const errorDiv = this.querySelector('#errorMessage');
+        const errorDetails = this.querySelector('#errorDetails');
+
+        if (errorDiv && errorDetails) {
+            errorDetails.textContent = message;
+            errorDiv.style.display = 'flex';
+        }
+    }
+
+    // Math helpers
     gcd(a, b) {
         while (b !== 0) {
             const temp = b;
@@ -397,517 +617,26 @@ class GaussianPeriodsViewer extends HTMLElement {
         }
         return a;
     }
-    
+
     multiplicativeOrder(omega, n) {
-        if (this.gcd(omega, n) !== 1) return 1;
-        
+        if (this.gcd(omega, n) !== 1) {
+            return 1;
+        }
+
         let order = 1;
         let current = omega % n;
-        
+
         while (current !== 1) {
             current = (current * omega) % n;
             order++;
-            if (order > n) return 1;
+            if (order > n) {
+                console.error('Multiplicative order exceeded n');
+                return 1;
+            }
         }
-        
+
         return order;
-    }
-    
-    /**
-     * CORRECTED AUTO-ZOOM: Container-aware centering in largest square
-     * For Three.js perspective camera, we adjust camera distance instead of scaling data
-     */
-    calculateAutoZoom(points) {
-        if (!points || points.length === 0) {
-            console.warn('No points available for auto-zoom calculation');
-            return 0.1;
-        }
-        
-        // Step 1: Get container dimensions
-        const { width, height } = this.getBoundingClientRect();
-        if (!width || !height) {
-            console.warn('Container has no dimensions');
-            return 0.1;
-        }
-        
-        console.log(`Container dimensions: ${width}x${height}`);
-        
-        // Step 2: Calculate the center square (largest square that fits in container)
-        const centerSquareSize = Math.min(width, height);
-        console.log(`Center square size: ${centerSquareSize}x${centerSquareSize}`);
-        
-        // Step 3: Use 90% of the center square as usable area (10% total padding)
-        const usableSizePixels = centerSquareSize * 0.9;
-        console.log(`Usable area: ${usableSizePixels}x${usableSizePixels} pixels (90% of center square)`);
-        
-        // Step 4: Calculate data bounds
-        let minX = Infinity, maxX = -Infinity;
-        let minY = Infinity, maxY = -Infinity;
-        
-        for (const point of points) {
-            minX = Math.min(minX, point.x);
-            maxX = Math.max(maxX, point.x);
-            minY = Math.min(minY, point.y);
-            maxY = Math.max(maxY, point.y);
-        }
-        
-        const dataWidth = maxX - minX;
-        const dataHeight = maxY - minY;
-        const maxDataDimension = Math.max(dataWidth, dataHeight);
-        
-        console.log(`Data bounds: width=${dataWidth.toFixed(2)}, height=${dataHeight.toFixed(2)}, max=${maxDataDimension.toFixed(2)}`);
-        
-        if (maxDataDimension === 0) {
-            console.warn('Data has no extent');
-            return 0.1;
-        }
-        
-        // Step 5: Convert pixels to world units at current camera distance
-        // For perspective camera: visible_height = 2 * tan(fov/2) * distance
-        const currentDistance = this.camera.position.z;
-        const fovRadians = (this.camera.fov * Math.PI) / 180;
-        const visibleHeightAtCurrentDistance = 2 * Math.tan(fovRadians / 2) * currentDistance;
-        
-        // World units per pixel at current distance
-        const worldUnitsPerPixel = visibleHeightAtCurrentDistance / height;
-        
-        // Convert usable pixel size to world units
-        const usableSizeWorldUnits = usableSizePixels * worldUnitsPerPixel;
-        
-        console.log(`Camera distance: ${currentDistance}, Visible height: ${visibleHeightAtCurrentDistance.toFixed(2)}, World units/pixel: ${worldUnitsPerPixel.toFixed(6)}`);
-        console.log(`Usable area in world units: ${usableSizeWorldUnits.toFixed(2)}`);
-        
-        // Step 6: Calculate scale factor to fit data in usable world space
-        const scaleFactor = usableSizeWorldUnits / maxDataDimension;
-        
-        console.log(`📊 Auto-zoom calculation complete:
-  Container: ${width}x${height}
-  Center square: ${centerSquareSize}x${centerSquareSize}
-  Usable area: ${usableSizePixels.toFixed(1)}px = ${usableSizeWorldUnits.toFixed(2)} world units
-  Data extent: ${maxDataDimension.toFixed(2)}
-  Scale factor: ${scaleFactor.toFixed(6)}
-        `);
-        
-        return scaleFactor;
-    }
-    
-    allocateArrays(pointCount) {
-        this.positionArray = new Float32Array(pointCount * 3);
-        this.colorArray = new Float32Array(pointCount * 3);
-    }
-    
-    fillArraysWithPoints() {
-        if (!this.positionArray || !this.colorArray) return;
-
-        const scaleFactor = this.computedScaleFactor;
-        
-        // Compute Lutz coloring if needed
-        const colorScheme = this.getParameter('colorScheme');
-        if (colorScheme === 'lutz') {
-            this.computeLutzColoring();
-        }
-
-        for (let i = 0; i < this.computedPoints.length; i++) {
-            const point = this.computedPoints[i];
-            const i3 = i * 3;
-
-            this.positionArray[i3] = point.x * scaleFactor;
-            this.positionArray[i3 + 1] = point.y * scaleFactor;
-            this.positionArray[i3 + 2] = 0;
-
-            const color = this.getPointColorAsRGB(point, i);
-            this.colorArray[i3] = color.r;
-            this.colorArray[i3 + 1] = color.g;
-            this.colorArray[i3 + 2] = color.b;
-        }
-    }
-    
-    createPointCloud() {
-        if (this.pointCloud) {
-            this.scene.remove(this.pointCloud);
-            if (this.pointGeometry) this.pointGeometry.dispose();
-            if (this.pointMaterial) this.pointMaterial.dispose();
-        }
-        
-        const THREE = this.THREE;
-        
-        this.pointGeometry = new THREE.BufferGeometry();
-        this.pointGeometry.setAttribute('position', new THREE.BufferAttribute(this.positionArray, 3));
-        this.pointGeometry.setAttribute('color', new THREE.BufferAttribute(this.colorArray, 3));
-        this.pointGeometry.setDrawRange(0, this.animationIndex);
-        
-        this.pointMaterial = new THREE.PointsMaterial({
-            size: this.getParameter('pointSize'),
-            transparent: false,
-            opacity: 1.0,
-            vertexColors: true,
-            sizeAttenuation: false
-        });
-        
-        this.pointCloud = new THREE.Points(this.pointGeometry, this.pointMaterial);
-        this.scene.add(this.pointCloud);
-        
-        this.trackObject(this.pointCloud);
-        this.trackGeometry(this.pointGeometry);
-        this.trackMaterial(this.pointMaterial);
-        
-        console.log('Point cloud created successfully');
-    }
-    
-    updateVisiblePoints() {
-        if (this.pointGeometry) {
-            this.pointGeometry.setDrawRange(0, this.animationIndex);
-        }
-    }
-    
-    getPointColorAsRGB(point, index) {
-        const scheme = this.getParameter('colorScheme');
-        
-        let hexColor;
-        switch (scheme) {
-            case 'time-based':
-                hexColor = this.getTimeBasedColor(index);
-                break;
-            case 'lutz':
-                hexColor = this.getLutzColor(index);
-                break;
-            case 'monochrome':
-                hexColor = '#ffffff';
-                break;
-            default:
-                hexColor = '#ffffff';
-        }
-        
-        const color = new this.THREE.Color(hexColor);
-        return { r: color.r, g: color.g, b: color.b };
-    }
-    
-    getTimeBasedColor(index) {
-        if (this.computedPoints.length <= 1) {
-            return this.getParameter('timeFirstColor');
-        }
-        
-        const firstColor = new this.THREE.Color(this.getParameter('timeFirstColor'));
-        const lastColor = new this.THREE.Color(this.getParameter('timeLastColor'));
-        
-        const t = index / (this.computedPoints.length - 1);
-        
-        const r = firstColor.r + (lastColor.r - firstColor.r) * t;
-        const g = firstColor.g + (lastColor.g - firstColor.g) * t;
-        const b = firstColor.b + (lastColor.b - firstColor.b) * t;
-        
-        const red = Math.round(r * 255);
-        const green = Math.round(g * 255);
-        const blue = Math.round(b * 255);
-        
-        return `#${red.toString(16).padStart(2, '0')}${green.toString(16).padStart(2, '0')}${blue.toString(16).padStart(2, '0')}`;
-    }
-    
-    /**
-     * Compute mathematical Lutz coloring
-     * Colors points based on their exponent class modulo c
-     */
-    computeLutzColoring() {
-        const c = this.getParameter('lutzC');
-        const omega = this.getParameter('omega');
-        const n = this.getParameter('n');
-        
-        if (!this.computedPoints || this.computedPoints.length === 0) {
-            this.lutzColoring = null;
-            return;
-        }
-
-        console.log(`Computing mathematical Lutz coloring with c=${c}...`);
-        
-        const d = this.multiplicativeOrder(omega, n);
-        
-        // Group points by their canonical representative
-        const representativeGroups = new Map();
-        
-        for (let i = 0; i < this.computedPoints.length; i++) {
-            const k = this.computedPoints[i].k;
-            
-            const representative = this.findCanonicalRepresentative(k, omega, n, d);
-            
-            if (!representativeGroups.has(representative)) {
-                representativeGroups.set(representative, []);
-            }
-            representativeGroups.get(representative).push({ k: k, index: i });
-        }
-        
-        // Resolve collisions using union-find
-        const { colors, stats } = this.resolveModCCollisions(representativeGroups, c);
-        
-        console.log(`✅ Mathematical Lutz coloring: ${representativeGroups.size} distinct representatives, ${stats.collisions} collisions, ${stats.numColors} final colors`);
-        
-        this.lutzColoring = {
-            colors: colors,
-            numDistinctColors: stats.numColors,
-            totalCollisions: stats.collisions,
-            numExponentGroups: representativeGroups.size,
-            c: c
-        };
-    }
-    
-    /**
-     * Find the canonical (minimum) representative in the orbit under multiplication by omega
-     */
-    findCanonicalRepresentative(k, omega, n, d) {
-        let minElement = k % n;
-        let current = k % n;
-        
-        for (let j = 0; j < d; j++) {
-            if (current < minElement) {
-                minElement = current;
-            }
-            current = (current * omega) % n;
-        }
-        
-        return minElement;
-    }
-    
-    /**
-     * Resolve collisions when multiple representatives map to the same class mod c
-     * Uses union-find to group colliding classes
-     */
-    resolveModCCollisions(representativeGroups, c) {
-        // Union-find data structure
-        const parent = new Array(c);
-        for (let i = 0; i < c; i++) {
-            parent[i] = i;
-        }
-        
-        function find(x) {
-            if (parent[x] !== x) {
-                parent[x] = find(parent[x]);
-            }
-            return parent[x];
-        }
-        
-        function union(x, y) {
-            const px = find(x);
-            const py = find(y);
-            if (px !== py) {
-                parent[px] = py;
-            }
-        }
-        
-        let collisions = 0;
-        
-        // For each representative group, union all their mod c classes
-        for (const [_representative, entries] of representativeGroups) {
-            const modClasses = [...new Set(entries.map(entry => entry.k % c))];
-            
-            if (modClasses.length > 1) {
-                collisions++;
-                for (let i = 1; i < modClasses.length; i++) {
-                    union(modClasses[0], modClasses[i]);
-                }
-            }
-        }
-        
-        // Assign color indices to each equivalence class
-        const colorMapping = new Map();
-        let colorIndex = 0;
-        
-        for (let i = 0; i < c; i++) {
-            const rep = find(i);
-            if (!colorMapping.has(rep)) {
-                colorMapping.set(rep, colorIndex++);
-            }
-        }
-        
-        // Assign colors to all points
-        const colors = new Array(this.computedPoints.length);
-        for (let i = 0; i < this.computedPoints.length; i++) {
-            const k = this.computedPoints[i].k;
-            const modClass = k % c;
-            const finalRep = find(modClass);
-            colors[i] = colorMapping.get(finalRep);
-        }
-        
-        return {
-            colors: colors,
-            stats: {
-                collisions: collisions,
-                numColors: colorIndex
-            }
-        };
-    }
-    
-    /**
-     * Get Lutz color for a point by index
-     */
-    getLutzColor(index) {
-        if (!this.lutzColoring || this.lutzColoring.c !== this.getParameter('lutzC')) {
-            this.computeLutzColoring();
-        }
-        
-        if (!this.lutzColoring || index >= this.lutzColoring.colors.length) {
-            return '#ffffff';
-        }
-        
-        const colorIndex = this.lutzColoring.colors[index];
-        const numColors = this.lutzColoring.numDistinctColors;
-        
-        // Distribute hues evenly across the color spectrum
-        const hue = (colorIndex / numColors) * 360;
-        const saturation = 0.8;
-        const value = 0.9;
-        
-        return this.hsvToHex(hue, saturation, value);
-    }
-    
-    /**
-     * Convert HSV to hex color
-     */
-    hsvToHex(h, s, v) {
-        const c = v * s;
-        const x = c * (1 - Math.abs((h / 60) % 2 - 1));
-        const m = v - c;
-        
-        let r, g, b;
-        
-        if (h >= 0 && h < 60) {
-            r = c; g = x; b = 0;
-        } else if (h >= 60 && h < 120) {
-            r = x; g = c; b = 0;
-        } else if (h >= 120 && h < 180) {
-            r = 0; g = c; b = x;
-        } else if (h >= 180 && h < 240) {
-            r = 0; g = x; b = c;
-        } else if (h >= 240 && h < 300) {
-            r = x; g = 0; b = c;
-        } else {
-            r = c; g = 0; b = x;
-        }
-        
-        r = Math.round((r + m) * 255);
-        g = Math.round((g + m) * 255);
-        b = Math.round((b + m) * 255);
-        
-        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-    }
-    
-    createGrid() {
-        const gridSize = 10;
-        this.gridHelper = new this.THREE.GridHelper(gridSize, gridSize, 0x444444, 0x222222);
-        this.gridHelper.rotateX(Math.PI / 2);
-        this.scene.add(this.gridHelper);
-    }
-    
-    updatePointSize(size) {
-        if (this.pointMaterial) {
-            this.pointMaterial.size = size;
-            this.pointMaterial.needsUpdate = true;
-        }
-    }
-    
-    updateGridVisibility(visible) {
-        // Handled in animation loop
-    }
-    
-    updateColors() {
-        if (this.computedPoints.length > 0) {
-            // Clear Lutz coloring cache when color scheme changes
-            const scheme = this.getParameter('colorScheme');
-            if (scheme !== 'lutz') {
-                this.lutzColoring = null;
-            }
-            
-            this.fillArraysWithPoints();
-            if (this.pointGeometry) {
-                this.pointGeometry.attributes.color.needsUpdate = true;
-            }
-        }
-    }
-    
-    updatePlotMode(mode) {
-        if (mode === 'all-at-once') {
-            this.animationIndex = this.computedPoints.length;
-        } else {
-            this.animationIndex = 0;
-        }
-        this.updateVisiblePoints();
-    }
-    
-    clearVisualization() {
-        this.computedPoints = [];
-        this.animationIndex = 0;
-        this.isPaused = false;
-        this.lutzColoring = null;
-        
-        if (this.pointCloud) {
-            this.scene.remove(this.pointCloud);
-            if (this.pointGeometry) this.pointGeometry.dispose();
-            if (this.pointMaterial) this.pointMaterial.dispose();
-            this.pointCloud = null;
-            this.pointGeometry = null;
-            this.pointMaterial = null;
-        }
-        
-        this.positionArray = null;
-        this.colorArray = null;
-    }
-    
-    togglePause() {
-        this.isPaused = !this.isPaused;
-        console.log(`Animation ${this.isPaused ? 'paused' : 'resumed'}`);
-    }
-    
-    showError(message) {
-        const error = this.querySelector('#errorMessage');
-        const details = this.querySelector('#errorDetails');
-        
-        if (error) error.style.display = 'flex';
-        if (details) details.textContent = message;
-    }
-    
-    trackObject(object) {
-        this._objects.add(object);
-    }
-    
-    trackGeometry(geometry) {
-        this._geometries.add(geometry);
-    }
-    
-    trackMaterial(material) {
-        this._materials.add(material);
-    }
-    
-    disposeAllResources() {
-        this._objects.forEach(object => {
-            try { 
-                if (object.dispose) object.dispose(); 
-            } catch (error) {
-                console.warn('⚠️ Error disposing object:', error);
-            }
-        });
-        
-        this._geometries.forEach(geometry => {
-            try { 
-                if (geometry.dispose) geometry.dispose(); 
-            } catch (error) {
-                console.warn('⚠️ Error disposing geometry:', error);
-            }
-        });
-        
-        this._materials.forEach(material => {
-            try { 
-                if (material.dispose) material.dispose(); 
-            } catch (error) {
-                console.warn('⚠️ Error disposing material:', error);
-            }
-        });
-        
-        this._objects.clear();
-        this._geometries.clear();
-        this._materials.clear();
-        
-        console.log('🧹 All resources disposed');
     }
 }
 
-console.log('📝 Registering gaussian-periods-viewer...');
 customElements.define('gaussian-periods-viewer', GaussianPeriodsViewer);
-console.log('✅ gaussian-periods-viewer registered successfully!');

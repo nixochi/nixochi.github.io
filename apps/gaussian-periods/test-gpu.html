@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPU Compute Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #f0f0f0;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .pass { background: #2d5016; }
+        .fail { background: #501616; }
+        .info { background: #163850; }
+        pre {
+            background: #0d0d0d;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebGPU Gaussian Periods Test</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import { GaussianPeriodsGPUCompute } from './gaussian-compute-gpu.js';
+
+        const resultsDiv = document.getElementById('results');
+
+        function log(message, className = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${className}`;
+            div.textContent = message;
+            resultsDiv.appendChild(div);
+        }
+
+        function logPre(message) {
+            const pre = document.createElement('pre');
+            pre.textContent = message;
+            resultsDiv.appendChild(pre);
+        }
+
+        // GCD helper
+        function gcd(a, b) {
+            while (b !== 0) {
+                const temp = b;
+                b = a % b;
+                a = temp;
+            }
+            return a;
+        }
+
+        // Multiplicative order
+        function multiplicativeOrder(omega, n) {
+            if (gcd(omega, n) !== 1) return 1;
+            let order = 1;
+            let current = omega % n;
+            while (current !== 1) {
+                current = (current * omega) % n;
+                order++;
+                if (order > n) return 1;
+            }
+            return order;
+        }
+
+        // CPU computation for reference
+        function computeOnCPU(n, omega, omegaPowers, cosValues, sinValues, bound, d) {
+            const points = [];
+            for (let k = 0; k < bound; k++) {
+                let sumReal = 0;
+                let sumImag = 0;
+                for (let j = 0; j < d; j++) {
+                    const omegaPower = omegaPowers[j];
+                    const exponent = (k * omegaPower) % n;
+                    sumReal += cosValues[exponent];
+                    sumImag += sinValues[exponent];
+                }
+                points.push({
+                    real: sumReal,
+                    imag: sumImag,
+                    magnitude: Math.sqrt(sumReal * sumReal + sumImag * sumImag),
+                    argument: Math.atan2(sumImag, sumReal)
+                });
+            }
+            return points;
+        }
+
+        async function runTest(n, omega, gpuCompute) {
+            log(`\n=== Testing n=${n}, omega=${omega} ===`, 'info');
+
+            if (gcd(omega, n) !== 1) {
+                log(`SKIP: omega=${omega} is not coprime to n=${n}`, 'info');
+                return;
+            }
+
+            // Compute prerequisites
+            const d = multiplicativeOrder(omega, n);
+            log(`Multiplicative order d = ${d}`, 'info');
+
+            const omegaPowers = new Uint32Array(d);
+            omegaPowers[0] = 1;
+            for (let j = 1; j < d; j++) {
+                omegaPowers[j] = (omegaPowers[j - 1] * omega) % n;
+            }
+
+            const cosValues = new Float32Array(n);
+            const sinValues = new Float32Array(n);
+            for (let i = 0; i < n; i++) {
+                const angle = 2 * Math.PI * i / n;
+                cosValues[i] = Math.cos(angle);
+                sinValues[i] = Math.sin(angle);
+            }
+
+            const gcdND = gcd(n, d);
+            const bound = Math.min(n, Math.floor(n / gcdND * d));
+            log(`Bound = ${bound} points`, 'info');
+
+            // CPU computation
+            log('Computing on CPU...', 'info');
+            const cpuStart = performance.now();
+            const cpuResults = computeOnCPU(n, omega, omegaPowers, cosValues, sinValues, bound, d);
+            const cpuTime = performance.now() - cpuStart;
+            log(`CPU time: ${cpuTime.toFixed(2)}ms`, 'info');
+
+            // GPU computation
+            log('Computing on GPU...', 'info');
+            const gpuStart = performance.now();
+            const gpuResults = await gpuCompute.computePeriods(n, omega, omegaPowers, cosValues, sinValues, bound, d);
+            const gpuTime = performance.now() - gpuStart;
+            log(`GPU time: ${gpuTime.toFixed(2)}ms`, 'info');
+
+            const speedup = (cpuTime / gpuTime).toFixed(2);
+            log(`Speedup: ${speedup}x`, cpuTime > gpuTime ? 'pass' : 'info');
+
+            // Verify correctness
+            let maxError = 0;
+            let errorCount = 0;
+            const epsilon = 1e-4; // Tolerance for floating point comparison
+            const magnitudeThreshold = 0.01; // Threshold for near-zero values (real Gaussian periods have |magnitude| ~ sqrt(d))
+
+            for (let i = 0; i < bound; i++) {
+                const cpu = cpuResults[i];
+                const gpu = gpuResults[i];
+
+                const realError = Math.abs(cpu.real - gpu.real);
+                const imagError = Math.abs(cpu.imag - gpu.imag);
+
+                // Use complex number magnitude for error (Euclidean distance)
+                const complexError = Math.sqrt(realError * realError + imagError * imagError);
+
+                // Only compare arguments for non-zero complex numbers
+                let argError = 0;
+                if (cpu.magnitude > magnitudeThreshold && gpu.magnitude > magnitudeThreshold) {
+                    // For non-zero values, compute angle difference accounting for wraparound
+                    let angleDiff = Math.abs(cpu.argument - gpu.argument);
+                    if (angleDiff > Math.PI) {
+                        angleDiff = 2 * Math.PI - angleDiff;
+                    }
+                    argError = angleDiff;
+                }
+
+                const error = Math.max(complexError, argError);
+                maxError = Math.max(maxError, error);
+
+                if (error > epsilon) {
+                    errorCount++;
+                    if (errorCount <= 3) {
+                        logPre(`Point ${i} mismatch:
+  CPU: real=${cpu.real.toFixed(6)}, imag=${cpu.imag.toFixed(6)}, mag=${cpu.magnitude.toFixed(6)}
+  GPU: real=${gpu.real.toFixed(6)}, imag=${gpu.imag.toFixed(6)}, mag=${gpu.magnitude.toFixed(6)}
+  Complex error: ${complexError.toExponential(3)}, Angle error: ${argError.toExponential(3)}`);
+                    }
+                }
+            }
+
+            if (errorCount === 0) {
+                log(`✅ PASS: All ${bound} points match (max error: ${maxError.toExponential(2)})`, 'pass');
+            } else {
+                log(`❌ FAIL: ${errorCount} of ${bound} points have errors > ${epsilon} (max error: ${maxError.toExponential(2)})`, 'fail');
+            }
+        }
+
+        async function runAllTests() {
+            log('Starting WebGPU Gaussian Periods Tests', 'info');
+
+            // Initialize GPU compute once (reuse pipeline across all tests)
+            const gpuCompute = new GaussianPeriodsGPUCompute();
+            const initialized = await gpuCompute.initialize();
+
+            if (!initialized) {
+                log('WebGPU not supported - cannot run tests', 'fail');
+                return;
+            }
+
+            // Test cases: (n, omega)
+            const tests = [
+                [100, 11],        // Small test
+                [1000, 7],        // Medium test
+                [5000, 13],       // Larger test
+                [20352, 319],     // Default from app
+                [50000, 97],      // Large test
+                [1481151, 54184], // Very large test
+            ];
+
+            for (const [n, omega] of tests) {
+                await runTest(n, omega, gpuCompute);
+            }
+
+            log('\n=== All tests complete ===', 'info');
+            gpuCompute.destroy();
+        }
+
+        runAllTests().catch(err => {
+            log(`Fatal error: ${err.message}`, 'fail');
+            console.error(err);
+        });
+    </script>
+</body>
+</html>

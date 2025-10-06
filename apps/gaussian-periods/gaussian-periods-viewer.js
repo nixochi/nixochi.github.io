@@ -3,6 +3,7 @@
  * Canvas-based rendering with WebGPU acceleration
  */
 import { GaussianPeriodsGPUCompute } from './gaussian-compute-gpu.js';
+import { TransformManager } from './transform-manager.js';
 
 class GaussianPeriodsViewer extends HTMLElement {
     static get observedAttributes() {
@@ -23,10 +24,19 @@ class GaussianPeriodsViewer extends HTMLElement {
         this.ctx = null;
 
         // View state
-        this.scale = 1.0;
-        this.offsetX = 0;
-        this.offsetY = 0;
+        this.transformManager = null;
         this.computedScaleFactor = 0.1;
+
+        // Interaction state
+        this.isDragging = false;
+        this.lastMouseX = 0;
+        this.lastMouseY = 0;
+        this.touchStartDistance = 0;
+
+        // Cached rendering for performance
+        this.offscreenCanvas = null;
+        this.offscreenCtx = null;
+        this.needsRedraw = true;
 
         // Lutz coloring cache
         this.lutzColoring = null;
@@ -39,6 +49,9 @@ class GaussianPeriodsViewer extends HTMLElement {
         this.gpuCompute = null;
         this.gpuAvailable = false;
         this.useGPU = false;
+
+        // Render throttling
+        this.renderScheduled = false;
     }
 
     connectedCallback() {
@@ -203,6 +216,14 @@ class GaussianPeriodsViewer extends HTMLElement {
         }
 
         this.ctx = this.canvas.getContext('2d', { alpha: true });
+        this.transformManager = new TransformManager(this.canvas);
+        this.transformManager.centerOrigin();
+
+        // Create offscreen canvas for caching
+        this.offscreenCanvas = document.createElement('canvas');
+        this.offscreenCtx = this.offscreenCanvas.getContext('2d', { alpha: true });
+
+        this.setupEventListeners();
         this.resizeCanvas();
 
         console.log('✅ Canvas setup complete');
@@ -217,11 +238,236 @@ class GaussianPeriodsViewer extends HTMLElement {
 
         this.ctx.scale(dpr, dpr);
 
+        // Resize offscreen canvas to match
+        if (this.offscreenCanvas) {
+            this.offscreenCanvas.width = rect.width * dpr;
+            this.offscreenCanvas.height = rect.height * dpr;
+            this.offscreenCtx.scale(dpr, dpr);
+            this.needsRedraw = true;
+        }
+
+        // Re-center origin after resize
+        if (this.transformManager) {
+            this.transformManager.centerOrigin();
+        }
+
         console.log(`📐 Canvas resized to ${rect.width}x${rect.height} (${this.canvas.width}x${this.canvas.height} actual)`);
 
         // Redraw if we have points
         if (this.computedPoints.length > 0) {
             this.redrawAll();
+        }
+    }
+
+    setupEventListeners() {
+        // Mouse wheel for zoom
+        this.canvas.addEventListener('wheel', (e) => this.handleWheel(e));
+
+        // Mouse events for panning
+        this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+        this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+        this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        this.canvas.addEventListener('mouseleave', (e) => this.handleMouseUp(e));
+
+        // Touch events for mobile
+        this.canvas.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+        this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+        this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e), { passive: false });
+    }
+
+    handleWheel(e) {
+        e.preventDefault();
+
+        const rect = this.canvas.getBoundingClientRect();
+
+        // Zoom from center of screen (where world origin (0,0) is)
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        // Compute incremental scale factor (like touch pinch does)
+        // Positive deltaY = zoom out, negative = zoom in
+        const zoomSpeed = 0.001;  // Much smaller since we're doing incremental
+        const scaleFactor = Math.exp(-e.deltaY * zoomSpeed);  // Exponential for smooth zoom
+
+        this.transformManager.zoomAt(centerX, centerY, scaleFactor);
+        this.scheduleRender();
+    }
+
+    scheduleRender() {
+        if (this.renderScheduled) return;
+
+        this.renderScheduled = true;
+        requestAnimationFrame(() => {
+            this.renderCurrentFrame();
+            this.renderScheduled = false;
+        });
+    }
+
+    handleMouseDown(e) {
+        this.isDragging = true;
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+        this.canvas.style.cursor = 'grabbing';
+    }
+
+    handleMouseMove(e) {
+        if (!this.isDragging) return;
+
+        const dx = e.clientX - this.lastMouseX;
+        const dy = e.clientY - this.lastMouseY;
+
+        this.transformManager.offsetX += dx;
+        this.transformManager.offsetY += dy;
+
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+
+        // DON'T set needsRedraw - just transform the cached image
+        this.scheduleRender();
+    }
+
+    handleMouseUp(e) {
+        this.isDragging = false;
+        this.canvas.style.cursor = 'default';
+    }
+
+    handleTouchStart(e) {
+        e.preventDefault();
+
+        if (e.touches.length === 2) {
+            // Two-finger pinch
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            this.touchStartDistance = Math.hypot(
+                touch2.clientX - touch1.clientX,
+                touch2.clientY - touch1.clientY
+            );
+        } else if (e.touches.length === 1) {
+            // Single finger pan
+            this.isDragging = true;
+            this.lastMouseX = e.touches[0].clientX;
+            this.lastMouseY = e.touches[0].clientY;
+        }
+    }
+
+    handleTouchMove(e) {
+        e.preventDefault();
+
+        if (e.touches.length === 2 && this.touchStartDistance > 0) {
+            // Two-finger pinch zoom
+            const touch1 = e.touches[0];
+            const touch2 = e.touches[1];
+            const currentDistance = Math.hypot(
+                touch2.clientX - touch1.clientX,
+                touch2.clientY - touch1.clientY
+            );
+
+            const rect = this.canvas.getBoundingClientRect();
+            const centerX = ((touch1.clientX + touch2.clientX) / 2) - rect.left;
+            const centerY = ((touch1.clientY + touch2.clientY) / 2) - rect.top;
+
+            const scaleFactor = currentDistance / this.touchStartDistance;
+            this.transformManager.zoomAt(centerX, centerY, scaleFactor);
+            this.touchStartDistance = currentDistance;
+
+            // DON'T set needsRedraw - just transform the cached image
+            this.scheduleRender();
+        } else if (e.touches.length === 1 && this.isDragging) {
+            // Single finger pan
+            const dx = e.touches[0].clientX - this.lastMouseX;
+            const dy = e.touches[0].clientY - this.lastMouseY;
+
+            this.transformManager.offsetX += dx;
+            this.transformManager.offsetY += dy;
+
+            this.lastMouseX = e.touches[0].clientX;
+            this.lastMouseY = e.touches[0].clientY;
+
+            // DON'T set needsRedraw - just transform the cached image
+            this.scheduleRender();
+        }
+    }
+
+    handleTouchEnd(e) {
+        e.preventDefault();
+        this.isDragging = false;
+        this.touchStartDistance = 0;
+    }
+
+    renderCurrentFrame() {
+        // Clear main canvas
+        this.clearCanvas();
+
+        // Apply transform: this translates (0,0) to screen center and applies zoom/pan
+        this.ctx.save();
+        this.transformManager.applyTransform(this.ctx);
+
+        // Draw grid
+        if (this.getParameter('showGrid')) {
+            this.drawGrid();
+        }
+
+        // Draw all points in world coordinates
+        this.drawPointsInWorldSpace();
+
+        this.ctx.restore();
+    }
+
+    drawPointsInWorldSpace() {
+        const pointSize = this.getParameter('pointSize');
+        const scale = this.computedScaleFactor;
+        const worldPointSize = pointSize / this.transformManager.scale;
+
+        for (let i = 0; i < this.animationIndex; i++) {
+            const point = this.computedPoints[i];
+
+            // World coordinates
+            const worldX = point.real * scale;
+            const worldY = -point.imag * scale; // Flip Y for screen coordinates
+
+            // Get color
+            const color = this.getPointColor(point, i);
+
+            // Draw point in world space
+            this.ctx.fillStyle = color;
+            this.ctx.fillRect(
+                worldX - worldPointSize / 2,
+                worldY - worldPointSize / 2,
+                worldPointSize,
+                worldPointSize
+            );
+        }
+    }
+
+
+    renderToOffscreenCanvas() {
+        // Clear offscreen canvas
+        const rect = this.canvas.getBoundingClientRect();
+        this.offscreenCtx.clearRect(0, 0, rect.width, rect.height);
+
+        // Draw all points to offscreen canvas WITHOUT transforms
+        // Points are in world space, transforms will be applied when drawing to main canvas
+        const pointSize = this.getParameter('pointSize');
+        const scale = this.computedScaleFactor;
+
+        for (let i = 0; i < this.animationIndex; i++) {
+            const point = this.computedPoints[i];
+
+            // World coordinates
+            const worldX = point.real * scale;
+            const worldY = -point.imag * scale; // Flip Y for screen coordinates
+
+            // Get color
+            const color = this.getPointColor(point, i);
+
+            // Draw point in world space (no transform, fixed pixel size)
+            this.offscreenCtx.fillStyle = color;
+            this.offscreenCtx.fillRect(
+                worldX - pointSize / 2,
+                worldY - pointSize / 2,
+                pointSize,
+                pointSize
+            );
         }
     }
 
@@ -248,8 +494,9 @@ class GaussianPeriodsViewer extends HTMLElement {
             const speed = this.getParameter('animationSpeed');
             const pointsToDraw = Math.min(speed, this.computedPoints.length - this.animationIndex);
 
-            this.drawPointsBatch(this.animationIndex, this.animationIndex + pointsToDraw);
             this.animationIndex += pointsToDraw;
+            this.needsRedraw = true;
+            this.renderCurrentFrame();
         }
     }
 
@@ -327,11 +574,18 @@ class GaussianPeriodsViewer extends HTMLElement {
             this.computedScaleFactor = 0.1;
         }
 
+        // Reset transform to centered and default zoom
+        this.transformManager.scale = 1.0;
+        this.transformManager.centerOrigin();
+
         const plotMode = this.getParameter('plotMode');
         if (plotMode === 'animated') {
             this.animationIndex = 0;
+            this.needsRedraw = true;
+            this.renderCurrentFrame(); // Immediately render grid if enabled
         } else {
             this.animationIndex = this.computedPoints.length;
+            this.needsRedraw = true;
             this.redrawAll();
         }
     }
@@ -393,13 +647,8 @@ class GaussianPeriodsViewer extends HTMLElement {
      * Clear canvas and redraw all visible points
      */
     redrawAll() {
-        this.clearCanvas();
-
-        if (this.getParameter('showGrid')) {
-            this.drawGrid();
-        }
-
-        this.drawPointsBatch(0, this.animationIndex);
+        this.needsRedraw = true;
+        this.renderCurrentFrame();
     }
 
     /**
@@ -411,63 +660,76 @@ class GaussianPeriodsViewer extends HTMLElement {
     }
 
     /**
-     * Draw grid
+     * Draw grid to a specific context
      */
-    drawGrid() {
-        const rect = this.canvas.getBoundingClientRect();
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
+    drawGridToContext(ctx) {
+        const bounds = this.transformManager.getViewportBounds();
 
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        this.ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1 / this.transformManager.scale;
 
         // Draw axes
-        this.ctx.beginPath();
-        this.ctx.moveTo(0, centerY);
-        this.ctx.lineTo(rect.width, centerY);
-        this.ctx.moveTo(centerX, 0);
-        this.ctx.lineTo(centerX, rect.height);
-        this.ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(bounds.left, 0);
+        ctx.lineTo(bounds.right, 0);
+        ctx.moveTo(0, bounds.top);
+        ctx.lineTo(0, bounds.bottom);
+        ctx.stroke();
 
-        // Draw grid lines
-        const gridSpacing = 50;
-        for (let x = centerX % gridSpacing; x < rect.width; x += gridSpacing) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, rect.height);
-            this.ctx.stroke();
+        // Draw grid lines in world space
+        const gridSpacing = 50 / this.transformManager.scale;
+        const startX = Math.floor(bounds.left / gridSpacing) * gridSpacing;
+        const startY = Math.floor(bounds.top / gridSpacing) * gridSpacing;
+
+        for (let x = startX; x <= bounds.right; x += gridSpacing) {
+            if (Math.abs(x) < 0.01) continue; // Skip axis
+            ctx.beginPath();
+            ctx.moveTo(x, bounds.top);
+            ctx.lineTo(x, bounds.bottom);
+            ctx.stroke();
         }
-        for (let y = centerY % gridSpacing; y < rect.height; y += gridSpacing) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(rect.width, y);
-            this.ctx.stroke();
+        for (let y = startY; y <= bounds.bottom; y += gridSpacing) {
+            if (Math.abs(y) < 0.01) continue; // Skip axis
+            ctx.beginPath();
+            ctx.moveTo(bounds.left, y);
+            ctx.lineTo(bounds.right, y);
+            ctx.stroke();
         }
+    }
+
+    /**
+     * Draw grid (convenience wrapper)
+     */
+    drawGrid() {
+        this.drawGridToContext(this.ctx);
     }
 
     /**
      * Draw a batch of points additively
      */
     drawPointsBatch(startIndex, endIndex) {
-        const rect = this.canvas.getBoundingClientRect();
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
         const pointSize = this.getParameter('pointSize');
         const scale = this.computedScaleFactor;
+        const worldPointSize = pointSize / this.transformManager.scale;
 
         for (let i = startIndex; i < endIndex; i++) {
             const point = this.computedPoints[i];
 
-            // Transform to canvas coordinates
-            const canvasX = centerX + point.real * scale;
-            const canvasY = centerY - point.imag * scale; // Flip Y axis
+            // Use world coordinates directly, scaled by computedScaleFactor
+            const worldX = point.real * scale;
+            const worldY = -point.imag * scale; // Flip Y axis
 
             // Get color
             const color = this.getPointColor(point, i);
 
-            // Draw point
+            // Draw point in world space
             this.ctx.fillStyle = color;
-            this.ctx.fillRect(canvasX - pointSize/2, canvasY - pointSize/2, pointSize, pointSize);
+            this.ctx.fillRect(
+                worldX - worldPointSize / 2,
+                worldY - worldPointSize / 2,
+                worldPointSize,
+                worldPointSize
+            );
         }
     }
 
@@ -556,9 +818,11 @@ class GaussianPeriodsViewer extends HTMLElement {
     updatePlotMode(mode) {
         if (mode === 'all-at-once') {
             this.animationIndex = this.computedPoints.length;
+            this.needsRedraw = true;
             this.redrawAll();
         } else {
             this.animationIndex = 0;
+            this.needsRedraw = true;
             this.clearCanvas();
             if (this.getParameter('showGrid')) {
                 this.drawGrid();
@@ -590,6 +854,7 @@ class GaussianPeriodsViewer extends HTMLElement {
         this.animationIndex = 0;
         this.isPaused = false;
         this.lutzColoring = null;
+        this.needsRedraw = true;
         this.clearCanvas();
     }
 

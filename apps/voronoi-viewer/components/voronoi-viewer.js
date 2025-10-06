@@ -99,6 +99,9 @@ class VoronoiViewer extends HTMLElement {
             this.showError(err.message || 'Unknown error occurred');
         });
 
+        // Setup page visibility handler to pause/resume animation
+        this.setupVisibilityHandler();
+
         console.log('✅ VoronoiViewer HTML rendered successfully');
     }
 
@@ -116,6 +119,11 @@ class VoronoiViewer extends HTMLElement {
 
         if (this._ro) {
             this._ro.disconnect();
+        }
+
+        // Remove visibility handler
+        if (this._visibilityHandler) {
+            document.removeEventListener('visibilitychange', this._visibilityHandler);
         }
     }
 
@@ -443,16 +451,19 @@ class VoronoiViewer extends HTMLElement {
         const deltaTime = (now - this.lastAnimationTime) / 1000;
         this.lastAnimationTime = now;
 
+        // Cap delta time to prevent huge jumps when tab becomes visible again
+        const cappedDeltaTime = Math.min(deltaTime, 0.1); // Max 100ms jump
+
         // 60fps = ~16.67ms per frame
-        if (deltaTime >= 1 / 60) {
+        if (cappedDeltaTime >= 1 / 60) {
             const W = this.canvas.width;
             const H = this.canvas.height;
             const margin = 10;
 
             this.sites.forEach(site => {
                 // Update position with speed multiplier
-                site.x += site.vx * deltaTime * this.animationSpeed;
-                site.y += site.vy * deltaTime * this.animationSpeed;
+                site.x += site.vx * cappedDeltaTime * this.animationSpeed;
+                site.y += site.vy * cappedDeltaTime * this.animationSpeed;
 
                 // Bounce off edges
                 if (site.x <= margin) {
@@ -476,6 +487,27 @@ class VoronoiViewer extends HTMLElement {
         }
 
         this.animationFrameId = requestAnimationFrame(() => this.animationLoop());
+    }
+
+    setupVisibilityHandler() {
+        this._visibilityHandler = () => {
+            if (document.hidden) {
+                // Tab is hidden - pause animation
+                if (this.isAnimating && this.animationFrameId) {
+                    cancelAnimationFrame(this.animationFrameId);
+                    this.animationFrameId = null;
+                }
+            } else {
+                // Tab is visible - resume animation
+                if (this.isAnimating && !this.animationFrameId) {
+                    // Reset time to prevent large delta
+                    this.lastAnimationTime = performance.now();
+                    this.animationLoop();
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', this._visibilityHandler);
     }
 
     showError(message) {

@@ -7,6 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Voronoi Diagram Viewer</title>
     <link rel="stylesheet" href="voronoi-styles.css?v=1.2.0">
+    <!-- DISABLED: Metric Picker Modal Styles (for future feature)
     <style>
         /* Metric Picker Modal Styles */
         .metric-modal-root {
@@ -306,6 +307,7 @@
             }
         }
     </style>
+    -->
     <style>
         /* Loading screen */
         #loadingScreen {
@@ -340,11 +342,11 @@
 </head>
 <body>
     <!-- Loading Screen -->
-    <div id="loadingScreen">
+    <div id="loadingScreen" class="hidden">
         <div class="loading-spinner"></div>
     </div>
 
-    <!-- Metric Picker Modal -->
+    <!-- DISABLED: Metric Picker Modal (for future feature)
     <div id="metricPickerRoot" class="metric-modal-root" style="display: none;">
         <div class="metric-backdrop" id="metricBackdrop"></div>
         <section class="metric-modal">
@@ -409,34 +411,36 @@
             </div>
         </section>
     </div>
+    -->
 
     <!-- Options Button -->
     <button class="options-button" id="optionsBtn" style="display: none;">Options</button>
 
-    <!-- Metric Button - Top Right -->
+    <!-- DISABLED: Metric Button - Top Right (for future feature)
     <button class="metric-button" id="metricBtn" style="display: none;">metric</button>
+    -->
 
-    <!-- Fullscreen voronoi viewer (hidden until metric is selected) -->
-    <voronoi-viewer id="viewer" style="opacity: 0; pointer-events: none;"></voronoi-viewer>
+    <!-- Fullscreen voronoi viewer -->
+    <voronoi-viewer id="viewer" style="opacity: 1; pointer-events: auto;"></voronoi-viewer>
     
     <!-- Compact Controls Panel -->
     <div class="floating-panel controls-panel" id="controlsPanel" style="display: none;">
         <div class="control-group">
-            <label class="control-label">display</label>
+            <label class="control-label">Display</label>
             <div style="display: flex; gap: 16px;">
                 <div class="toggle-wrapper" style="margin-bottom: 0;">
                     <div class="toggle active" id="edgesToggle"></div>
-                    <span class="toggle-label">edges</span>
+                    <span class="toggle-label">Edges</span>
                 </div>
                 <div class="toggle-wrapper" style="margin-bottom: 0;">
                     <div class="toggle active" id="sitesToggle"></div>
-                    <span class="toggle-label">sites</span>
+                    <span class="toggle-label">Sites</span>
                 </div>
             </div>
         </div>
 
         <div class="control-group">
-            <label class="control-label">resolution scale</label>
+            <label class="control-label">Resolution Scale</label>
             <div class="resolution-switch" id="resolutionSwitch">
                 <div class="resolution-switch-indicator" id="resolutionSwitchIndicator"></div>
                 <button class="resolution-switch-option" data-resolution="0.25">0.25x</button>
@@ -447,13 +451,13 @@
         </div>
 
         <div class="control-group">
-            <label class="control-label">animation</label>
+            <label class="control-label">Animation</label>
             <div class="toggle-wrapper">
                 <div class="toggle" id="animateToggle"></div>
-                <span class="toggle-label">animate</span>
+                <span class="toggle-label">Animate</span>
             </div>
             <div class="slider-wrapper">
-                <label class="slider-label">speed</label>
+                <label class="slider-label">Speed</label>
                 <input type="range" class="slider" id="speedSlider"
                        min="0.1" max="3" step="0.1" value="1">
                 <div class="slider-value" id="speedValue">1.0x</div>
@@ -461,9 +465,9 @@
         </div>
 
         <div class="control-group">
-            <label class="control-label">metric</label>
+            <label class="control-label">Metric</label>
             <div class="slider-wrapper">
-                <label class="slider-label">p value</label>
+                <label class="slider-label">P Value</label>
                 <input type="range" class="slider" id="metricSlider"
                        min="1" max="10" step="0.1" value="2">
                 <div class="slider-value" id="metricValue">L₂ (Euclidean)</div>
@@ -475,9 +479,9 @@
         </div>
 
         <div class="control-group">
-            <label class="control-label">algorithm</label>
+            <label class="control-label">Algorithm</label>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 13px; color: #8b949e;">jfa +</span>
+                <span style="font-size: 13px; color: #8b949e;">JFA +</span>
                 <select class="algorithm-select" id="algorithmSelect">
                     <option value="0">0</option>
                     <option value="1" selected>1</option>
@@ -489,27 +493,28 @@
         </div>
 
         <div class="control-group">
-            <label class="control-label">color palette</label>
+            <label class="control-label">Color Palette</label>
             <div id="paletteGrid" class="palette-grid"></div>
         </div>
 
         <div class="control-group">
-            <label class="control-label">actions</label>
-            <button class="action-btn" id="clearBtn">clear all</button>
-            <button class="action-btn" id="randomBtn">add random</button>
-            <button class="action-btn" id="gridBtn">grid</button>
+            <label class="control-label">Actions</label>
+            <button class="action-btn" id="clearBtn">Clear All</button>
+            <button class="action-btn" id="randomBtn">Add Random</button>
+            <button class="action-btn" id="gridBtn">Grid</button>
         </div>
     </div>
 
     <script type="module">
         // Import components
         import './components/voronoi-viewer.js';
-        import { MetricPicker } from './components/metric-picker.js';
+        // DISABLED: Metric picker (for future feature)
+        // import { MetricPicker } from './components/metric-picker.js';
         import { PALETTES } from './lib/palette.js';
 
-        // Initialize metric picker
-        const metricPicker = new MetricPicker();
-        metricPicker.init();
+        // DISABLED: Initialize metric picker (for future feature)
+        // const metricPicker = new MetricPicker();
+        // metricPicker.init();
 
         // ======================== VORONOI VIEWER ========================
         const viewer = document.getElementById('viewer');
@@ -545,7 +550,10 @@
         });
         const optionsBtn = document.getElementById('optionsBtn');
         const controlsPanel = document.getElementById('controlsPanel');
-        
+
+        // Show options button and panel on load since we disabled the metric picker
+        optionsBtn.style.display = 'block';
+
         let panelVisible = false;
         optionsBtn.textContent = 'Options';
         

@@ -13,7 +13,7 @@ export function initWebGL(canvas) {
             depth: false,
             stencil: false,
             premultipliedAlpha: false,
-            preserveDrawingBuffer: false
+            preserveDrawingBuffer: true
         });
     } catch (e) {}
 

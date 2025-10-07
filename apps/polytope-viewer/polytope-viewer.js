@@ -291,10 +291,11 @@ class PolytopeViewer extends HTMLElement {
         this.camera.position.set(5, 5, 5);
         
         // Renderer with transparency
-        this.renderer = new THREE.WebGLRenderer({ 
-            canvas: canvas, 
-            antialias: true, 
-            alpha: true 
+        this.renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true,
+            alpha: true,
+            preserveDrawingBuffer: true
         });
         this.renderer.setClearColor(0x000000, 0); // Fully transparent
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));

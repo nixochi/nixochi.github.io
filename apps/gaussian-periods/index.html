@@ -693,6 +693,7 @@
 
         <div class="control-group">
             <label class="control-label">Actions</label>
+            <button class="action-btn" id="exportBtn">Export Image</button>
             <button class="action-btn danger" id="clearBtn">Clear</button>
         </div>
     </div>
@@ -771,6 +772,7 @@
 
         <div class="control-group">
             <label class="control-label">Actions</label>
+            <button class="action-btn" id="exportBtnDesktop">Export Image</button>
             <button class="action-btn danger" id="clearBtnDesktop">Clear</button>
         </div>
     </div>
@@ -1354,6 +1356,28 @@
                 btn?.addEventListener('click', () => {
                     if (viewer.togglePause) {
                         viewer.togglePause();
+                    }
+                });
+            });
+
+            // Export button for both panels
+            ['exportBtn', 'exportBtnDesktop'].forEach(id => {
+                const btn = document.getElementById(id);
+                btn?.addEventListener('click', () => {
+                    // Get canvas directly from viewer (no shadow DOM)
+                    const canvas = viewer.canvas || viewer.querySelector('canvas');
+                    if (canvas) {
+                        try {
+                            const dataURL = canvas.toDataURL('image/png');
+                            const link = document.createElement('a');
+                            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                            link.download = `gaussian-periods-${timestamp}.png`;
+                            link.href = dataURL;
+                            link.click();
+                        } catch (e) {
+                            console.error('Export failed:', e);
+                            alert('Failed to export image. Please try again.');
+                        }
                     }
                 });
             });

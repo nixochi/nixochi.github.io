@@ -199,6 +199,11 @@
                 <div class="slider-value" id="opacityValue">90%</div>
             </div>
         </div>
+
+        <div class="control-group">
+            <label class="control-label">Actions</label>
+            <button class="action-btn" id="exportBtn">Export Image</button>
+        </div>
     </div>
 
     <!-- Polytope Selector Modal with Scrolling -->
@@ -325,6 +330,26 @@
                 const percentage = Math.round(value * 100);
                 opacityValue.textContent = `${percentage}%`;
                 viewer.setAttribute('opacity', value.toString());
+            });
+
+            // Export button functionality
+            const exportBtn = document.getElementById('exportBtn');
+            exportBtn.addEventListener('click', () => {
+                // Access canvas through THREE.js renderer
+                if (viewer.renderer) {
+                    try {
+                        const canvas = viewer.renderer.domElement;
+                        const dataURL = canvas.toDataURL('image/png');
+                        const link = document.createElement('a');
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                        link.download = `polytope-${timestamp}.png`;
+                        link.href = dataURL;
+                        link.click();
+                    } catch (e) {
+                        console.error('Export failed:', e);
+                        alert('Failed to export image. Please try again.');
+                    }
+                }
             });
 
             // Polytope selection functionality

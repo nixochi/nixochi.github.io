@@ -166,6 +166,28 @@ addIntersectionsBtn.addEventListener('click', () => {
     canvasManager.addIntersectionPoints();
 });
 
+// Export button
+const exportBtn = document.getElementById('exportBtn');
+exportBtn.addEventListener('click', () => {
+    // Get the canvas and convert to blob
+    canvasManager.canvas.toBlob((blob) => {
+        // Create a temporary link element
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        link.download = `point-configuration-${timestamp}.png`;
+
+        // Set the URL and trigger download
+        link.href = url;
+        link.click();
+
+        // Clean up
+        URL.revokeObjectURL(url);
+    }, 'image/png');
+});
+
 // Clear all button
 const clearAllBtn = document.getElementById('clearAllBtn');
 clearAllBtn.addEventListener('click', () => {

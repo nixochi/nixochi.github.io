@@ -12,5 +12,5 @@ todo:
 [~]add add a library of common and famous examples
 [x] add way of adding configurations precisely (for beautiful images and such)
 [x] consolidate the options menu
-[ ] change line snapping so it is based on angle when not near a specific point
+[x] change line snapping so it is based on angle when not near a specific point
 [ ] add images to the examples in the library of the configuration

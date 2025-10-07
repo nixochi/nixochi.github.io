@@ -261,6 +261,30 @@ polytope-viewer {
     margin-bottom: 12px;
 }
 
+/* Action buttons */
+.action-btn {
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg-primary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+.action-btn:last-child {
+    margin-bottom: 0;
+}
+
 /* Modal styles */
 .modal-overlay {
     position: fixed;

@@ -763,7 +763,7 @@ body.resizing .resize-handle {
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/></svg>
                     </button>
                 </div>
-                <button class="history-btn" id="debugBtn" title="open debug menu" style="margin-left: 8px;">
+                <button class="history-btn" id="debugBtn" title="open debug menu" style="margin-left: 8px; z-index: 1500; position: relative;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg>
                 </button>
             </div>
@@ -796,7 +796,7 @@ body.resizing .resize-handle {
             </div>
 
             <!-- Debug Panel (Starts hidden) -->
-            <div class="floating-panel" id="debugPanel" style="display: none; top: 70px; left: 20px; max-width: 350px; max-height: calc(100vh - 90px); max-height: calc(100svh - 90px); overflow-y: auto;">
+            <div class="floating-panel" id="debugPanel" style="display: none; top: 70px; left: 20px; max-width: 350px; max-height: calc(100vh - 90px); max-height: calc(100svh - 90px); overflow-y: auto; z-index: 1500;">
                 <div style="margin-bottom: 16px;">
                     <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--fg-primary);">add point</h3>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">

@@ -137,26 +137,55 @@ export class SnapManager {
     }
 
     /**
-     * Find snap targets for line preview near cursor
-     * Only snaps when cursor is NEAR existing multipoints or multi-intersections
-     * @param {number} _startX - Line start X (unused but kept for API consistency)
-     * @param {number} _startY - Line start Y (unused but kept for API consistency)
+     * Find snap targets for line preview based on line angle
+     * Snaps to points that are close to the line (perpendicular distance), picking the one nearest to cursor
+     * @param {number} startX - Line start X
+     * @param {number} startY - Line start Y
      * @param {number} endX - Line end X (cursor position)
      * @param {number} endY - Line end Y (cursor position)
      * @param {Array} points - Array of point objects
      * @param {Array} intersections - Array of intersection objects
      * @param {Object} viewportBounds - Viewport bounds in world coordinates
      * @param {number} scale - Current zoom scale
-     * @param {number} screenSnapThreshold - Screen-space threshold (default 30)
+     * @param {number} screenPerpendicularThreshold - Perpendicular distance threshold in screen space (default 20)
      * @returns {Object|null} Snap result with snapTarget and allIntersections or null
      */
-    findLineEndpointSnap(_startX, _startY, endX, endY, points, intersections, viewportBounds, scale, screenSnapThreshold = 30) {
+    findLineEndpointSnap(startX, startY, endX, endY, points, intersections, viewportBounds, scale, screenPerpendicularThreshold = 20) {
         const candidates = [];
 
         // Convert screen-space threshold to world-space
-        const worldSnapThreshold = screenSnapThreshold / scale;
+        const worldPerpendicularThreshold = screenPerpendicularThreshold / scale;
+
+        // Calculate line direction
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const lineLength = Math.hypot(dx, dy);
+
+        if (lineLength < 0.1) return null; // Line too short
+
+        // Normalized direction
+        const dirX = dx / lineLength;
+        const dirY = dy / lineLength;
+
+        // Helper: calculate perpendicular distance from point to infinite line
+        const getPerpendicularDistance = (px, py) => {
+            // Vector from start to point
+            const vx = px - startX;
+            const vy = py - startY;
+
+            // Project onto line direction (dot product)
+            const projection = vx * dirX + vy * dirY;
+
+            // Perpendicular component
+            const perpX = vx - projection * dirX;
+            const perpY = vy - projection * dirY;
+
+            return Math.hypot(perpX, perpY);
+        };
 
         // Check all existing points (including those not on any line)
+        const processedPositions = new Set();
+
         for (let i = 0; i < points.length; i++) {
             const point = points[i];
             const pos = getPointPosition(point, intersections);
@@ -167,27 +196,29 @@ export class SnapManager {
                 continue;
             }
 
-            // Check if cursor is near this point
-            const distToCursor = Math.hypot(pos.x - endX, pos.y - endY);
-            if (distToCursor <= worldSnapThreshold) {
+            // Skip if we've already processed this position
+            const posKey = `${Math.round(pos.x * 100)},${Math.round(pos.y * 100)}`;
+            if (processedPositions.has(posKey)) continue;
+            processedPositions.add(posKey);
+
+            // Check if point is close to the line (perpendicular distance)
+            const perpDistance = getPerpendicularDistance(pos.x, pos.y);
+
+            if (perpDistance <= worldPerpendicularThreshold) {
                 // Find all points at this location (multipoint)
                 const pointIndices = this.getPointsAtPosition(pos.x, pos.y, points, intersections, scale);
 
-                // Check if already added
-                const alreadyAdded = candidates.some(c =>
-                    c.type === 'multipoint' &&
-                    Math.hypot(c.x - pos.x, c.y - pos.y) < 0.1
-                );
+                // Calculate distance to cursor (for sorting)
+                const distToCursor = Math.hypot(pos.x - endX, pos.y - endY);
 
-                if (!alreadyAdded) {
-                    candidates.push({
-                        type: 'multipoint',
-                        x: pos.x,
-                        y: pos.y,
-                        pointIndices: pointIndices,
-                        distance: distToCursor
-                    });
-                }
+                candidates.push({
+                    type: 'multipoint',
+                    x: pos.x,
+                    y: pos.y,
+                    pointIndices: pointIndices,
+                    distance: distToCursor,
+                    perpDistance: perpDistance
+                });
             }
         }
 
@@ -204,27 +235,40 @@ export class SnapManager {
                 continue;
             }
 
-            // Check if cursor is near this multi-intersection
-            const distToCursor = Math.hypot(intersection.x - endX, intersection.y - endY);
-            if (distToCursor <= worldSnapThreshold) {
-                candidates.push({
-                    type: 'intersection',
-                    x: intersection.x,
-                    y: intersection.y,
-                    lineIndices: intersection.lineIndices,
-                    distance: distToCursor
-                });
+            // Check if intersection is close to the line (perpendicular distance)
+            const perpDistance = getPerpendicularDistance(intersection.x, intersection.y);
+
+            if (perpDistance <= worldPerpendicularThreshold) {
+                // Calculate distance to cursor (for sorting)
+                const distToCursor = Math.hypot(intersection.x - endX, intersection.y - endY);
+
+                // Skip if we already have this as a multipoint
+                const alreadyAdded = candidates.some(c =>
+                    c.type === 'multipoint' &&
+                    Math.hypot(c.x - intersection.x, c.y - intersection.y) < 0.1
+                );
+
+                if (!alreadyAdded) {
+                    candidates.push({
+                        type: 'intersection',
+                        x: intersection.x,
+                        y: intersection.y,
+                        lineIndices: intersection.lineIndices,
+                        distance: distToCursor,
+                        perpDistance: perpDistance
+                    });
+                }
             }
         }
 
         if (candidates.length === 0) return null;
 
-        // Sort by distance to cursor
+        // Sort by distance to cursor (not perpendicular distance)
         candidates.sort((a, b) => a.distance - b.distance);
 
         return {
             snapTarget: candidates[0],
-            allIntersections: candidates // All nearby targets (not all line intersections)
+            allIntersections: candidates // All nearby targets along the line
         };
     }
 
@@ -235,13 +279,13 @@ export class SnapManager {
      * @param {Array} points - Array of point objects
      * @param {Array} intersections - Array of intersection objects
      * @param {number} scale - Current zoom scale
-     * @param {number} threshold - Optional threshold (default uses pointRadius + 5)
+     * @param {number} threshold - Optional threshold (default uses larger hit radius)
      * @returns {Array} Array of point indices at this position
      */
     getPointsAtPosition(worldX, worldY, points, intersections, scale, threshold = null) {
-        // Convert screen-space threshold to world-space (uses pointRadius + 5 as screen pixels)
-        const pointRadius = 9; // Default point radius
-        const screenThreshold = threshold || (pointRadius + 5);
+        // Convert screen-space threshold to world-space (uses larger hit radius)
+        const hitRadius = 'ontouchstart' in window || navigator.maxTouchPoints > 0 ? 24 : 18;
+        const screenThreshold = threshold || hitRadius;
         const worldThreshold = screenThreshold / scale;
         const indices = [];
 

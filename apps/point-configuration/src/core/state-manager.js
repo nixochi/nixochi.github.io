@@ -63,6 +63,10 @@ export class StateManager {
                         } else if (visuals.snapPreview.type === 'intersection') {
                             const intersection = intersections[visuals.snapPreview.intersectionIndex];
                             intersection.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
+                        } else if (visuals.snapPreview.type === 'point') {
+                            // Snapping to an existing point - highlight all its lines
+                            const targetPoint = points[visuals.snapPreview.pointIndex];
+                            targetPoint.onLines.forEach(idx => visuals.highlightedLines.add(idx));
                         }
                     }
                 }
@@ -111,6 +115,10 @@ export class StateManager {
                         } else if (visuals.snapPreview.type === 'intersection') {
                             const intersection = intersections[visuals.snapPreview.intersectionIndex];
                             intersection.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
+                        } else if (visuals.snapPreview.type === 'point') {
+                            // Snapping to an existing point - highlight all its lines
+                            const targetPoint = points[visuals.snapPreview.pointIndex];
+                            targetPoint.onLines.forEach(idx => visuals.highlightedLines.add(idx));
                         }
                     } else {
                         // No snap, ghost at mouse position
@@ -165,19 +173,18 @@ export class StateManager {
                                 endY: snapResult.snapTarget.y
                             };
 
-                            // Highlight ALL intersections
-                            snapResult.allIntersections.forEach(intersection => {
-                                if (intersection.type === 'multipoint') {
-                                    intersection.pointIndices.forEach(idx => {
-                                        visuals.highlightedPoints.add(idx);
-                                        // Also highlight all lines that these points are on
-                                        const point = points[idx];
-                                        point.onLines.forEach(lineIdx => visuals.highlightedLines.add(lineIdx));
-                                    });
-                                } else if (intersection.type === 'intersection') {
-                                    intersection.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
-                                }
-                            });
+                            // Highlight only the chosen snap target (not all candidates)
+                            const snapTarget = snapResult.snapTarget;
+                            if (snapTarget.type === 'multipoint') {
+                                snapTarget.pointIndices.forEach(idx => {
+                                    visuals.highlightedPoints.add(idx);
+                                    // Also highlight all lines that these points are on
+                                    const point = points[idx];
+                                    point.onLines.forEach(lineIdx => visuals.highlightedLines.add(lineIdx));
+                                });
+                            } else if (snapTarget.type === 'intersection') {
+                                snapTarget.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
+                            }
                         } else {
                             visuals.previewLine = {
                                 startX: state.data.startX,
@@ -222,6 +229,10 @@ export class StateManager {
                         } else if (visuals.snapPreview.type === 'intersection') {
                             const intersection = intersections[visuals.snapPreview.intersectionIndex];
                             intersection.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
+                        } else if (visuals.snapPreview.type === 'point') {
+                            // Snapping to an existing point - highlight all its lines
+                            const targetPoint = points[visuals.snapPreview.pointIndex];
+                            targetPoint.onLines.forEach(idx => visuals.highlightedLines.add(idx));
                         }
                     } else {
                         // No snap, ghost at mouse position
@@ -245,6 +256,10 @@ export class StateManager {
                     } else if (this.capturedSnapPreview.type === 'intersection') {
                         const intersection = intersections[this.capturedSnapPreview.intersectionIndex];
                         intersection.lineIndices.forEach(idx => visuals.highlightedLines.add(idx));
+                    } else if (this.capturedSnapPreview.type === 'point') {
+                        // Snapping to an existing point - highlight all its lines
+                        const targetPoint = points[this.capturedSnapPreview.pointIndex];
+                        targetPoint.onLines.forEach(idx => visuals.highlightedLines.add(idx));
                     }
                 }
                 break;

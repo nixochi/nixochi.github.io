@@ -15,6 +15,7 @@ export class PointLineManager {
 
         // Settings
         this.pointRadius = 'ontouchstart' in window || navigator.maxTouchPoints > 0 ? 14 : 9;
+        this.hitRadius = 'ontouchstart' in window || navigator.maxTouchPoints > 0 ? 24 : 18; // Larger touch target
         this.scale = scale;
 
         // History manager
@@ -35,8 +36,8 @@ export class PointLineManager {
      * Get points at a given world position
      */
     getPointsAtPosition(worldX, worldY, threshold = null) {
-        // Convert screen-space threshold to world-space (uses pointRadius + 5 as screen pixels)
-        const screenThreshold = threshold || (this.pointRadius + 5);
+        // Convert screen-space threshold to world-space (uses hitRadius as screen pixels)
+        const screenThreshold = threshold || this.hitRadius;
         const worldThreshold = screenThreshold / this.scale;
         const indices = [];
 

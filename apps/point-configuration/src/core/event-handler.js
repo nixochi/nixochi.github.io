@@ -186,6 +186,9 @@ export class EventHandler {
     handleMouseUp(e) {
         const { worldX, worldY, screenX, screenY } = this.transformManager.getEventCoordinates(e);
 
+        // Update current mouse position so visual state computation uses latest position
+        this.stateManager.currentMousePos = { worldX, worldY, screenX, screenY };
+
         const state = this.stateManager.interactionState;
 
         // Check if this was a click (minimal movement)
@@ -296,30 +299,22 @@ export class EventHandler {
                         point.x = visuals.ghostPoint.x;
                         point.y = visuals.ghostPoint.y;
 
-                        // Update line memberships if snapped
+                        // Update line memberships based on snap target
                         if (visuals.snapPreview) {
                             if (visuals.snapPreview.type === 'intersection') {
                                 const intersection = this.pointLineManager.intersections[visuals.snapPreview.intersectionIndex];
-                                point.onLines = [...new Set([...point.onLines, ...intersection.lineIndices])];
+                                point.onLines = [...intersection.lineIndices];
                                 point.isIntersection = true;
                                 point.intersectionIndex = visuals.snapPreview.intersectionIndex;
                             } else if (visuals.snapPreview.type === 'line') {
-                                if (!point.onLines.includes(visuals.snapPreview.lineIndex)) {
-                                    point.onLines.push(visuals.snapPreview.lineIndex);
-                                }
-                                point.isIntersection = point.onLines.length > 1;
-
-                                // Update intersectionIndex if now on 2+ lines
-                                if (point.onLines.length >= 2) {
-                                    point.intersectionIndex = findIntersectionByLines(point.onLines, this.pointLineManager.intersections);
-                                } else {
-                                    point.intersectionIndex = null;
-                                }
+                                point.onLines = [visuals.snapPreview.lineIndex];
+                                point.isIntersection = false;
+                                point.intersectionIndex = null;
                             } else if (visuals.snapPreview.type === 'point') {
-                                // Snapped to another point - merge line memberships
+                                // Snapped to another point - use that point's line memberships
                                 const snapTarget = this.pointLineManager.points[visuals.snapPreview.pointIndex];
-                                point.onLines = [...new Set([...point.onLines, ...snapTarget.onLines])];
-                                point.isIntersection = point.onLines.length > 1;
+                                point.onLines = [...snapTarget.onLines];
+                                point.isIntersection = snapTarget.onLines.length > 1;
 
                                 // Update intersectionIndex if now on 2+ lines
                                 if (point.onLines.length >= 2) {
@@ -334,6 +329,11 @@ export class EventHandler {
                                     point.intersectionIndex = null;
                                 }
                             }
+                        } else {
+                            // No snap - clear all line memberships (dragged to empty space)
+                            point.onLines = [];
+                            point.isIntersection = false;
+                            point.intersectionIndex = null;
                         }
 
                         // Capture new state
@@ -457,6 +457,7 @@ export class EventHandler {
         // Clear captured snap and canvas hover and transition back to idle
         this.stateManager.capturedSnapPreview = null;
         this.stateManager.canvasHoveredPointIndices = null;
+        this.stateManager.currentMousePos = null;
         this.stateManager.transitionState('idle');
         this.canvas.style.cursor = 'crosshair';
         if (this.onDraw) this.onDraw();
@@ -585,9 +586,9 @@ export class EventHandler {
             return;
         }
 
-        // Single touch - clear position then treat as mouse up
-        this.stateManager.currentMousePos = null; // Clear before mouseUp
+        // Single touch - treat as mouse up, then clear position
         this.handleMouseUp(e);
+        this.stateManager.currentMousePos = null; // Clear after mouseUp
     }
 
     /**

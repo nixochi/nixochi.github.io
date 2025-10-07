@@ -1,8 +1,12 @@
 import { CanvasManager } from './core/canvas-manager.js';
+import { DebugMenu } from './ui/debug-menu.js';
 
 // Initialize canvas
 const canvas = document.getElementById('canvas');
 const canvasManager = new CanvasManager(canvas);
+
+// Initialize debug menu
+const debugMenu = new DebugMenu(canvasManager);
 
 // Mode switch
 const pointBtn = document.getElementById('pointBtn');
@@ -162,6 +166,22 @@ addIntersectionsBtn.addEventListener('click', () => {
     canvasManager.addIntersectionPoints();
 });
 
+// Clear all button
+const clearAllBtn = document.getElementById('clearAllBtn');
+clearAllBtn.addEventListener('click', () => {
+    if (confirm('Clear all points and lines?')) {
+        canvasManager.pointLineManager.points = [];
+        canvasManager.pointLineManager.lines = [];
+        canvasManager.pointLineManager.intersections = [];
+
+        if (canvasManager.pointLineManager.onStateChange) {
+            canvasManager.pointLineManager.onStateChange();
+        }
+
+        canvasManager.draw();
+    }
+});
+
 // Stats panel
 let currentView = 'general';
 
@@ -230,8 +250,42 @@ function updateStatsPanel() {
     }
 
     if (currentView === 'general') {
+        // Calculate Levi code
+        let leviCode = 'irregular';
+        if (stats.numPoints > 0 && stats.numLines > 0) {
+            const points = canvasManager.pointLineManager.points;
+            const lines = canvasManager.pointLineManager.lines;
+
+            // Calculate γ (lines per point) and π (points per line)
+            const linesPerPoint = points.map(p => p.onLines.length);
+            const pointsPerLine = lines.map((line, lineIndex) =>
+                points.filter(p => p.onLines.includes(lineIndex)).length
+            );
+
+            // Check if configuration is regular (all same values)
+            const allSameGamma = linesPerPoint.length > 0 && linesPerPoint.every(v => v === linesPerPoint[0]);
+            const allSamePi = pointsPerLine.length > 0 && pointsPerLine.every(v => v === pointsPerLine[0]);
+
+            if (allSameGamma && allSamePi && linesPerPoint[0] > 0) {
+                const gamma = linesPerPoint[0];
+                const pi = pointsPerLine[0];
+                const p = stats.numPoints;
+                const l = stats.numLines;
+
+                // Use subscript formatting
+                if (p === l && gamma === pi) {
+                    // Balanced configuration: (p_γ)
+                    leviCode = `(${p}<sub>${gamma}</sub>)`;
+                } else {
+                    // Non-balanced: (p_γ ℓ_π)
+                    leviCode = `(${p}<sub>${gamma}</sub> ${l}<sub>${pi}</sub>)`;
+                }
+            }
+        }
+
         panelContent.innerHTML = `
             <div style="font-size: 13px; line-height: 1.6;">
+                <div><strong>Levi code:</strong> ${leviCode}</div>
                 <div><strong>rank:</strong> ${stats.rank}</div>
                 <div><strong>points:</strong> ${stats.numPoints}</div>
                 <div><strong>lines:</strong> ${stats.numLines}</div>

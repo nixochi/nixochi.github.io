@@ -330,14 +330,24 @@ class PolytopeViewer extends HTMLElement {
         const handleResize = () => {
             const { width, height } = this.getBoundingClientRect();
             if (!width || !height) return;
-            
-            this.renderer.setSize(width, height, false);
-            this.camera.aspect = width / height;
+
+            // Calculate largest square that fits in the screen
+            const squareSize = Math.min(width, height);
+
+            this.renderer.setSize(squareSize, squareSize, false);
+            this.camera.aspect = 1.0; // Square aspect ratio
             this.camera.updateProjectionMatrix();
-            
-            console.log(`📐 PolytopeViewer resized to: ${width}x${height}`);
+
+            // Center the canvas
+            const canvas = this.querySelector('#polytopeCanvas');
+            if (canvas) {
+                canvas.style.width = `${squareSize}px`;
+                canvas.style.height = `${squareSize}px`;
+            }
+
+            console.log(`📐 PolytopeViewer resized to square: ${squareSize}x${squareSize} (container: ${width}x${height})`);
         };
-        
+
         handleResize();
         this._ro = new ResizeObserver(handleResize);
         this._ro.observe(this);
@@ -597,32 +607,42 @@ class PolytopeViewer extends HTMLElement {
     }
     
     frameToFit() {
-        if (!this.polytopeGroup || !this.THREE) return;
-        
+        if (!this.polytopeGroup || !this.THREE || !this.vertices) return;
+
         const box = new this.THREE.Box3().setFromObject(this.polytopeGroup);
-        const size = new this.THREE.Vector3();
         const center = new this.THREE.Vector3();
-        
-        box.getSize(size);
         box.getCenter(center);
-        
-        if (!isFinite(size.x + size.y + size.z)) return;
-        
+
+        if (!isFinite(center.x + center.y + center.z)) return;
+
         this.controls.target.copy(center);
-        
-        const maxDimension = Math.max(size.x, size.y, size.z) || 1;
+
+        // Compute the maximum distance from center to any vertex
+        let maxRadius = 0;
+        for (const vertex of this.vertices) {
+            const dx = vertex[0] - center.x;
+            const dy = vertex[1] - center.y;
+            const dz = vertex[2] - center.z;
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            maxRadius = Math.max(maxRadius, dist);
+        }
+
+        if (maxRadius === 0) maxRadius = 1;
+
+        // Calculate camera distance for a square viewport (aspect ratio 1.0)
+        // The polytope sphere of radius maxRadius should fit snugly in the viewport
         const fov = this.camera.fov * (Math.PI / 180);
-        const distance = (maxDimension * 1.25) / (2 * Math.tan(fov / 2));
-        
-        this.camera.position.copy(center).add(
-            new this.THREE.Vector3(distance, distance, distance)
-        );
-        
+        const distance = (maxRadius / Math.tan(fov / 2)) * 1.2;
+
+        // Position camera at this distance
+        const direction = new this.THREE.Vector3(1, 1, 1).normalize();
+        this.camera.position.copy(center).add(direction.multiplyScalar(distance));
+
         this.camera.near = Math.max(distance / 1000, 0.01);
         this.camera.far = distance * 1000;
         this.camera.updateProjectionMatrix();
-        
-        console.log('📷 Camera positioned to frame polytope');
+
+        console.log(`📷 Camera positioned at distance ${distance.toFixed(2)} for radius ${maxRadius.toFixed(2)}`);
     }
     
     // Hull computation helpers - UPDATED to use tezcatli approach

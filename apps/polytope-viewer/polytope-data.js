@@ -7,6 +7,11 @@ export const polytopeOptions = [
         active: true
     },
     {
+        id: 'signed_permutahedron',
+        name: 'Signed Permutahedron',
+        description: 'Convex hull of permutations of [1,2,3] with signs'
+    },
+    {
         id: 'cube',
         name: 'Cube',
         description: '3D hypercube with 8 vertices'
@@ -30,36 +35,6 @@ export const polytopeOptions = [
         id: 'icosahedron',
         name: 'Icosahedron',
         description: '20 triangular faces'
-    },
-    {
-        id: 'tesseract',
-        name: 'Tesseract',
-        description: '4D hypercube projection'
-    },
-    {
-        id: 'truncated_tetrahedron',
-        name: 'Truncated Tetrahedron',
-        description: '4 triangular and 4 hexagonal faces'
-    },
-    {
-        id: 'cuboctahedron',
-        name: 'Cuboctahedron',
-        description: '8 triangular and 6 square faces'
-    },
-    {
-        id: 'truncated_cube',
-        name: 'Truncated Cube',
-        description: '8 triangular and 6 octagonal faces'
-    },
-    {
-        id: 'snub_cube',
-        name: 'Snub Cube',
-        description: '32 triangular and 6 square faces'
-    },
-    {
-        id: 'rhombicuboctahedron',
-        name: 'Rhombicuboctahedron',
-        description: '8 triangular and 18 square faces'
     },
     {
         id: 'pentagonal_prism',
@@ -114,62 +89,42 @@ export const polytopeVertices = {
         [ 0,  0,  1],
         [ 0,  0, -1]
     ],
-    dodecahedron: [
-        // Golden ratio approximation for dodecahedron vertices
-        [1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1],
-        [-1, 1, 1], [-1, 1, -1], [-1, -1, 1], [-1, -1, -1],
-        [0, 1.618, 0.618], [0, 1.618, -0.618], [0, -1.618, 0.618], [0, -1.618, -0.618],
-        [0.618, 0, 1.618], [-0.618, 0, 1.618], [0.618, 0, -1.618], [-0.618, 0, -1.618],
-        [1.618, 0.618, 0], [1.618, -0.618, 0], [-1.618, 0.618, 0], [-1.618, -0.618, 0]
-    ],
-    icosahedron: [
-        // Golden ratio based icosahedron
-        [0, 1, 1.618], [0, 1, -1.618], [0, -1, 1.618], [0, -1, -1.618],
-        [1, 1.618, 0], [1, -1.618, 0], [-1, 1.618, 0], [-1, -1.618, 0],
-        [1.618, 0, 1], [1.618, 0, -1], [-1.618, 0, 1], [-1.618, 0, -1]
-    ],
-    tesseract: [
-        // 4D tesseract projected to 3D
-        [ 1,  1,  1], [-1,  1,  1], [-1, -1,  1], [ 1, -1,  1],
-        [ 1,  1, -1], [-1,  1, -1], [-1, -1, -1], [ 1, -1, -1],
-        [ 0.5,  0.5,  0.5], [-0.5,  0.5,  0.5], [-0.5, -0.5,  0.5], [ 0.5, -0.5,  0.5],
-        [ 0.5,  0.5, -0.5], [-0.5,  0.5, -0.5], [-0.5, -0.5, -0.5], [ 0.5, -0.5, -0.5]
-    ],
-    truncated_tetrahedron: [
-        [1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1],
-        [0, 1/Math.sqrt(3), 2*Math.sqrt(2/3)], [0, -1/Math.sqrt(3), -2*Math.sqrt(2/3)],
-        [2*Math.sqrt(2/3), 0, 1/Math.sqrt(3)], [-2*Math.sqrt(2/3), 0, -1/Math.sqrt(3)],
-        [1/Math.sqrt(3), 2*Math.sqrt(2/3), 0], [-1/Math.sqrt(3), -2*Math.sqrt(2/3), 0]
-    ],
-    cuboctahedron: [
-        [1, 1, 0], [1, -1, 0], [-1, 1, 0], [-1, -1, 0],
-        [1, 0, 1], [1, 0, -1], [-1, 0, 1], [-1, 0, -1],
-        [0, 1, 1], [0, 1, -1], [0, -1, 1], [0, -1, -1]
-    ],
-    truncated_cube: [
-        [1, 1, Math.sqrt(2)+1], [1, -1, Math.sqrt(2)+1], [-1, 1, Math.sqrt(2)+1], [-1, -1, Math.sqrt(2)+1],
-        [1, 1, -(Math.sqrt(2)+1)], [1, -1, -(Math.sqrt(2)+1)], [-1, 1, -(Math.sqrt(2)+1)], [-1, -1, -(Math.sqrt(2)+1)],
-        [Math.sqrt(2)+1, 1, 1], [Math.sqrt(2)+1, -1, 1], [-(Math.sqrt(2)+1), 1, 1], [-(Math.sqrt(2)+1), -1, 1],
-        [Math.sqrt(2)+1, 1, -1], [Math.sqrt(2)+1, -1, -1], [-(Math.sqrt(2)+1), 1, -1], [-(Math.sqrt(2)+1), -1, -1],
-        [1, Math.sqrt(2)+1, 1], [-1, Math.sqrt(2)+1, 1], [1, -(Math.sqrt(2)+1), 1], [-1, -(Math.sqrt(2)+1), 1],
-        [1, Math.sqrt(2)+1, -1], [-1, Math.sqrt(2)+1, -1], [1, -(Math.sqrt(2)+1), -1], [-1, -(Math.sqrt(2)+1), -1]
-    ],
-    snub_cube: [
-        // Simplified snub cube vertices
-        [1, 1/1.618, 1.618], [1, -1/1.618, 1.618], [-1, 1/1.618, 1.618], [-1, -1/1.618, 1.618],
-        [1, 1/1.618, -1.618], [1, -1/1.618, -1.618], [-1, 1/1.618, -1.618], [-1, -1/1.618, -1.618],
-        [1.618, 1, 1/1.618], [1.618, -1, 1/1.618], [-1.618, 1, 1/1.618], [-1.618, -1, 1/1.618],
-        [1.618, 1, -1/1.618], [1.618, -1, -1/1.618], [-1.618, 1, -1/1.618], [-1.618, -1, -1/1.618],
-        [1/1.618, 1.618, 1], [-1/1.618, 1.618, 1], [1/1.618, -1.618, 1], [-1/1.618, -1.618, 1],
-        [1/1.618, 1.618, -1], [-1/1.618, 1.618, -1], [1/1.618, -1.618, -1], [-1/1.618, -1.618, -1]
-    ],
-    rhombicuboctahedron: [
-        [1+Math.sqrt(2), 1, 1], [1+Math.sqrt(2), 1, -1], [1+Math.sqrt(2), -1, 1], [1+Math.sqrt(2), -1, -1],
-        [-(1+Math.sqrt(2)), 1, 1], [-(1+Math.sqrt(2)), 1, -1], [-(1+Math.sqrt(2)), -1, 1], [-(1+Math.sqrt(2)), -1, -1],
-        [1, 1+Math.sqrt(2), 1], [1, 1+Math.sqrt(2), -1], [-1, 1+Math.sqrt(2), 1], [-1, 1+Math.sqrt(2), -1],
-        [1, -(1+Math.sqrt(2)), 1], [1, -(1+Math.sqrt(2)), -1], [-1, -(1+Math.sqrt(2)), 1], [-1, -(1+Math.sqrt(2)), -1],
-        [1, 1, 1+Math.sqrt(2)], [-1, 1, 1+Math.sqrt(2)], [1, -1, 1+Math.sqrt(2)], [-1, -1, 1+Math.sqrt(2)],
-        [1, 1, -(1+Math.sqrt(2))], [-1, 1, -(1+Math.sqrt(2))], [1, -1, -(1+Math.sqrt(2))], [-1, -1, -(1+Math.sqrt(2))]
+    dodecahedron: (() => {
+        // Golden ratio: φ = (1 + √5)/2
+        const phi = (1 + Math.sqrt(5)) / 2;
+        const inv_phi = 1 / phi;
+        return [
+            // (±1, ±1, ±1)
+            [1, 1, 1], [1, 1, -1], [1, -1, 1], [1, -1, -1],
+            [-1, 1, 1], [-1, 1, -1], [-1, -1, 1], [-1, -1, -1],
+            // (0, ±φ, ±1/φ)
+            [0, phi, inv_phi], [0, phi, -inv_phi], [0, -phi, inv_phi], [0, -phi, -inv_phi],
+            // (±1/φ, 0, ±φ)
+            [inv_phi, 0, phi], [-inv_phi, 0, phi], [inv_phi, 0, -phi], [-inv_phi, 0, -phi],
+            // (±φ, ±1/φ, 0)
+            [phi, inv_phi, 0], [phi, -inv_phi, 0], [-phi, inv_phi, 0], [-phi, -inv_phi, 0]
+        ];
+    })(),
+    icosahedron: (() => {
+        // Golden ratio: φ = (1 + √5)/2
+        const phi = (1 + Math.sqrt(5)) / 2;
+        return [
+            // (0, ±1, ±φ)
+            [0, 1, phi], [0, 1, -phi], [0, -1, phi], [0, -1, -phi],
+            // (±1, ±φ, 0)
+            [1, phi, 0], [1, -phi, 0], [-1, phi, 0], [-1, -phi, 0],
+            // (±φ, 0, ±1)
+            [phi, 0, 1], [phi, 0, -1], [-phi, 0, 1], [-phi, 0, -1]
+        ];
+    })(),
+    signed_permutahedron: [
+        // All permutations of [1,2,3] with all sign combinations (48 vertices)
+        [1, 2, 3], [1, 2, -3], [1, -2, 3], [1, -2, -3], [-1, 2, 3], [-1, 2, -3], [-1, -2, 3], [-1, -2, -3],
+        [1, 3, 2], [1, 3, -2], [1, -3, 2], [1, -3, -2], [-1, 3, 2], [-1, 3, -2], [-1, -3, 2], [-1, -3, -2],
+        [2, 1, 3], [2, 1, -3], [2, -1, 3], [2, -1, -3], [-2, 1, 3], [-2, 1, -3], [-2, -1, 3], [-2, -1, -3],
+        [2, 3, 1], [2, 3, -1], [2, -3, 1], [2, -3, -1], [-2, 3, 1], [-2, 3, -1], [-2, -3, 1], [-2, -3, -1],
+        [3, 1, 2], [3, 1, -2], [3, -1, 2], [3, -1, -2], [-3, 1, 2], [-3, 1, -2], [-3, -1, 2], [-3, -1, -2],
+        [3, 2, 1], [3, 2, -1], [3, -2, 1], [3, -2, -1], [-3, 2, 1], [-3, 2, -1], [-3, -2, 1], [-3, -2, -1]
     ],
     pentagonal_prism: [
         // Top pentagon

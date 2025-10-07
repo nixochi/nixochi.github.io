@@ -190,23 +190,17 @@ class PolytopeViewer extends HTMLElement {
         return Math.min(1, Math.max(0, num));
     }
     
-    // Initialization
     async initialize() {
         console.log('🚀 Initializing PolytopeViewer...');
         
-        // Load THREE.js and dependencies
         await this.loadDependencies();
         
-        // Setup 3D scene
         this.setupScene();
         
-        // Build initial mesh
         this.rebuildMesh();
         
-        // Setup resize handling
         this.setupResizeObserver();
         
-        // Start animation loop
         this.startAnimationLoop();
         
         console.log('✅ PolytopeViewer initialization complete');
@@ -289,7 +283,6 @@ class PolytopeViewer extends HTMLElement {
         const THREE = this.THREE;
         const canvas = this.querySelector('#polytopeCanvas');
         
-        // Scene
         this.scene = new THREE.Scene();
         // Keep background transparent for container integration
         
@@ -363,7 +356,6 @@ class PolytopeViewer extends HTMLElement {
         console.log('🎬 Animation loop started');
     }
 
-    // Get face color palette - same as tezcatli
     getFaceColorPalette() {
         return [
             '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
@@ -372,7 +364,6 @@ class PolytopeViewer extends HTMLElement {
         ];
     }
 
-    // Get edge color palette - vibrant colors that work on both light/dark backgrounds
     getEdgeColorPalette() {
         return [
             '#ff6b35', '#4ecdc4', '#45b7d1', '#96ceb4', 
@@ -381,7 +372,6 @@ class PolytopeViewer extends HTMLElement {
         ];
     }
     
-    // Mesh building - updated to use tezcatli approach
     rebuildMesh() {
         if (!this.THREE) return;
         
@@ -548,7 +538,6 @@ class PolytopeViewer extends HTMLElement {
             ], 3));
             this.trackObject(geometry);
             
-            // Black edges for solid mode - same as tezcatli
             const material = new this.THREE.LineBasicMaterial({
                 color: new this.THREE.Color('#000000'),
                 transparent: true,
@@ -572,7 +561,6 @@ class PolytopeViewer extends HTMLElement {
                 object.visible = !this.isWireframe;
             } else if (object.isLine) {
                 object.visible = true;
-                // Update edge colors based on mode
                 if (this.isWireframe) {
                     // Colorful edges for wireframe mode
                     const edgeColors = this.getEdgeColorPalette();
@@ -617,7 +605,6 @@ class PolytopeViewer extends HTMLElement {
 
         this.controls.target.copy(center);
 
-        // Compute the maximum distance from center to any vertex
         let maxRadius = 0;
         for (const vertex of this.vertices) {
             const dx = vertex[0] - center.x;
@@ -645,7 +632,6 @@ class PolytopeViewer extends HTMLElement {
         console.log(`📷 Camera positioned at distance ${distance.toFixed(2)} for radius ${maxRadius.toFixed(2)}`);
     }
     
-    // Hull computation helpers - UPDATED to use tezcatli approach
     getFacesFromVertices(vertices, options = {}) {
         if (!vertices || vertices.length < 4) return [];
         const opts = {
@@ -661,7 +647,6 @@ class PolytopeViewer extends HTMLElement {
         }
     }
     
-    // Extract edges from face data - same as tezcatli
     getEdgesFromFaces(faces) {
         if (!faces || !faces.length) return [];
         
@@ -675,7 +660,6 @@ class PolytopeViewer extends HTMLElement {
                 const a = face[i];
                 const b = face[(i + 1) % n];
                 
-                // Create a consistent edge key (smaller index first)
                 const key = a < b ? `${a}-${b}` : `${b}-${a}`;
                 edgeSet.add(key);
             }
@@ -688,7 +672,6 @@ class PolytopeViewer extends HTMLElement {
         });
     }
     
-    // Default vertices
     getDefaultCubeVertices() {
         return [
             [ 1,  1,  1], [-1,  1,  1], [-1, -1,  1], [ 1, -1,  1],
@@ -696,7 +679,6 @@ class PolytopeViewer extends HTMLElement {
         ];
     }
     
-    // UI helpers - only error message remains
     showError(message) {
         const error = this.querySelector('#errorMessage');
         const details = this.querySelector('#errorDetails');

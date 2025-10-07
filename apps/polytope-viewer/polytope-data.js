@@ -90,7 +90,6 @@ export const polytopeVertices = {
         [ 0,  0, -1]
     ],
     dodecahedron: (() => {
-        // Golden ratio: φ = (1 + √5)/2
         const phi = (1 + Math.sqrt(5)) / 2;
         const inv_phi = 1 / phi;
         return [

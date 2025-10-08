@@ -158,7 +158,9 @@ export class StateManager {
                             points,
                             intersections,
                             this.getViewportBoundsForSnap(),
-                            scale
+                            scale,
+                            20,
+                            state.data.startPointIndices || []
                         );
 
                         if (snapResult) {

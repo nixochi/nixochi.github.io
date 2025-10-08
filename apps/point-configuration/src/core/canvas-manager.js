@@ -113,18 +113,18 @@ export class CanvasManager {
     }
 
     /**
-     * Set which points should be highlighted (called from UI)
+     * Show UI highlights for specific points (called from UI)
      */
-    setHoveredPoints(pointIndices) {
-        this.stateManager.setHoveredPoints(pointIndices);
+    showUIHighlight(pointIndices) {
+        this.stateManager.showUIHighlight(pointIndices);
         this.draw();
     }
 
     /**
-     * Clear hovered points
+     * Clear UI highlights (called from UI)
      */
-    clearHoveredPoints() {
-        this.stateManager.clearHoveredPoints();
+    clearUIHighlight() {
+        this.stateManager.clearUIHighlight();
         this.draw();
     }
 

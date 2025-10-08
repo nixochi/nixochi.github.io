@@ -54,7 +54,7 @@ export class EventHandler {
         this.stateManager.currentMousePos = { worldX, worldY, screenX, screenY };
 
         // Clear UI hover highlights when interacting with canvas
-        this.stateManager.hoveredPointIndices = null;
+        this.stateManager.clearUIHighlight();
 
         if (this.mode === 'line') {
             // Check if starting from or near a point

@@ -369,13 +369,13 @@ function attachHoverListeners() {
             const pointsStr = item.getAttribute('data-points');
             if (pointsStr) {
                 const points = pointsStr.split(',').map(Number).filter(n => !isNaN(n));
-                canvasManager.setHoveredPoints(points);
+                canvasManager.showUIHighlight(points);
             }
             item.style.background = 'color-mix(in srgb, var(--bg-secondary) 90%, var(--fg-primary) 10%)';
         });
 
         item.addEventListener('mouseleave', () => {
-            canvasManager.clearHoveredPoints();
+            canvasManager.clearUIHighlight();
             item.style.background = 'transparent';
         });
 
@@ -388,7 +388,7 @@ function attachHoverListeners() {
 
 // Clear highlighting when clicking anywhere outside matroid items
 document.addEventListener('click', () => {
-    canvasManager.clearHoveredPoints();
+    canvasManager.clearUIHighlight();
     // Also clear background from all items
     document.querySelectorAll('.matroid-item').forEach(item => {
         item.style.background = 'transparent';

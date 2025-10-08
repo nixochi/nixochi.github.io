@@ -4,7 +4,7 @@
 export class InteractionMode {
     constructor() {
         this.interactionState = {
-            type: 'idle', // 'idle' | 'dragging-point' | 'drawing-line' | 'panning' | 'placing-point' | 'dragging-new-point' | 'two-finger-gesture'
+            type: 'idle', // 'idle' | 'dragging-point' | 'drawing-line' | 'panning' | 'placing-point' | 'dragging-new-point' | 'two-finger-gesture' | 'showing-ui-highlight'
             data: null
         };
 
@@ -12,8 +12,7 @@ export class InteractionMode {
         this.mouseDownPos = null; // {worldX, worldY, screenX, screenY, time}
         this.capturedSnapPreview = null; // Snap preview captured on mousedown for point placement
 
-        // External state inputs (from UI)
-        this.hoveredPointIndices = null; // Set from UI hover events
+        // Canvas hover state (for line mode)
         this.canvasHoveredPointIndices = null; // Points hovered on canvas (for line mode)
     }
 
@@ -73,10 +72,12 @@ export class InteractionMode {
                 if (mode === 'line' && this.canvasHoveredPointIndices) {
                     this.canvasHoveredPointIndices.forEach(idx => visuals.highlightedPoints.add(idx));
                 }
+                break;
 
-                // UI hover highlights (only in idle state)
-                if (this.hoveredPointIndices) {
-                    this.hoveredPointIndices.forEach(idx => visuals.highlightedPoints.add(idx));
+            case 'showing-ui-highlight':
+                // Highlight points from UI interaction (e.g., hovering matroid list)
+                if (state.data && state.data.pointIndices) {
+                    state.data.pointIndices.forEach(idx => visuals.highlightedPoints.add(idx));
                 }
                 break;
 
@@ -280,6 +281,8 @@ export class InteractionMode {
     }
 
     /**
+     * 
+     * 
      * Set viewport bounds getter
      */
     setViewportBoundsGetter(getter) {
@@ -287,16 +290,22 @@ export class InteractionMode {
     }
 
     /**
-     * Set which points should be highlighted (called from UI)
+     * Show UI highlights for specific points (proper state transition)
      */
-    setHoveredPoints(pointIndices) {
-        this.hoveredPointIndices = pointIndices ? new Set(pointIndices) : null;
+    showUIHighlight(pointIndices) {
+        if (pointIndices && pointIndices.length > 0) {
+            this.transitionState('showing-ui-highlight', { pointIndices: [...pointIndices] });
+        } else {
+            this.transitionState('idle');
+        }
     }
 
     /**
-     * Clear hovered points
+     * Clear UI highlights (return to idle)
      */
-    clearHoveredPoints() {
-        this.hoveredPointIndices = null;
+    clearUIHighlight() {
+        if (this.interactionState.type === 'showing-ui-highlight') {
+            this.transitionState('idle');
+        }
     }
 }

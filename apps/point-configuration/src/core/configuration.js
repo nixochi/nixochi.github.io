@@ -416,58 +416,34 @@ export class PointLineManager {
      * Uses compact array format and gzip compression
      */
     serializeState() {
-        // Try with 1 decimal precision first
-        let precision = 1;
-        let state = this._createCompactState(precision);
-
-        // Verify topology is preserved
-        if (!this._verifyTopology(state, precision)) {
-            console.warn('Topology changed with precision 1, trying precision 2');
-            precision = 2;
-            state = this._createCompactState(precision);
-
-            if (!this._verifyTopology(state, precision)) {
-                console.error('Topology still changed with precision 2, using precision 3');
-                precision = 3;
-                state = this._createCompactState(precision);
-            }
-        }
+        const precision = 1;
+        const state = this._createCompactState(precision);
 
         // Convert to JSON and compress
         const jsonStr = JSON.stringify(state);
 
-        try {
-            // Compress with pako
-            const compressed = pako.deflate(jsonStr, { level: 9 });
+        // Compress with pako
+        const compressed = pako.deflate(jsonStr, { level: 9 });
 
-            // Convert to base64url (URL-safe base64)
-            const base64 = btoa(String.fromCharCode.apply(null, compressed))
-                .replace(/\+/g, '-')
-                .replace(/\//g, '_')
-                .replace(/=+$/, '');
+        // Convert to base64url (URL-safe base64)
+        const base64 = btoa(String.fromCharCode.apply(null, compressed))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
 
-            console.log(`Serialized state: ${jsonStr.length} chars → ${base64.length} chars (${Math.round(base64.length / jsonStr.length * 100)}% of original)`);
+        console.log(`Serialized state: ${jsonStr.length} chars → ${base64.length} chars (${Math.round(base64.length / jsonStr.length * 100)}% of original)`);
 
-            return base64;
-        } catch (e) {
-            console.error('Compression failed, using uncompressed:', e);
-            // Fallback to uncompressed base64
-            return btoa(jsonStr)
-                .replace(/\+/g, '-')
-                .replace(/\//g, '_')
-                .replace(/=+$/, '');
-        }
+        return base64;
     }
 
     /**
      * Create compact state representation with given precision
-     * Format: {p: [[x,y,[lines]], ...], l: [[x,y,angle], ...], v: 1}
+     * Format: {p: [[x,y,[lines]], ...], l: [[x,y,angle], ...]}
      */
     _createCompactState(precision) {
         const factor = Math.pow(10, precision);
 
         return {
-            v: 1, // version number for future compatibility
             p: this.points.map(p => [
                 Math.round(p.x * factor) / factor,
                 Math.round(p.y * factor) / factor,
@@ -479,46 +455,6 @@ export class PointLineManager {
                 Math.round(l.angle * 10000) / 10000 // 4 decimals for angles
             ])
         };
-    }
-
-    /**
-     * Verify that topology is preserved with given precision
-     * Returns true if all points remain on their assigned lines
-     */
-    _verifyTopology(compactState, precision) {
-        const tolerance = 1 / Math.pow(10, precision) + 0.01; // Add small epsilon
-
-        // Check each point is still on all its lines
-        for (let i = 0; i < compactState.p.length; i++) {
-            const [px, py, onLines] = compactState.p[i];
-
-            for (const lineIdx of onLines) {
-                const [lx, ly, angle] = compactState.l[lineIdx];
-
-                // Calculate distance from point to line
-                const dx = Math.cos(angle);
-                const dy = Math.sin(angle);
-
-                // Vector from line point to target point
-                const vx = px - lx;
-                const vy = py - ly;
-
-                // Project onto line direction
-                const t = vx * dx + vy * dy;
-
-                // Perpendicular distance
-                const perpX = vx - t * dx;
-                const perpY = vy - t * dy;
-                const distance = Math.sqrt(perpX * perpX + perpY * perpY);
-
-                if (distance > tolerance) {
-                    console.warn(`Point ${i} is ${distance.toFixed(4)} units from line ${lineIdx} (tolerance: ${tolerance.toFixed(4)})`);
-                    return false;
-                }
-            }
-        }
-
-        return true;
     }
 
     /**
@@ -555,12 +491,6 @@ export class PointLineManager {
             }
 
             const state = JSON.parse(jsonStr);
-
-            // Version check
-            if (state.v !== 1) {
-                console.error('Unsupported state version:', state.v);
-                return false;
-            }
 
             // Restore from compact format
             this.points = state.p.map(([x, y, onLines]) => ({

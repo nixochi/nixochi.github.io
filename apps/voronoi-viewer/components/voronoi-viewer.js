@@ -52,6 +52,9 @@ class VoronoiViewer extends HTMLElement {
     connectedCallback() {
         console.log('🔗 VoronoiViewer connected to DOM');
 
+        // ✅ Preserve existing skeleton, don't overwrite it
+        const existingSkeleton = this.querySelector('.skeleton-loader');
+
         this.innerHTML = `
             <div style="
                 width: 100%;
@@ -91,6 +94,11 @@ class VoronoiViewer extends HTMLElement {
                 <div id="errorDetails" style="font-size: 12px; opacity: 0.8;"></div>
             </div>
         `;
+
+        // ✅ Re-add skeleton on top if it existed
+        if (existingSkeleton) {
+            this.appendChild(existingSkeleton);
+        }
 
         this.canvas = this.querySelector('#glcanvas');
 
@@ -170,6 +178,19 @@ class VoronoiViewer extends HTMLElement {
         this.recompute();
 
         console.log('✅ VoronoiViewer initialization complete');
+
+        // ✅ Remove skeleton after everything is ready
+        this.removeLoadingSkeleton();
+    }
+
+    removeLoadingSkeleton() {
+        // Find skeleton loader
+        const skeleton = this.querySelector('.skeleton-loader');
+        if (skeleton) {
+            console.log('🎨 Removing loading skeleton - voronoi is ready');
+            skeleton.classList.add('fade-out');
+            setTimeout(() => skeleton.remove(), 300);
+        }
     }
 
     setupInteractions() {

@@ -7,9 +7,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // ======================== VORONOI VIEWER ========================
     const viewer = document.getElementById('viewer');
 
+    // Check for "fun mode" URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const isFunMode = urlParams.has('fun');
+
     // Setup palette selector
     const paletteGrid = document.getElementById('paletteGrid');
-    let currentPaletteId = 'vibrant';
+    let currentPaletteId = isFunMode ? 'greyscale' : 'vibrant';
 
     PALETTES.forEach(palette => {
         const swatch = document.createElement('div');
@@ -217,4 +221,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial setup
     metricValue.textContent = 'L₂ (Euclidean)';
+
+    // Apply fun mode configuration if enabled
+    if (isFunMode) {
+        // Wait for viewer to be fully initialized
+        setTimeout(() => {
+            // Clear the default 3 points and add 50 random points
+            viewer.clearAll();
+            viewer.addRandomPoints(50);
+
+            // Enable animation at 1.5x speed
+            viewer.setAnimation(true);
+            viewer.setAnimationSpeed(1.5);
+            animateToggle.classList.add('active');
+            speedSlider.value = '1.5';
+            speedValue.textContent = '1.5x';
+
+            // Set greyscale palette (already set in currentPaletteId above)
+            viewer.setPalette('greyscale');
+
+            // Hide the site points
+            viewer.setShowSites(false);
+            sitesToggle.classList.remove('active');
+
+            console.log('🎉 Fun mode activated! 50 points, 1.5x speed, greyscale palette, sites hidden');
+        }, 100); // Small delay to ensure viewer is ready
+    }
 });

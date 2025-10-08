@@ -141,7 +141,7 @@ export class SnapManager {
      * Snaps to the nearest point that is close to the line (perpendicular distance)
      * @returns {Object|null} Snap result with snapTarget or null
      */
-    findLineEndpointSnap(startX, startY, endX, endY, points, intersections, viewportBounds, scale, screenPerpendicularThreshold = 20, excludePointIndices = []) {
+    findLineEndpointSnap(startX, startY, endX, endY, points, intersections, viewportBounds, scale, screenPerpendicularThreshold = 20) {
         const candidates = [];
 
         // Convert screen-space threshold to world-space
@@ -176,11 +176,8 @@ export class SnapManager {
 
         // Check all existing points (including those not on any line)
         const processedPositions = new Set();
-        const excludeSet = new Set(excludePointIndices);
 
         for (let i = 0; i < points.length; i++) {
-            if (excludeSet.has(i)) continue;
-
             const point = points[i];
             const pos = getPointPosition(point, intersections);
 
@@ -224,14 +221,6 @@ export class SnapManager {
                 intersection.y < viewportBounds.top || intersection.y > viewportBounds.bottom) {
                 continue;
             }
-
-            // Skip if this intersection is at the same position as any excluded point
-            const isAtExcludedPoint = excludePointIndices.some(idx => {
-                const point = points[idx];
-                const pos = getPointPosition(point, intersections);
-                return Math.hypot(pos.x - intersection.x, pos.y - intersection.y) < 0.1;
-            });
-            if (isAtExcludedPoint) continue;
 
             const perpDistance = getPerpendicularDistance(intersection.x, intersection.y);
 

@@ -40,8 +40,8 @@ export class CanvasManager {
         // OLD: Keep old managers for compatibility (will be removed in later phases)
         // ============================================================================
         this.stateManager = new StateManager();
-        this.transformManager = new TransformManager(canvas, this.transformState);
-        this.pointLineManager = new PointLineManager(this.transformManager.scale, this.configuration);
+        this.transformManager = new TransformManager(canvas);
+        this.pointLineManager = new PointLineManager(this.transformManager.scale);
         this.snapManager = new SnapManager(15, 20); // intersectionSnapThreshold, lineSnapThreshold
         this.renderer = new Renderer(canvas, this.ctx);
 
@@ -81,10 +81,6 @@ export class CanvasManager {
         // Initialize
         this.setupCanvas();
         this.eventHandler.setupEventListeners();
-
-        // Initialize rayOpacity from UIState
-        this.rayOpacity = this.uiState.getRayOpacity();
-
         this.draw();
     }
 
@@ -133,7 +129,6 @@ export class CanvasManager {
         const resizeCanvas = () => {
             this.canvas.width = this.canvas.offsetWidth;
             this.canvas.height = this.canvas.offsetHeight;
-            this.transformState.setCanvasSize(this.canvas.width, this.canvas.height);
             this.transformManager.centerOrigin();
             this.draw();
         };
@@ -157,7 +152,6 @@ export class CanvasManager {
         this.stateManager.mouseDownPos = null;
         this.stateManager.capturedSnapPreview = null;
         this.stateManager.transitionState('idle');
-        this.interactionState.setMode(mode); // NEW: Mirror to new state (resets to idle automatically)
         this.canvas.style.cursor = 'crosshair';
         this.draw();
     }
@@ -167,7 +161,6 @@ export class CanvasManager {
      */
     setRayOpacity(opacity) {
         this.rayOpacity = opacity;
-        this.uiState.setRayOpacity(opacity); // NEW: Mirror to new state
         this.draw();
     }
 
@@ -176,7 +169,6 @@ export class CanvasManager {
      */
     setColorPalette(palette) {
         this.renderer.setPalette(palette);
-        this.uiState.setColorPalette(palette); // NEW: Mirror to new state
         this.draw();
     }
 
@@ -185,7 +177,6 @@ export class CanvasManager {
      */
     setHoveredPoints(pointIndices) {
         this.stateManager.setHoveredPoints(pointIndices);
-        this.uiState.setHoveredPointsFromUI(pointIndices); // NEW: Mirror to new state
         this.draw();
     }
 
@@ -194,7 +185,6 @@ export class CanvasManager {
      */
     clearHoveredPoints() {
         this.stateManager.clearHoveredPoints();
-        this.uiState.clearHoveredPointsFromUI(); // NEW: Mirror to new state
         this.draw();
     }
 

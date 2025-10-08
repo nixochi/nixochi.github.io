@@ -173,10 +173,8 @@ export class EventHandler {
                 // Update pan offset
                 const dx = screenX - this.stateManager.mouseDownPos.screenX;
                 const dy = screenY - this.stateManager.mouseDownPos.screenY;
-                this.transformManager.setPan(
-                    state.data.startOffsetX + dx,
-                    state.data.startOffsetY + dy
-                );
+                this.transformManager.offsetX = state.data.startOffsetX + dx;
+                this.transformManager.offsetY = state.data.startOffsetY + dy;
                 if (this.onDraw) this.onDraw();
                 break;
         }
@@ -560,7 +558,8 @@ export class EventHandler {
 
             // Apply combined transform
             this.transformManager.scale = newScale;
-            this.transformManager.setPan(newOffsetX + panDx, newOffsetY + panDy);
+            this.transformManager.offsetX = newOffsetX + panDx;
+            this.transformManager.offsetY = newOffsetY + panDy;
 
             if (this.onDraw) this.onDraw();
             return;

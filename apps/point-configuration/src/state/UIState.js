@@ -4,7 +4,7 @@
 export class UIState {
     constructor() {
         // Rendering settings
-        this.rayOpacity = 1.0; // 0.0 to 1.0, opacity of ray portions of lines
+        this.rayOpacity = 0.3; // 0.0 to 1.0, opacity of ray portions of lines
         this.colorPalette = 'monochromatic'; // 'monochromatic' | 'rainbow' | 'pastel'
 
         // Stats panel settings

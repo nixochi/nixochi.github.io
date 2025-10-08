@@ -2,7 +2,7 @@
 // Manages pan, zoom, and coordinate transformations
 
 export class TransformManager {
-    constructor(canvas, transformState = null) {
+    constructor(canvas) {
         this.canvas = canvas;
 
         // Pan state
@@ -13,9 +13,6 @@ export class TransformManager {
         this.scale = 1;
         this.minScale = 0.1;
         this.maxScale = 5;
-
-        // NEW: Reference to new TransformState (Phase 1 - mirroring)
-        this.transformState = transformState;
     }
 
     /**
@@ -24,11 +21,6 @@ export class TransformManager {
     centerOrigin() {
         this.offsetX = this.canvas.width / 2;
         this.offsetY = this.canvas.height / 2;
-
-        // NEW: Mirror to new TransformState
-        if (this.transformState) {
-            this.transformState.setPan(this.offsetX, this.offsetY);
-        }
     }
 
     /**
@@ -99,11 +91,6 @@ export class TransformManager {
         // Adjust offset so world position stays under same screen position
         this.offsetX = screenX - worldX * newScale;
         this.offsetY = screenY - worldY * newScale;
-
-        // NEW: Mirror to new TransformState
-        if (this.transformState) {
-            this.transformState.zoomAt(screenX, screenY, scaleFactor);
-        }
     }
 
     /**
@@ -116,18 +103,6 @@ export class TransformManager {
             top: -this.offsetY / this.scale,
             bottom: (this.canvas.height - this.offsetY) / this.scale
         };
-    }
-
-    /**
-     * Set pan offset (and mirror to TransformState)
-     */
-    setPan(offsetX, offsetY) {
-        this.offsetX = offsetX;
-        this.offsetY = offsetY;
-
-        if (this.transformState) {
-            this.transformState.setPan(offsetX, offsetY);
-        }
     }
 
     /**

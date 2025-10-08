@@ -7,7 +7,7 @@ import { HistoryManager } from './history-manager.js';
 import pako from 'https://esm.sh/pako@2.1.0';
 
 export class PointLineManager {
-    constructor(scale, configuration = null) {
+    constructor(scale) {
         // State
         this.points = []; // Array of {x, y, onLines: [], isIntersection: boolean, intersectionIndex: null}
         this.lines = []; // Array of {x, y, angle} - infinite lines through point with angle
@@ -23,8 +23,6 @@ export class PointLineManager {
 
         // Callback for state changes
         this.onStateChange = null;
-
-        this.configuration = configuration;
     }
 
     /**
@@ -89,10 +87,6 @@ export class PointLineManager {
 
         const newIndex = this.points.length - 1;
         const newPoint = this.points[newIndex];
-
-        if (this.configuration) {
-            this.configuration.addPoint(newPoint.x, newPoint.y, newPoint.onLines);
-        }
 
         // Record history
         this.history.recordAction(
@@ -163,10 +157,6 @@ export class PointLineManager {
         this.lines.push({ x: actualStartX, y: actualStartY, angle });
         const newLineIndex = this.lines.length - 1;
 
-        if (this.configuration) {
-            this.configuration.addLine(actualStartX, actualStartY, angle);
-        }
-
         // Collect all point indices to add to the line
         const allPointIndices = new Set();
         if (startPointIndices) {
@@ -194,10 +184,6 @@ export class PointLineManager {
             if (!point.onLines.includes(newLineIndex)) {
                 point.onLines.push(newLineIndex);
                 point.isIntersection = point.onLines.length > 1;
-
-                if (this.configuration) {
-                    this.configuration.updatePointLines(pointIndex, point.onLines);
-                }
             }
         });
 
@@ -245,10 +231,6 @@ export class PointLineManager {
 
         this.points.splice(index, 1);
 
-        if (this.configuration) {
-            this.configuration.removePoint(index);
-        }
-
         // No need to update point indices in onLines since we're not tracking point-to-point references
         // Just recompute intersections
         this.intersections = computeIntersections(this.lines, this.points);
@@ -272,10 +254,6 @@ export class PointLineManager {
 
         // Remove the line
         this.lines.splice(index, 1);
-
-        if (this.configuration) {
-            this.configuration.removeLine(index);
-        }
 
         // Update all points' onLines arrays
         for (const point of this.points) {

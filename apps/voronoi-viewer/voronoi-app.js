@@ -53,6 +53,15 @@ document.addEventListener('DOMContentLoaded', () => {
             controlsPanel.offsetHeight;
             controlsPanel.classList.add('expanded');
             optionsBtn.textContent = 'Close';
+
+            // Update resolution indicator position now that panel is visible
+            const activeResolution = document.querySelector('.resolution-switch-option.active');
+            if (activeResolution) {
+                // Use setTimeout to ensure the panel has fully rendered
+                setTimeout(() => {
+                    updateResolutionIndicator(activeResolution);
+                }, 50);
+            }
         } else {
             controlsPanel.classList.remove('expanded');
             setTimeout(() => {

@@ -220,26 +220,76 @@ class PolytopeViewer extends HTMLElement {
     }
     
     async loadDependencies() {
-        console.log('📦 Loading THREE.js dependencies...');
-        
-        // Load THREE.js
-        const threeMod = await this.importFirst([
-            'https://esm.sh/three@0.160.0',
-            'https://cdn.jsdelivr.net/npm/three@0.160.0/+esm'
+        console.log('📦 Loading THREE.js dependencies with tree-shaking...');
+
+        // Load only the THREE.js modules we need (tree-shaking enabled)
+        const [
+            { Scene },
+            { PerspectiveCamera },
+            { WebGLRenderer },
+            { Group },
+            { BufferGeometry },
+            { Float32BufferAttribute },
+            { MeshStandardMaterial },
+            { LineBasicMaterial },
+            { Color },
+            { DoubleSide },
+            { Mesh },
+            { Line },
+            { Box3 },
+            { Vector3 },
+            { AmbientLight },
+            { DirectionalLight }
+        ] = await Promise.all([
+            import('https://esm.sh/three@0.160.0/src/scenes/Scene.js'),
+            import('https://esm.sh/three@0.160.0/src/cameras/PerspectiveCamera.js'),
+            import('https://esm.sh/three@0.160.0/src/renderers/WebGLRenderer.js'),
+            import('https://esm.sh/three@0.160.0/src/objects/Group.js'),
+            import('https://esm.sh/three@0.160.0/src/core/BufferGeometry.js'),
+            import('https://esm.sh/three@0.160.0/src/core/BufferAttribute.js'),
+            import('https://esm.sh/three@0.160.0/src/materials/MeshStandardMaterial.js'),
+            import('https://esm.sh/three@0.160.0/src/materials/LineBasicMaterial.js'),
+            import('https://esm.sh/three@0.160.0/src/math/Color.js'),
+            import('https://esm.sh/three@0.160.0/src/constants.js'),
+            import('https://esm.sh/three@0.160.0/src/objects/Mesh.js'),
+            import('https://esm.sh/three@0.160.0/src/objects/Line.js'),
+            import('https://esm.sh/three@0.160.0/src/math/Box3.js'),
+            import('https://esm.sh/three@0.160.0/src/math/Vector3.js'),
+            import('https://esm.sh/three@0.160.0/src/lights/AmbientLight.js'),
+            import('https://esm.sh/three@0.160.0/src/lights/DirectionalLight.js')
         ]);
-        this.THREE = threeMod;
-        
+
+        // Create a minimal THREE namespace with only what we need
+        this.THREE = {
+            Scene,
+            PerspectiveCamera,
+            WebGLRenderer,
+            Group,
+            BufferGeometry,
+            Float32BufferAttribute,
+            MeshStandardMaterial,
+            LineBasicMaterial,
+            Color,
+            DoubleSide,
+            Mesh,
+            Line,
+            Box3,
+            Vector3,
+            AmbientLight,
+            DirectionalLight
+        };
+
         // Load OrbitControls
         const orbitMod = await this.importFirst([
             'https://esm.sh/three@0.160.0/examples/jsm/controls/OrbitControls.js',
             'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js'
         ]);
         this.OrbitControls = orbitMod.OrbitControls;
-        
+
         // Load QuickHull
         this._qh = await this.loadQuickHull();
-        
-        console.log('✅ Dependencies loaded successfully');
+
+        console.log('✅ Dependencies loaded successfully with tree-shaking');
     }
     
     async loadQuickHull() {
@@ -325,21 +375,19 @@ class PolytopeViewer extends HTMLElement {
             const { width, height } = this.getBoundingClientRect();
             if (!width || !height) return;
 
-            // Calculate largest square that fits in the screen
-            const squareSize = Math.min(width, height);
-
-            this.renderer.setSize(squareSize, squareSize, false);
-            this.camera.aspect = 1.0; // Square aspect ratio
+            // Use full screen dimensions
+            this.renderer.setSize(width, height, false);
+            this.camera.aspect = width / height;
             this.camera.updateProjectionMatrix();
 
-            // Center the canvas
+            // Make canvas fill the entire screen
             const canvas = this.querySelector('#polytopeCanvas');
             if (canvas) {
-                canvas.style.width = `${squareSize}px`;
-                canvas.style.height = `${squareSize}px`;
+                canvas.style.width = `${width}px`;
+                canvas.style.height = `${height}px`;
             }
 
-            console.log(`📐 PolytopeViewer resized to square: ${squareSize}x${squareSize} (container: ${width}x${height})`);
+            console.log(`📐 PolytopeViewer resized to: ${width}x${height}`);
         };
 
         handleResize();
@@ -617,10 +665,15 @@ class PolytopeViewer extends HTMLElement {
 
         if (maxRadius === 0) maxRadius = 1;
 
-        // Calculate camera distance for a square viewport (aspect ratio 1.0)
-        // The polytope sphere of radius maxRadius should fit snugly in the viewport
+        // Calculate camera distance based on FOV and aspect ratio
+        // Account for both horizontal and vertical FOV to ensure polytope fits
         const fov = this.camera.fov * (Math.PI / 180);
-        const distance = (maxRadius / Math.tan(fov / 2)) * 1.2;
+        const aspect = this.camera.aspect;
+
+        // Use the smaller dimension to ensure the polytope fits in the viewport
+        const verticalDistance = maxRadius / Math.tan(fov / 2);
+        const horizontalDistance = maxRadius / (Math.tan(fov / 2) * aspect);
+        const distance = Math.max(verticalDistance, horizontalDistance) * 1.2;
 
         // Position camera at this distance
         const direction = new this.THREE.Vector3(1, 1, 1).normalize();
@@ -630,7 +683,7 @@ class PolytopeViewer extends HTMLElement {
         this.camera.far = distance * 1000;
         this.camera.updateProjectionMatrix();
 
-        console.log(`📷 Camera positioned at distance ${distance.toFixed(2)} for radius ${maxRadius.toFixed(2)}`);
+        console.log(`📷 Camera positioned at distance ${distance.toFixed(2)} for radius ${maxRadius.toFixed(2)} (aspect: ${aspect.toFixed(2)})`);
     }
     
     getFacesFromVertices(vertices, options = {}) {

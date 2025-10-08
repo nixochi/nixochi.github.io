@@ -97,15 +97,16 @@ class GaussianPeriodsViewer extends HTMLElement {
                     bottom: 8px;
                     right: 8px;
                     font-family: monospace;
-                    font-size: 12px;
+                    font-size: 10px;
                     background: rgba(0, 0, 0, 0.85);
                     color: #00ff00;
-                    padding: 8px 12px;
+                    padding: 6px 8px;
                     border-radius: 4px;
                     pointer-events: none;
                     z-index: 10000;
                     white-space: pre-wrap;
-                    max-width: 400px;
+                    max-width: 250px;
+                    line-height: 1.3;
                 ">Initializing...</div>
             </div>
         `;

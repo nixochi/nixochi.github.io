@@ -62,6 +62,23 @@ export class PointLineMatroid {
         const p2 = this.points[j];
         return Math.abs(p1.x - p2.x) < 0.01 && Math.abs(p1.y - p2.y) < 0.01;
     }
+
+    /**
+     * Check if a set of points are all on the same position
+     * @param {Array} pointIndices - Array of point indicies
+     * @returns {boolean} True if all the points are at the same place.
+     */
+    areAllAtSamePosition(pointIndices){
+        if (pointIndices.length <= 1){
+            return true;
+        }
+        for(let i = 0; i < pointIndices.length - 1; i++){
+            if (!this._areAtSamePosition(pointIndices[i],pointIndices[i+1])){
+                return false;
+            }
+        }
+        return true;
+    }
     
     /**
      * Check if a set of points are all collinear (lie on a single line)
@@ -116,24 +133,20 @@ export class PointLineMatroid {
      */
     rankOfSubset(pointIndices) {
         if (pointIndices.length === 0) return 0;
-        if (pointIndices.length === 1) return 1;
 
-        // Check for multipoints in pairs
-        if (pointIndices.length === 2) {
-            if (this._areAtSamePosition(pointIndices[0], pointIndices[1])) {
-                return 1; // Two points at same position have rank 1
-            }
-            return 2; // Two distinct points have rank 2
-        }
+        // Count distinct positions in the subset
+        const positions = new Set();
+        pointIndices.forEach(i => {
+            const point = this.points[i];
+            const key = `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+            positions.add(key);
+        });
 
-        // For 3+ points: check multipoints first
-        for (let i = 0; i < pointIndices.length; i++) {
-            for (let j = i + 1; j < pointIndices.length; j++) {
-                if (this._areAtSamePosition(pointIndices[i], pointIndices[j])) {
-                    return 1; // Any multipoint means rank 1
-                }
-            }
-        }
+        const numPositions = positions.size;
+
+        if (numPositions === 0) return 0;
+        if (numPositions === 1) return 1;
+        if (numPositions === 2) return 2;
 
         // If all points are collinear, rank is 2
         if (this.areCollinear(pointIndices)) {
@@ -149,17 +162,7 @@ export class PointLineMatroid {
      * @returns {number} The rank
      */
     _computeRank() {
-        if (this.groundSet.length === 0) return 0;
-        if (this.groundSet.length === 1) return 1;
-        if (this.groundSet.length === 2) return 2;
-        
-        // Check if all points are collinear
-        if (this.areCollinear(this.groundSet)) {
-            return 2;
-        }
-        
-        // In 2D, max rank is 3
-        return 3;
+        return this.rankOfSubset(this.groundSet);
     }
     
     /**

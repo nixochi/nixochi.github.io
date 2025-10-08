@@ -17,8 +17,6 @@ export class PointLineManager {
         this.pointRadius = 'ontouchstart' in window || navigator.maxTouchPoints > 0 ? 14 : 9;
         this.hitRadius = 'ontouchstart' in window || navigator.maxTouchPoints > 0 ? 24 : 18; // Larger touch target
         this.scale = scale;
-
-        // History manager
         this.history = new HistoryManager(this);
 
         // Callback for state changes

@@ -1,10 +1,13 @@
 // debug-menu.js
 // Debug UI for manually adding points and lines
 
+import { getPointPosition } from '../geometry/geometry-utils.js';
+
 export class DebugMenu {
-    constructor(canvasManager) {
-        this.canvasManager = canvasManager;
-        this.pointLineManager = canvasManager.pointLineManager;
+    constructor(app) {
+        this.app = app;
+        this.geometryController = app.geometryController;
+        this.geometryModel = app.geometryModel;
 
         // UI elements
         this.panel = null;
@@ -42,12 +45,8 @@ export class DebugMenu {
         const clearAllBtn = document.getElementById('debugClearAllBtn');
         clearAllBtn.addEventListener('click', () => this.clearAll());
 
-        // Listen for state changes to update lists
-        const originalCallback = this.pointLineManager.onStateChange;
-        this.pointLineManager.onStateChange = () => {
-            if (originalCallback) originalCallback();
-            this.updateLists();
-        };
+        // Listen for geometry changes to update lists
+        this.geometryModel.subscribe(() => this.updateLists());
 
         // Initial update
         this.updateLists();
@@ -93,11 +92,11 @@ export class DebugMenu {
         if (linesStr) {
             onLines = linesStr.split(',')
                 .map(s => parseInt(s.trim()))
-                .filter(n => !isNaN(n) && n >= 0 && n < this.pointLineManager.lines.length);
+                .filter(n => !isNaN(n) && n >= 0 && n < this.geometryModel.lines.length);
         }
 
-        // Add the point
-        this.pointLineManager.addPoint(x, y, onLines, onLines.length >= 2, null);
+        // Add the point via controller
+        this.geometryController.addPoint(x, y, onLines, onLines.length >= 2, null);
 
         // Clear inputs
         xInput.value = '';
@@ -119,7 +118,7 @@ export class DebugMenu {
         // Parse point indices
         const pointIndices = pointsStr.split(',')
             .map(s => parseInt(s.trim()))
-            .filter(n => !isNaN(n) && n >= 0 && n < this.pointLineManager.points.length);
+            .filter(n => !isNaN(n) && n >= 0 && n < this.geometryModel.points.length);
 
         if (pointIndices.length < 2) {
             alert('Need at least 2 valid point indices to create a line');
@@ -127,14 +126,14 @@ export class DebugMenu {
         }
 
         // Get positions of the points
-        const p1 = this.pointLineManager.points[pointIndices[0]];
-        const p2 = this.pointLineManager.points[pointIndices[1]];
+        const p1 = this.geometryModel.points[pointIndices[0]];
+        const p2 = this.geometryModel.points[pointIndices[1]];
 
-        const pos1 = this.getPointPosition(p1);
-        const pos2 = this.getPointPosition(p2);
+        const pos1 = getPointPosition(p1, this.geometryModel.intersections);
+        const pos2 = getPointPosition(p2, this.geometryModel.intersections);
 
-        // Add the line
-        this.pointLineManager.addLine(
+        // Add the line via controller
+        this.geometryController.addLine(
             pos1.x, pos1.y,
             pos2.x, pos2.y,
             [pointIndices[0]], // startPointIndices
@@ -147,14 +146,6 @@ export class DebugMenu {
         console.log(`Added line through points [${pointIndices.join(', ')}]`);
     }
 
-    getPointPosition(point) {
-        if (point.isIntersection && point.intersectionIndex !== null) {
-            const intersection = this.pointLineManager.intersections[point.intersectionIndex];
-            return { x: intersection.x, y: intersection.y };
-        }
-        return { x: point.x, y: point.y };
-    }
-
     updateLists() {
         this.updatePointsList();
         this.updateLinesList();
@@ -163,13 +154,13 @@ export class DebugMenu {
     updatePointsList() {
         const listEl = document.getElementById('debugPointsList');
 
-        if (this.pointLineManager.points.length === 0) {
+        if (this.geometryModel.points.length === 0) {
             listEl.innerHTML = '<div style="text-align: center; padding: 12px;">no points yet</div>';
             return;
         }
 
-        const html = this.pointLineManager.points.map((point, idx) => {
-            const pos = this.getPointPosition(point);
+        const html = this.geometryModel.points.map((point, idx) => {
+            const pos = getPointPosition(point, this.geometryModel.intersections);
             const linesStr = point.onLines.length > 0 ? `[${point.onLines.join(', ')}]` : '[]';
             return `<div style="padding: 4px 8px; border-bottom: 1px solid var(--border);">
                 <strong>Point ${idx}:</strong> (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}) on lines ${linesStr}
@@ -182,15 +173,15 @@ export class DebugMenu {
     updateLinesList() {
         const listEl = document.getElementById('debugLinesList');
 
-        if (this.pointLineManager.lines.length === 0) {
+        if (this.geometryModel.lines.length === 0) {
             listEl.innerHTML = '<div style="text-align: center; padding: 12px;">no lines yet</div>';
             return;
         }
 
-        const html = this.pointLineManager.lines.map((line, lineIdx) => {
+        const html = this.geometryModel.lines.map((line, lineIdx) => {
             // Find all points on this line
             const pointsOnLine = [];
-            this.pointLineManager.points.forEach((point, pointIdx) => {
+            this.geometryModel.points.forEach((point, pointIdx) => {
                 if (point.onLines.includes(lineIdx)) {
                     pointsOnLine.push(pointIdx);
                 }
@@ -218,8 +209,8 @@ export class DebugMenu {
 
         const config = {
             name: displayName,
-            points: this.pointLineManager.points.map(p => {
-                const pos = this.getPointPosition(p);
+            points: this.geometryModel.points.map(p => {
+                const pos = getPointPosition(p, this.geometryModel.intersections);
                 return [
                     Math.round(pos.x * 10) / 10,
                     Math.round(pos.y * 10) / 10,
@@ -228,12 +219,16 @@ export class DebugMenu {
             })
         };
 
-        // Format as a proper entry for examples.json
-        const entry = {
-            [key]: config
-        };
-
-        const json = JSON.stringify(entry, null, 2);
+        // Format as a proper entry for examples.json with compact point arrays
+        const pointsStr = config.points.map(p => `      ${JSON.stringify(p)}`).join(',\n');
+        const json = `{
+  "${key}": {
+    "name": "${displayName}",
+    "points": [
+${pointsStr}
+    ]
+  }
+}`;
 
         // Copy to clipboard
         navigator.clipboard.writeText(json).then(() => {
@@ -241,7 +236,6 @@ export class DebugMenu {
             console.log('Exported configuration:', json);
         }).catch(err => {
             console.error('Failed to copy to clipboard:', err);
-            // Fallback: show in console
             console.log('Configuration (copy manually):', json);
             alert('Failed to copy. Check console for configuration.');
         });
@@ -252,16 +246,7 @@ export class DebugMenu {
             return;
         }
 
-        this.pointLineManager.points = [];
-        this.pointLineManager.lines = [];
-        this.pointLineManager.intersections = [];
-
-        if (this.pointLineManager.onStateChange) {
-            this.pointLineManager.onStateChange();
-        }
-
-        this.canvasManager.draw();
-
+        this.geometryController.clearAll();
         console.log('Cleared all points and lines');
     }
 }

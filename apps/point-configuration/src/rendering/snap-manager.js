@@ -148,9 +148,10 @@ export class SnapManager {
      * @param {Object} viewportBounds - Viewport bounds in world coordinates
      * @param {number} scale - Current zoom scale
      * @param {number} screenPerpendicularThreshold - Perpendicular distance threshold in screen space (default 20)
+     * @param {Array} excludePointIndices - Point indices to exclude from snapping (e.g., starting point)
      * @returns {Object|null} Snap result with snapTarget and allIntersections or null
      */
-    findLineEndpointSnap(startX, startY, endX, endY, points, intersections, viewportBounds, scale, screenPerpendicularThreshold = 20) {
+    findLineEndpointSnap(startX, startY, endX, endY, points, intersections, viewportBounds, scale, screenPerpendicularThreshold = 20, excludePointIndices = []) {
         const candidates = [];
 
         // Convert screen-space threshold to world-space
@@ -190,6 +191,11 @@ export class SnapManager {
             const point = points[i];
             const pos = getPointPosition(point, intersections);
 
+            // Skip excluded points (e.g., starting point)
+            if (excludePointIndices.includes(i)) {
+                continue;
+            }
+
             // Check if in viewport
             if (pos.x < viewportBounds.left || pos.x > viewportBounds.right ||
                 pos.y < viewportBounds.top || pos.y > viewportBounds.bottom) {
@@ -206,7 +212,11 @@ export class SnapManager {
 
             if (perpDistance <= worldPerpendicularThreshold) {
                 // Find all points at this location (multipoint)
-                const pointIndices = this.getPointsAtPosition(pos.x, pos.y, points, intersections, scale);
+                const pointIndices = this.getPointsAtPosition(pos.x, pos.y, points, intersections, scale)
+                    .filter(idx => !excludePointIndices.includes(idx)); // Exclude starting points
+
+                // Skip if all points at this location are excluded
+                if (pointIndices.length === 0) continue;
 
                 // Calculate distance to cursor (for sorting)
                 const distToCursor = Math.hypot(pos.x - endX, pos.y - endY);
@@ -239,6 +249,15 @@ export class SnapManager {
             const perpDistance = getPerpendicularDistance(intersection.x, intersection.y);
 
             if (perpDistance <= worldPerpendicularThreshold) {
+                // Check if there are points at this intersection and if they're all excluded
+                const pointsAtIntersection = this.getPointsAtPosition(intersection.x, intersection.y, points, intersections, scale);
+                const nonExcludedPoints = pointsAtIntersection.filter(idx => !excludePointIndices.includes(idx));
+
+                // Skip if all points at this intersection are excluded
+                if (pointsAtIntersection.length > 0 && nonExcludedPoints.length === 0) {
+                    continue;
+                }
+
                 // Calculate distance to cursor (for sorting)
                 const distToCursor = Math.hypot(intersection.x - endX, intersection.y - endY);
 

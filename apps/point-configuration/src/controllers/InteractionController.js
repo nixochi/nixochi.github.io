@@ -1,7 +1,7 @@
 // interaction-controller.js
 // Controller for user interactions (mouse, touch, gestures)
 
-import { getPointPosition, findIntersectionByLines } from '../geometry/geometry-utils.js';
+import { findIntersectionByLines } from '../geometry/geometry-utils.js';
 
 export class InteractionController {
     constructor(geometryController, viewportController, snapManager) {
@@ -166,7 +166,7 @@ export class InteractionController {
                 break;
 
             case 'dragging-new-point':
-                result = this._finalizeDragNewPoint(isClick, worldX, worldY);
+                result = this._finalizeDragNewPoint(isClick);
                 break;
 
             case 'panning':
@@ -437,7 +437,6 @@ export class InteractionController {
             const points = this.geometryController.geometryModel.points;
             const lines = this.geometryController.geometryModel.lines;
             const intersections = this.geometryController.geometryModel.intersections;
-            const scale = this.viewportController.getScale();
             const visuals = this.computeVisualState(points, lines, intersections);
 
             let endX = worldX;
@@ -483,10 +482,11 @@ export class InteractionController {
         const point = this.geometryController.geometryModel.points[state.pointIndex];
 
         if (isClick) {
-            // Restore original position
+            // Restore original position (if it was moved)
             point.x = state.originalX;
             point.y = state.originalY;
         } else {
+            // Dragged - apply the new position
             // Capture old state
             const oldState = {
                 x: state.originalX,
@@ -514,7 +514,25 @@ export class InteractionController {
 
             if (visuals.ghostPoint) {
                 // Apply ghost position
-                const newState = this._applySnapToPoint(point, visuals.snapPreview, intersections);
+                if (visuals.snapPreview) {
+                    // Snap to line/intersection/point
+                    this._applySnapToPoint(point, visuals.snapPreview, intersections);
+                } else {
+                    // No snap - move to ghost position
+                    point.x = visuals.ghostPoint.x;
+                    point.y = visuals.ghostPoint.y;
+                    point.onLines = [];
+                    point.isIntersection = false;
+                    point.intersectionIndex = null;
+                }
+
+                const newState = {
+                    x: point.x,
+                    y: point.y,
+                    onLines: [...point.onLines],
+                    isIntersection: point.isIntersection,
+                    intersectionIndex: point.intersectionIndex
+                };
 
                 // Check if at multipoint now
                 const newPositionPoints = this.geometryController.getPointsAtPosition(
@@ -542,7 +560,7 @@ export class InteractionController {
         return { needsRedraw: true, cursor: 'crosshair' };
     }
 
-    _finalizeDragNewPoint(isClick, worldX, worldY) {
+    _finalizeDragNewPoint(isClick) {
         const state = this.interactionState.data;
         const scale = this.viewportController.getScale();
 
@@ -643,8 +661,8 @@ export class InteractionController {
 
     _computeDragPointVisuals(state, points, lines, intersections, scale, visuals) {
         const draggedPoint = points[state.data.pointIndex];
-        const tempX = draggedPoint.x;
-        const tempY = draggedPoint.y;
+
+        // Ensure point stays at original position during drag
         draggedPoint.x = state.data.originalX;
         draggedPoint.y = state.data.originalY;
 
@@ -673,9 +691,6 @@ export class InteractionController {
                 };
             }
         }
-
-        draggedPoint.x = tempX;
-        draggedPoint.y = tempY;
     }
 
     _computeDrawLineVisuals(state, points, intersections, scale, visuals) {
@@ -697,7 +712,9 @@ export class InteractionController {
                 points,
                 intersections,
                 this.viewportController.getViewportBounds(),
-                scale
+                scale,
+                20, // screenPerpendicularThreshold
+                state.data.startPointIndices || [] // Exclude starting points from snapping
             );
 
             if (snapResult) {

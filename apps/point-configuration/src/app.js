@@ -10,14 +10,13 @@ import { GeometryController } from './controllers/GeometryController.js';
 import { ViewportController } from './controllers/ViewportController.js';
 import { InteractionController } from './controllers/InteractionController.js';
 import { UIController } from './controllers/UIController.js';
+import { SerializationController } from './controllers/SerializationController.js';
 
 import { CanvasView } from './views/CanvasView.js';
 import { StatsView } from './views/StatsView.js';
 
 import { SnapManager } from './rendering/snap-manager.js';
 import { DebugMenu } from './ui/debug-menu.js';
-
-import pako from 'https://esm.sh/pako@2.1.0';
 
 // ============================================================================
 // Phase 2: MVC Architecture
@@ -35,7 +34,8 @@ class Application {
         // Initialize Controllers
         this.geometryController = new GeometryController(this.geometryModel, this.historyModel);
         this.viewportController = new ViewportController(this.viewportModel);
-        
+        this.serializationController = new SerializationController(this.geometryModel, this.historyModel);
+
         this.snapManager = new SnapManager(15, 20);
         this.interactionController = new InteractionController(
             this.geometryController,
@@ -70,9 +70,8 @@ class Application {
             }
         );
 
-        // Legacy adapter for debug menu
-        this.canvasManager = this._createLegacyAdapter();
-        this.debugMenu = new DebugMenu(this.canvasManager);
+        // Debug menu
+        this.debugMenu = new DebugMenu(this);
 
         // Load initial state
         this.loadStateFromURL();
@@ -673,7 +672,7 @@ class Application {
     loadStateFromURL() {
         const hash = window.location.hash.slice(1);
         if (hash) {
-            const loaded = this.deserializeState(hash);
+            const loaded = this.serializationController.deserialize(hash);
             if (loaded) {
                 this.viewportController.centerOrigin();
                 console.log('✅ Loaded configuration from URL');
@@ -686,137 +685,20 @@ class Application {
     updateURL() {
         clearTimeout(this._urlUpdateTimeout);
         this._urlUpdateTimeout = setTimeout(() => {
-            const encoded = this.serializeState();
+            const encoded = this.serializationController.serialize();
             const newURL = `${window.location.pathname}#${encoded}`;
             window.history.replaceState(null, '', newURL);
         }, 500);
     }
 
-    serializeState() {
-        const precision = 1;
-        const factor = Math.pow(10, precision);
-
-        const state = {
-            p: this.geometryModel.points.map(p => [
-                Math.round(p.x * factor) / factor,
-                Math.round(p.y * factor) / factor,
-                p.onLines
-            ]),
-            l: this.geometryModel.lines.map(l => [
-                Math.round(l.x * factor) / factor,
-                Math.round(l.y * factor) / factor,
-                Math.round(l.angle * 10000) / 10000
-            ])
-        };
-
-        const jsonStr = JSON.stringify(state);
-        const compressed = pako.deflate(jsonStr, { level: 9 });
-        const base64 = btoa(String.fromCharCode.apply(null, compressed))
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=+$/, '');
-
-        console.log(`Serialized state: ${jsonStr.length} chars → ${base64.length} chars`);
-        return base64;
-    }
-
-    deserializeState(encoded) {
-        if (!encoded) return false;
-
-        try {
-            let base64 = encoded
-                .replace(/-/g, '+')
-                .replace(/_/g, '/');
-
-            while (base64.length % 4) {
-                base64 += '=';
-            }
-
-            let jsonStr;
-            try {
-                const binaryString = atob(base64);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                const decompressed = pako.inflate(bytes, { to: 'string' });
-                jsonStr = decompressed;
-            } catch (e) {
-                jsonStr = atob(base64);
-            }
-
-            const state = JSON.parse(jsonStr);
-
-            this.geometryModel.points = state.p.map(([x, y, onLines]) => ({
-                x,
-                y,
-                onLines,
-                isIntersection: onLines.length > 1,
-                intersectionIndex: null
-            }));
-
-            this.geometryModel.lines = state.l.map(([x, y, angle]) => ({
-                x,
-                y,
-                angle
-            }));
-
-            this.geometryModel.recomputeIntersections();
-            this.historyModel.clear();
-
-            console.log(`✅ Loaded: ${this.geometryModel.points.length} points, ${this.geometryModel.lines.length} lines`);
-            return true;
-        } catch (e) {
-            console.error('Failed to deserialize state:', e);
-            return false;
-        }
-    }
-
     async loadConfiguration(configName) {
-        try {
-            const response = await fetch('src/examples/examples.json');
-            if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
-
-            const examples = await response.json();
-            const config = examples[configName];
-            if (!config) throw new Error(`Configuration '${configName}' not found`);
-
-            this.geometryModel.points = config.points.map(([x, y, onLines]) => ({
-                x,
-                y,
-                onLines,
-                isIntersection: onLines.length > 1,
-                intersectionIndex: null
-            }));
-
-            const linePoints = new Map();
-            this.geometryModel.points.forEach((point, idx) => {
-                point.onLines.forEach(lineIdx => {
-                    if (!linePoints.has(lineIdx)) linePoints.set(lineIdx, []);
-                    linePoints.get(lineIdx).push(idx);
-                });
-            });
-
-            this.geometryModel.lines = [];
-            linePoints.forEach((pointIndices, lineIdx) => {
-                if (pointIndices.length < 2) throw new Error(`Line ${lineIdx} has < 2 points`);
-                const p1 = this.geometryModel.points[pointIndices[0]];
-                const p2 = this.geometryModel.points[pointIndices[1]];
-                const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-                this.geometryModel.lines[lineIdx] = { x: p1.x, y: p1.y, angle };
-            });
-
-            this.geometryModel.recomputeIntersections();
-            this.historyModel.clear();
-            this.geometryModel.notify();
-
-            console.log(`✅ Loaded ${config.name}`);
+        const success = await this.serializationController.loadConfiguration(configName);
+        if (success) {
+            this.viewportController.centerOrigin();
+            this.updateURL();
             this.renderStats();
-            return true;
-        } catch (e) {
-            console.error('Failed to load configuration:', e);
-            return false;
         }
+        return success;
     }
 
     exportImage() {
@@ -871,36 +753,6 @@ class Application {
         const examplesModal = document.getElementById('examplesModal');
         examplesModal.classList.remove('active');
         document.body.classList.remove('modal-open');
-    }
-
-    // ========================================================================
-    // Legacy Adapter (for DebugMenu compatibility)
-    // ========================================================================
-
-    _createLegacyAdapter() {
-        return {
-            pointLineManager: {
-                points: this.geometryModel.points,
-                lines: this.geometryModel.lines,
-                intersections: this.geometryModel.intersections,
-                history: this.historyModel,
-                onStateChange: () => {
-                    this.geometryModel.notify();
-                    this.renderStats();
-                    this.updateURL();
-                },
-                addPoint: (x, y, onLines, isIntersection, intersectionIndex) => {
-                    return this.geometryController.addPoint(x, y, onLines, isIntersection, intersectionIndex);
-                },
-                addLine: (startX, startY, endX, endY, startPointIndices, endPointIndices) => {
-                    return this.geometryController.addLine(startX, startY, endX, endY, startPointIndices, endPointIndices);
-                }
-            },
-            draw: () => this.render(),
-            getMatroidStats: () => this.matroidModel.getStats(),
-            canUndo: () => this.historyModel.canUndo(),
-            canRedo: () => this.historyModel.canRedo()
-        };
     }
 }
 

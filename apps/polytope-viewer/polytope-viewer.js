@@ -387,6 +387,11 @@ class PolytopeViewer extends HTMLElement {
                 canvas.style.height = `${height}px`;
             }
 
+            // Re-frame the polytope when aspect ratio changes
+            if (this.polytopeGroup) {
+                this.frameToFit();
+            }
+
             console.log(`📐 PolytopeViewer resized to: ${width}x${height}`);
         };
 
@@ -675,12 +680,12 @@ class PolytopeViewer extends HTMLElement {
         const horizontalDistance = maxRadius / (Math.tan(fov / 2) * aspect);
 
         // Use the maximum to ensure it fits in both dimensions
-        // Add extra padding (1.5x) to ensure polytope fits comfortably, especially on mobile
+        // Add extra padding (1.5x) to ensure polytope fits comfortably
         const baseDistance = Math.max(verticalDistance, horizontalDistance);
 
-        // For mobile/portrait mode (aspect < 1), use even more padding
-        // Mobile uses 2.34 (30% more distance than before) to make polytopes appear 30% smaller
-        const paddingMultiplier = aspect < 1 ? 2.34 : 1.5;
+        // For mobile/portrait mode (aspect < 1), make polytopes fit snugly then 15% smaller
+        // 1.725 = 1.5 (snug fit) × 1.15 (15% smaller)
+        const paddingMultiplier = aspect < 1 ? 1.725 : 1.5;
         const distance = baseDistance * paddingMultiplier;
 
         // Position camera at this distance

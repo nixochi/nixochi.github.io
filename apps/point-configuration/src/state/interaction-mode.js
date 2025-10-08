@@ -1,15 +1,13 @@
-// state-manager.js
+// interaction-mode.js
 // Manages interaction state machine and visual state derivation
 
-export class StateManager {
+export class InteractionMode {
     constructor() {
-        // State machine - replaces all boolean flags
         this.interactionState = {
             type: 'idle', // 'idle' | 'dragging-point' | 'drawing-line' | 'panning' | 'placing-point' | 'dragging-new-point' | 'two-finger-gesture'
             data: null
         };
 
-        // Mouse tracking for visual derivation
         this.currentMousePos = null; // {worldX, worldY, screenX, screenY}
         this.mouseDownPos = null; // {worldX, worldY, screenX, screenY, time}
         this.capturedSnapPreview = null; // Snap preview captured on mousedown for point placement

@@ -1,9 +1,9 @@
-// history-manager.js
+// history.js
 // Manages undo/redo history using incremental action storage
 
 import { computeIntersections, findIntersectionByLines } from '../geometry/geometry-utils.js';
 
-export class HistoryManager {
+export class History {
     constructor(pointLineManager) {
         this.pointLineManager = pointLineManager;
         this.actions = [];
@@ -160,14 +160,7 @@ export class HistoryManager {
             return;
         }
 
-        // Temporarily disable state change callback to avoid double-triggering
-        const originalCallback = this.pointLineManager.onStateChange;
-        this.pointLineManager.onStateChange = null;
-
         this.pointLineManager.removePoint(action.index);
-
-        // Restore callback
-        this.pointLineManager.onStateChange = originalCallback;
     }
 
     _undoAddLine(action) {
@@ -176,10 +169,6 @@ export class HistoryManager {
             console.error('Cannot undo addLine: line index mismatch');
             return;
         }
-
-        // Temporarily disable state change callback to avoid double-triggering
-        const originalCallback = this.pointLineManager.onStateChange;
-        this.pointLineManager.onStateChange = null;
 
         // Restore affected points to their old state BEFORE removing the line
         for (const change of action.affectedPoints) {
@@ -191,9 +180,6 @@ export class HistoryManager {
 
         // Now remove the line
         this.pointLineManager.removeLine(action.index);
-
-        // Restore callback
-        this.pointLineManager.onStateChange = originalCallback;
     }
 
     _undoMovePoint(action) {

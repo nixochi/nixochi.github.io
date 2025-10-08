@@ -4,9 +4,9 @@
 import { getPointPosition } from '../geometry/geometry-utils.js';
 import { SnapManager } from '../rendering/snap-manager.js';
 import { Renderer } from '../rendering/renderer.js';
-import { StateManager } from './state-manager.js';
+import { InteractionMode } from '../state/interaction-mode.js';
 import { TransformManager } from './transform-manager.js';
-import { PointLineManager } from '../state/configuration.js';
+import { Configuration } from '../state/configuration.js';
 import { EventHandler } from './event-handler.js';
 
 export class CanvasManager {
@@ -25,9 +25,9 @@ export class CanvasManager {
         this.rayOpacity = 1.0; // Default opacity for rays
 
         // Initialize managers
-        this.stateManager = new StateManager();
+        this.stateManager = new InteractionMode();
         this.transformManager = new TransformManager(canvas);
-        this.pointLineManager = new PointLineManager(this.transformManager.scale);
+        this.pointLineManager = new Configuration(this.transformManager.scale);
         this.snapManager = new SnapManager(15, 20); // intersectionSnapThreshold, lineSnapThreshold
         this.renderer = new Renderer(canvas, this.ctx);
 

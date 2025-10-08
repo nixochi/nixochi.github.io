@@ -3,10 +3,10 @@
 
 import { getPointPosition, findIntersectionByLines, computeIntersections } from '../geometry/geometry-utils.js';
 import { PointLineMatroid } from './matroid.js';
-import { HistoryManager } from '../core/history-manager.js';
+import { History } from './history.js';
 import pako from 'https://esm.sh/pako@2.1.0';
 
-export class PointLineManager {
+export class Configuration {
     constructor(scale) {
         // State
         this.points = []; // Array of {x, y, onLines: [], isIntersection: boolean, intersectionIndex: null}
@@ -17,7 +17,7 @@ export class PointLineManager {
         this.pointRadius = 'ontouchstart' in window || navigator.maxTouchPoints > 0 ? 14 : 9;
         this.hitRadius = 'ontouchstart' in window || navigator.maxTouchPoints > 0 ? 24 : 18; // Larger touch target
         this.scale = scale;
-        this.history = new HistoryManager(this);
+        this.history = new History(this);
 
         // Callback for state changes
         this.onStateChange = null;

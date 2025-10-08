@@ -6,7 +6,7 @@ import { SnapManager } from '../rendering/snap-manager.js';
 import { Renderer } from '../rendering/renderer.js';
 import { StateManager } from './state-manager.js';
 import { TransformManager } from './transform-manager.js';
-import { PointLineManager } from './configuration.js';
+import { PointLineManager } from '../state/configuration.js';
 import { EventHandler } from './event-handler.js';
 
 export class CanvasManager {

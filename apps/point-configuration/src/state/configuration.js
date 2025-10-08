@@ -2,8 +2,8 @@
 // Manages points, lines, and intersection data
 
 import { getPointPosition, findIntersectionByLines, computeIntersections } from '../geometry/geometry-utils.js';
-import { PointLineMatroid } from '../math/matroid.js';
-import { HistoryManager } from './history-manager.js';
+import { PointLineMatroid } from './matroid.js';
+import { HistoryManager } from '../core/history-manager.js';
 import pako from 'https://esm.sh/pako@2.1.0';
 
 export class PointLineManager {

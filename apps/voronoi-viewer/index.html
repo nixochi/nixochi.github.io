@@ -6,7 +6,470 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Voronoi Diagram Viewer</title>
-    <link rel="stylesheet" href="voronoi-styles.css?v=1.2.0">
+    <style>
+/* CSS Variables for theming */
+:root {
+    --bg-primary: #fafafa;
+    --bg-secondary: #ffffff;
+    --fg-primary: #161616;
+    --fg-secondary: #5e5e5e;
+    --border: #e7e7e7;
+    --shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
+    --backdrop-blur: rgba(255, 255, 255, 0.9);
+    --radius: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #161617;
+        --bg-secondary: #1c1c1e;
+        --fg-primary: #f3f3f3;
+        --fg-secondary: #b9b9b9;
+        --border: #222224;
+        --shadow: rgba(0,0,0,0.5);
+        --backdrop-blur: rgba(28, 28, 30, 0.9);
+    }
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    height: 100vh;
+    height: -webkit-fill-available;
+    height: 100svh;
+    overflow: hidden;
+    touch-action: none;
+    -ms-touch-action: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+body {
+    visibility: visible;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-primary);
+    color: var(--fg-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+voronoi-viewer {
+    width: 100vw;
+    width: -webkit-fill-available;
+    width: 100svw;
+    height: 100vh;
+    height: -webkit-fill-available;
+    height: 100svh;
+    display: block;
+    position: relative;
+}
+
+/* Options button - Top Left */
+.options-button {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 6px 12px;
+    z-index: 1001;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    min-width: 80px;
+    text-align: center;
+}
+
+.options-button:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+/* Floating Panel */
+.floating-panel {
+    position: absolute;
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    z-index: 1000;
+    min-width: 200px;
+    max-height: 80vh;
+    max-height: -webkit-fill-available;
+    max-height: 80svh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    transition: all 0.3s ease;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+}
+
+.floating-panel.expanded {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.controls-panel {
+    top: 68px;
+    left: 20px;
+}
+
+.control-group {
+    margin-bottom: 12px;
+}
+
+.control-group:last-child {
+    margin-bottom: 0;
+}
+
+.control-label {
+    font-size: 12px;
+    color: var(--fg-secondary);
+    margin-bottom: 4px;
+    display: block;
+}
+
+/* Resolution switch */
+.resolution-switch {
+    display: inline-flex;
+    width: 100%;
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2px;
+    position: relative;
+    box-shadow: var(--shadow);
+    margin-bottom: 8px;
+}
+
+.resolution-switch-option {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fg-secondary);
+    cursor: pointer;
+    transition: color 0.2s ease;
+    position: relative;
+    z-index: 1;
+    border: none;
+    background: transparent;
+}
+
+.resolution-switch-option.active {
+    color: var(--fg-primary);
+}
+
+.resolution-switch-indicator {
+    position: absolute;
+    background: color-mix(in srgb, var(--bg-secondary) 70%, var(--fg-primary) 30%);
+    border-radius: 6px;
+    transition: transform 0.2s ease, width 0.2s ease;
+    height: calc(100% - 4px);
+    top: 2px;
+    left: 2px;
+    z-index: 0;
+}
+
+/* Toggle wrapper */
+.toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+/* Toggle switch - Updated to match point-configuration style */
+.toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background-color: var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toggle.active {
+    background-color: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+}
+
+.toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.toggle.active::after {
+    transform: translateX(20px);
+}
+
+.toggle-label {
+    font-size: 13px;
+    color: var(--fg-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+/* Slider wrapper */
+.slider-wrapper {
+    margin-bottom: 12px;
+}
+
+.slider-label {
+    font-size: 12px;
+    color: var(--fg-secondary);
+    margin-bottom: 4px;
+    display: block;
+    font-weight: normal;
+}
+
+/* Range slider styling - Updated to match point-configuration */
+.slider {
+    width: 100%;
+    margin-bottom: 4px;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+}
+
+.slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.1s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+    background: color-mix(in srgb, var(--fg-secondary) 80%, var(--bg-secondary) 20%);
+    transform: scale(1.1);
+}
+
+.slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.slider-value {
+    font-size: 12px;
+    color: var(--fg-secondary);
+    text-align: right;
+}
+
+/* Algorithm select dropdown */
+.algorithm-select {
+    flex: 1;
+    padding: 6px 10px;
+    background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg-primary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238b949e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 28px;
+}
+
+.algorithm-select:hover {
+    background-color: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+.algorithm-select option {
+    background: var(--bg-secondary);
+    color: var(--fg-primary);
+}
+
+/* Action buttons - Updated to match point-configuration */
+.action-btn {
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg-primary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+.action-btn:last-child {
+    margin-bottom: 0;
+}
+
+/* Help text */
+.help-text {
+    font-size: 11px;
+    color: var(--fg-secondary);
+    line-height: 1.4;
+    margin-top: 4px;
+    padding: 6px;
+    background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+/* Color picker styles */
+.color-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 0;
+}
+
+.color-option {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.color-option:hover {
+    transform: scale(1.1);
+    border-color: var(--fg-primary);
+}
+
+.color-option.active {
+    border-color: var(--fg-primary);
+    box-shadow: 0 0 0 2px var(--bg-primary);
+}
+
+/* Custom scrollbar for floating panels */
+.floating-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.floating-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.floating-panel::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+
+.floating-panel::-webkit-scrollbar-thumb:hover {
+    background: var(--fg-secondary);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .floating-panel {
+        min-width: 180px;
+        max-height: 60vh;
+        max-height: -webkit-fill-available;
+        max-height: 60svh;
+    }
+
+    .controls-panel {
+        top: 60px;
+        left: 15px;
+        padding: 12px;
+    }
+
+    .options-button {
+        top: 15px;
+        left: 15px;
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+
+    .color-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .color-option {
+        width: 24px;
+        height: 24px;
+    }
+}
+
+/* Palette grid */
+.palette-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.palette-swatch {
+    position: relative;
+    height: 32px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    overflow: hidden;
+    display: flex;
+}
+
+.palette-swatch:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.palette-swatch.active {
+    border-color: var(--fg-primary);
+    box-shadow: 0 0 0 1px var(--fg-primary);
+}
+
+.palette-swatch-color {
+    flex: 1;
+    height: 100%;
+}
+    </style>
     <!-- DISABLED: Metric Picker Modal Styles (for future feature)
     <style>
         /* Metric Picker Modal Styles */

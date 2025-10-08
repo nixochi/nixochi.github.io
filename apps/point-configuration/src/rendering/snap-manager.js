@@ -137,9 +137,18 @@ export class SnapManager {
     }
 
     /**
-     * Find snap target for line endpoint
-     * Snaps to the nearest point that is close to the line (perpendicular distance)
-     * @returns {Object|null} Snap result with snapTarget or null
+     * Find snap targets for line preview based on line angle
+     * Snaps to points that are close to the line (perpendicular distance), picking the one nearest to cursor
+     * @param {number} startX - Line start X
+     * @param {number} startY - Line start Y
+     * @param {number} endX - Line end X (cursor position)
+     * @param {number} endY - Line end Y (cursor position)
+     * @param {Array} points - Array of point objects
+     * @param {Array} intersections - Array of intersection objects
+     * @param {Object} viewportBounds - Viewport bounds in world coordinates
+     * @param {number} scale - Current zoom scale
+     * @param {number} screenPerpendicularThreshold - Perpendicular distance threshold in screen space (default 20)
+     * @returns {Object|null} Snap result with snapTarget and allIntersections or null
      */
     findLineEndpointSnap(startX, startY, endX, endY, points, intersections, viewportBounds, scale, screenPerpendicularThreshold = 20) {
         const candidates = [];
@@ -192,11 +201,15 @@ export class SnapManager {
             if (processedPositions.has(posKey)) continue;
             processedPositions.add(posKey);
 
+            // Check if point is close to the line (perpendicular distance)
             const perpDistance = getPerpendicularDistance(pos.x, pos.y);
 
             if (perpDistance <= worldPerpendicularThreshold) {
-                const distToCursor = Math.hypot(pos.x - endX, pos.y - endY);
+                // Find all points at this location (multipoint)
                 const pointIndices = this.getPointsAtPosition(pos.x, pos.y, points, intersections, scale);
+
+                // Calculate distance to cursor (for sorting)
+                const distToCursor = Math.hypot(pos.x - endX, pos.y - endY);
 
                 candidates.push({
                     type: 'multipoint',
@@ -222,11 +235,14 @@ export class SnapManager {
                 continue;
             }
 
+            // Check if intersection is close to the line (perpendicular distance)
             const perpDistance = getPerpendicularDistance(intersection.x, intersection.y);
 
             if (perpDistance <= worldPerpendicularThreshold) {
+                // Calculate distance to cursor (for sorting)
                 const distToCursor = Math.hypot(intersection.x - endX, intersection.y - endY);
 
+                // Skip if we already have this as a multipoint
                 const alreadyAdded = candidates.some(c =>
                     c.type === 'multipoint' &&
                     Math.hypot(c.x - intersection.x, c.y - intersection.y) < 0.1
@@ -247,10 +263,12 @@ export class SnapManager {
 
         if (candidates.length === 0) return null;
 
+        // Sort by distance to cursor (not perpendicular distance)
         candidates.sort((a, b) => a.distance - b.distance);
 
         return {
-            snapTarget: candidates[0]
+            snapTarget: candidates[0],
+            allIntersections: candidates // All nearby targets along the line
         };
     }
 

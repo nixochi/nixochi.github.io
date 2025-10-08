@@ -2320,7 +2320,7 @@ This architecture gives you:
 ✅ **Testable:** Each layer can be tested independently  
 ✅ **Maintainable:** Easy to find and change code  
 ✅ **Scalable:** Easy to add new features  
-✅ **Simple:** No caching, no dirty flags - just recompudote when needed  
+✅ **Simple:** No caching, no dirty flags - just recompute when needed  
 ✅ **Observable:** State changes automatically trigger renders  
 
 The key insight: **Not all state is equal.** Some state is primary (manually set), some is derived (computed from primary). Keeping these separate and using observers to connect them creates a clean, understandable architecture.

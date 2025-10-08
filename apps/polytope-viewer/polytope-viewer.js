@@ -679,7 +679,8 @@ class PolytopeViewer extends HTMLElement {
         const baseDistance = Math.max(verticalDistance, horizontalDistance);
 
         // For mobile/portrait mode (aspect < 1), use even more padding
-        const paddingMultiplier = aspect < 1 ? 1.8 : 1.5;
+        // Mobile uses 2.34 (30% more distance than before) to make polytopes appear 30% smaller
+        const paddingMultiplier = aspect < 1 ? 2.34 : 1.5;
         const distance = baseDistance * paddingMultiplier;
 
         // Position camera at this distance

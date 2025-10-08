@@ -1,9 +1,10 @@
-// transform-manager.js
-// Manages pan, zoom, and coordinate transformations
+// viewport-model.js
+// Model for viewport state (pan, zoom, coordinate transforms)
 
-export class TransformManager {
-    constructor(canvas) {
-        this.canvas = canvas;
+export class ViewportModel {
+    constructor() {
+        this.canvas = null; // Set by view or controller
+        this.listeners = new Set();
 
         // Pan state
         this.offsetX = 0;
@@ -16,11 +17,34 @@ export class TransformManager {
     }
 
     /**
+     * Set canvas (called by controller during setup)
+     */
+    setCanvas(canvas) {
+        this.canvas = canvas;
+    }
+
+    /**
+     * Subscribe to viewport changes
+     */
+    subscribe(listener) {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
+    }
+
+    /**
+     * Notify listeners of changes
+     */
+    notify() {
+        this.listeners.forEach(listener => listener());
+    }
+
+    /**
      * Center the origin (0,0) on the canvas
      */
     centerOrigin() {
         this.offsetX = this.canvas.width / 2;
         this.offsetY = this.canvas.height / 2;
+        this.notify();
     }
 
     /**
@@ -91,6 +115,36 @@ export class TransformManager {
         // Adjust offset so world position stays under same screen position
         this.offsetX = screenX - worldX * newScale;
         this.offsetY = screenY - worldY * newScale;
+        this.notify();
+    }
+
+    /**
+     * Pan viewport by delta
+     */
+    pan(dx, dy) {
+        this.offsetX += dx;
+        this.offsetY += dy;
+        this.notify();
+    }
+
+    /**
+     * Convert screen coordinates to world coordinates
+     */
+    screenToWorld(screenX, screenY) {
+        return {
+            x: (screenX - this.offsetX) / this.scale,
+            y: (screenY - this.offsetY) / this.scale
+        };
+    }
+
+    /**
+     * Convert world coordinates to screen coordinates
+     */
+    worldToScreen(worldX, worldY) {
+        return {
+            x: worldX * this.scale + this.offsetX,
+            y: worldY * this.scale + this.offsetY
+        };
     }
 
     /**

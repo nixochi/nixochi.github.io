@@ -1,9 +1,27 @@
+import { GeometryModel } from './models/GeometryModel.js';
+import { ViewportModel } from './models/ViewportModel.js';
+import { MatroidModel } from './models/MatroidModel.js';
+import { HistoryModel } from './models/HistoryModel.js';
 import { CanvasManager } from './core/canvas-manager.js';
 import { DebugMenu } from './ui/debug-menu.js';
 
+// Phase 1: Initialize Models
+const geometryModel = new GeometryModel();
+const viewportModel = new ViewportModel();
+const matroidModel = new MatroidModel(geometryModel);
+const historyModel = new HistoryModel(geometryModel);
+
 // Initialize canvas
 const canvas = document.getElementById('canvas');
-const canvasManager = new CanvasManager(canvas);
+
+// TEMPORARY: Pass models to existing CanvasManager
+// (In Phase 2-3, CanvasManager will be replaced with Controllers)
+const canvasManager = new CanvasManager(canvas, {
+    geometryModel,
+    viewportModel,
+    matroidModel,
+    historyModel
+});
 
 // Initialize debug menu
 const debugMenu = new DebugMenu(canvasManager);

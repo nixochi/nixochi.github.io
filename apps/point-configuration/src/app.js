@@ -180,9 +180,12 @@ class Application {
         });
 
         // Initialize UI panels
-        this.optionsPanel = new OptionsPanel(this);
+        // this.optionsPanel = new OptionsPanel(this);
         this.examplesModal = new ExamplesModal(this);
         this.debugMenu = new DebugMenu(this);
+
+        // Setup options panel
+        this.setupOptionsPanel();
 
         // History buttons
         this.setupHistoryButtons();
@@ -221,6 +224,102 @@ class Application {
         this.geometryModel.subscribe(() => updateButtons());
 
         updateButtons();
+    }
+
+    setupOptionsPanel() {
+        const optionsBtn = document.getElementById('optionsBtn');
+        const optionsPanel = document.getElementById('optionsPanel');
+        let isVisible = false;
+
+        // Toggle button
+        optionsBtn.addEventListener('click', () => {
+            isVisible = !isVisible;
+            if (isVisible) {
+                optionsPanel.style.display = 'block';
+                optionsPanel.offsetHeight; // Force reflow
+                optionsPanel.classList.add('expanded');
+                optionsBtn.textContent = 'close';
+            } else {
+                optionsPanel.classList.remove('expanded');
+                setTimeout(() => {
+                    if (!isVisible) {
+                        optionsPanel.style.display = 'none';
+                    }
+                }, 300);
+                optionsBtn.textContent = 'options';
+            }
+        });
+
+        // Palette switch
+        const monoBtn = document.getElementById('monoBtn');
+        const rainbowBtn = document.getElementById('rainbowBtn');
+        const pastelBtn = document.getElementById('pastelBtn');
+        const paletteSwitchIndicator = document.getElementById('paletteSwitchIndicator');
+
+        const updatePaletteSwitchIndicator = (activeBtn) => {
+            const btnRect = activeBtn.getBoundingClientRect();
+            const switchRect = activeBtn.parentElement.getBoundingClientRect();
+            const offset = btnRect.left - switchRect.left - 2;
+            paletteSwitchIndicator.style.width = `${btnRect.width}px`;
+            paletteSwitchIndicator.style.transform = `translateX(${offset}px)`;
+        };
+
+        monoBtn.addEventListener('click', () => {
+            this.uiController.setColorPalette('monochromatic');
+            monoBtn.classList.add('active');
+            rainbowBtn.classList.remove('active');
+            pastelBtn.classList.remove('active');
+            updatePaletteSwitchIndicator(monoBtn);
+        });
+
+        rainbowBtn.addEventListener('click', () => {
+            this.uiController.setColorPalette('rainbow');
+            rainbowBtn.classList.add('active');
+            monoBtn.classList.remove('active');
+            pastelBtn.classList.remove('active');
+            updatePaletteSwitchIndicator(rainbowBtn);
+        });
+
+        pastelBtn.addEventListener('click', () => {
+            this.uiController.setColorPalette('pastel');
+            pastelBtn.classList.add('active');
+            monoBtn.classList.remove('active');
+            rainbowBtn.classList.remove('active');
+            updatePaletteSwitchIndicator(pastelBtn);
+        });
+
+        // Ray opacity slider
+        const rayOpacitySlider = document.getElementById('rayOpacitySlider');
+        const rayOpacityValue = document.getElementById('rayOpacityValue');
+
+        rayOpacitySlider.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            const percentage = Math.round(value * 100);
+            rayOpacityValue.textContent = `${percentage}%`;
+            this.uiController.setRayOpacity(value);
+        });
+
+        // Action buttons
+        document.getElementById('cleanBtn').addEventListener('click', () => {
+            this.geometryController.removeNonEssentialLines();
+        });
+
+        document.getElementById('addIntersectionsBtn').addEventListener('click', () => {
+            const viewportBounds = this.viewportController.getViewportBounds();
+            this.geometryController.addIntersectionPoints(viewportBounds);
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            this.exportImage();
+        });
+
+        document.getElementById('clearAllBtn').addEventListener('click', () => {
+            if (confirm('Clear all points and lines?')) {
+                this.geometryController.clearAll();
+                this.updateURL();
+                this.renderStats();
+            }
+        });
     }
 
     setupStatsDropdown() {

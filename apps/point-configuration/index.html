@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>point configuration calculator</title>
+
+    <!-- DNS prefetch and preconnect for external resources -->
+    <link rel="dns-prefetch" href="https://esm.sh">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://esm.sh" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
     <style>
 /* CSS Variables for theming */
 :root {
@@ -70,6 +77,8 @@ body {
 .canvas-container {
     position: relative;
     background: var(--bg-primary);
+    flex: 1 1 auto;
+    min-width: 300px;
 }
 
 #canvas {
@@ -79,6 +88,275 @@ body {
     cursor: crosshair;
 }
 
+/* Loading Skeleton - only on canvas */
+.skeleton-loader {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary);
+    z-index: 9999;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.skeleton-loader.fade-out {
+    opacity: 0;
+}
+
+.skeleton-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--fg-secondary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.skeleton-text {
+    font-size: 14px;
+    color: var(--fg-secondary);
+    margin-bottom: 8px;
+}
+
+.skeleton-subtext {
+    font-size: 12px;
+    color: var(--fg-secondary);
+    opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .skeleton-spinner {
+        animation: none;
+        border-top-color: var(--border);
+    }
+}
+
+/* Controls Panel - Top Left */
+.controls-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: var(--backdrop-blur);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 8px 12px;
+    z-index: 1000;
+}
+
+.control-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+
+.control-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-primary);
+    margin-right: 2px;
+}
+
+.control-button {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.control-button:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+    color: var(--fg-primary);
+}
+
+.control-button:active {
+    background: color-mix(in srgb, var(--bg-secondary) 40%, var(--border) 60%);
+}
+
+/* Shadcn-style switch */
+.mode-switch {
+    display: inline-flex;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2px;
+    position: relative;
+}
+
+.mode-switch-option {
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg-secondary);
+    cursor: pointer;
+    transition: color 0.2s ease;
+    position: relative;
+    z-index: 1;
+    border: none;
+    background: transparent;
+}
+
+.mode-switch-option.active {
+    color: var(--fg-primary);
+}
+
+.mode-switch-indicator {
+    position: absolute;
+    background: color-mix(in srgb, var(--fg-primary) 8%, var(--bg-secondary));
+    border-radius: 6px;
+    transition: transform 0.2s ease, width 0.2s ease;
+    height: calc(100% - 4px);
+    top: 2px;
+    left: 2px;
+    z-index: 0;
+}
+
+/* Controls Toggle Button */
+.right-panel {
+    flex: 0 0 auto;
+    width: 250px;
+    min-width: 250px;
+    max-width: 60vw;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.panel-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.panel-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--fg-primary);
+}
+
+/* Shadcn-style dropdown */
+.dropdown-container {
+    position: relative;
+}
+
+.dropdown-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-primary);
+    color: var(--fg-primary);
+    font-size: 15px;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.dropdown-trigger:hover {
+    background: color-mix(in srgb, var(--bg-primary) 95%, var(--fg-primary) 5%);
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+.dropdown-trigger:focus {
+    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+}
+
+.dropdown-arrow {
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid var(--fg-secondary);
+    transition: transform 0.2s ease;
+}
+
+.dropdown-trigger.open .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.dropdown-content {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 160px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    padding: 4px;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: all 0.15s ease;
+}
+
+.dropdown-content.open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: var(--fg-primary);
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+}
+
+.dropdown-item:hover {
+    background: color-mix(in srgb, var(--bg-secondary) 90%, var(--fg-primary) 10%);
+}
+
+.dropdown-item.active {
+    background: color-mix(in srgb, var(--bg-secondary) 85%, var(--fg-primary) 15%);
+    font-weight: 500;
+}
+
+.panel-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.empty-state {
+    color: var(--fg-secondary);
+    font-size: 16px;
+    text-align: center;
+    margin-top: 40px;
+    line-height: 1.6;
+}
 
 /* Options button - Top Right */
 .options-button {
@@ -233,29 +511,6 @@ input[type="range"]::-moz-range-thumb {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-
-.control-button {
-    padding: 6px 12px;
-    border: 1px solid var(--border);
-    background: var(--bg-secondary);
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--fg-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.control-button:hover {
-    background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
-    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
-    color: var(--fg-primary);
-}
-
-.control-button:active {
-    background: color-mix(in srgb, var(--bg-secondary) 40%, var(--border) 60%);
-}
-
 /* Shadcn-style switch */
 .mode-switch-container {
     position: absolute;
@@ -332,115 +587,6 @@ input[type="range"]::-moz-range-thumb {
 .history-btn:hover {
     background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
     border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
-}
-
-/* Controls Toggle Button */
-.right-panel {
-    background: var(--bg-secondary);
-    border-left: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.panel-header {
-    padding: 8px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    justify-content: center;
-}
-
-.panel-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--fg-primary);
-}
-
-/* Shadcn-style dropdown */
-.dropdown-container {
-    position: relative;
-}
-
-.dropdown-trigger {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--bg-primary);
-    color: var(--fg-primary);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    outline: none;
-    transition: all 0.2s ease;
-    user-select: none;
-}
-
-.dropdown-trigger:hover {
-    background: color-mix(in srgb, var(--bg-primary) 95%, var(--fg-primary) 5%);
-    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
-}
-
-.dropdown-trigger:focus {
-    border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
-}
-
-.dropdown-arrow {
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 4px solid var(--fg-secondary);
-    transition: transform 0.2s ease;
-}
-
-.dropdown-trigger.open .dropdown-arrow {
-    transform: rotate(180deg);
-}
-
-.dropdown-content {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    min-width: 160px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    padding: 4px;
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-8px);
-    transition: all 0.15s ease;
-}
-
-.dropdown-content.open {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-}
-
-.dropdown-item {
-    display: block;
-    width: 100%;
-    padding: 8px 12px;
-    font-size: 14px;
-    color: var(--fg-primary);
-    background: transparent;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    text-align: left;
-    transition: all 0.15s ease;
-}
-
-.dropdown-item:hover {
-    background: color-mix(in srgb, var(--bg-secondary) 90%, var(--fg-primary) 10%);
 }
 
 /* Library button */
@@ -600,20 +746,6 @@ body.modal-open {
     overflow: hidden;
 }
 
-.panel-content {
-    flex: 1;
-    padding: 16px;
-    overflow-y: auto;
-}
-
-.empty-state {
-    color: var(--fg-secondary);
-    font-size: 16px;
-    text-align: center;
-    margin-top: 40px;
-    line-height: 1.6;
-}
-
 /* Resizable handle */
 .resize-handle {
     width: 10px;
@@ -656,19 +788,6 @@ body.modal-open {
     background-position: center 0, center 50%, center 100%;
     background-repeat: no-repeat;
     z-index: 1;
-}
-
-/* Desktop resizable panel */
-.canvas-container {
-    flex: 1 1 auto;
-    min-width: 300px;
-}
-
-.right-panel {
-    flex: 0 0 auto;
-    width: 250px;
-    min-width: 250px;
-    max-width: 60vw;
 }
 
 /* Disable user selection during resize */
@@ -741,12 +860,23 @@ body.resizing .resize-handle {
     }
 }
     </style>
+
+    <!-- Module Preload - download critical modules early -->
+    <link rel="modulepreload" href="./src/app.js">
+    <link rel="modulepreload" href="./src/models/GeometryModel.js">
+    <link rel="modulepreload" href="./src/controllers/GeometryController.js">
 </head>
 <body>
     <div class="container">
         <!-- Canvas Container -->
         <div class="canvas-container">
             <canvas id="canvas"></canvas>
+
+            <!-- Loading Skeleton -->
+            <div class="skeleton-loader" id="skeletonLoader" aria-live="polite" aria-label="Loading application">
+                <div class="skeleton-spinner"></div>
+                <div class="skeleton-text">Loading Calculator...</div>
+            </div>
 
             <!-- Input Mode Switch and History Buttons -->
             <div class="mode-switch-container">
@@ -892,6 +1022,35 @@ body.resizing .resize-handle {
         </div>
     </div>
 
-    <script type="module" src="./src/app.js"></script>
+    <!-- Optimized Loading Script -->
+    <script type="module">
+        // Update loading message
+        const skeletonLoader = document.getElementById('skeletonLoader');
+        function updateLoadingMessage(message) {
+            const subtext = skeletonLoader.querySelector('.skeleton-subtext');
+            if (subtext) subtext.textContent = message;
+        }
+
+        // Load app progressively
+        (async function() {
+            updateLoadingMessage('Loading geometry engine...');
+
+            // Dynamic import of main app
+            const appModule = await import('./src/app.js');
+
+            updateLoadingMessage('Rendering canvas...');
+
+            // Small delay to ensure smooth transition
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Remove skeleton loader
+            skeletonLoader.classList.add('fade-out');
+
+            // Clean up after fade animation
+            setTimeout(() => {
+                skeletonLoader.remove();
+            }, 300);
+        })();
+    </script>
 </body>
 </html>

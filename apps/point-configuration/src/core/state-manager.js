@@ -38,8 +38,7 @@ export class StateManager {
             highlightedLines: new Set(),
             previewLine: null,
             ghostPoint: null,
-            lineEndSnap: null,
-            allLineIntersections: [] // All preview line intersections to show
+            lineEndSnap: null
         };
 
         // Compute based on current state
@@ -164,7 +163,6 @@ export class StateManager {
 
                         if (snapResult) {
                             visuals.lineEndSnap = snapResult.snapTarget;
-                            visuals.allLineIntersections = snapResult.allIntersections;
 
                             visuals.previewLine = {
                                 startX: state.data.startX,

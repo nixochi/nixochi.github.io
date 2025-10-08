@@ -1,7 +1,7 @@
 // canvas-manager.js
 // Orchestrates all canvas functionality using specialized managers
 
-import { getPointPosition } from '../geometry/geometry-utils.js';
+import { getPointPosition, computeIntersections } from '../geometry/geometry-utils.js';
 import { SnapManager } from '../rendering/snap-manager.js';
 import { Renderer } from '../rendering/renderer.js';
 import { StateManager } from './state-manager.js';
@@ -9,22 +9,36 @@ import { TransformManager } from './transform-manager.js';
 import { PointLineManager } from './point-line-manager.js';
 import { EventHandler } from './event-handler.js';
 
+// Import new state classes
+import { Configuration } from '../state/Configuration.js';
+import { InteractionState } from '../state/InteractionState.js';
+import { TransformState } from '../state/TransformState.js';
+import { UIState } from '../state/UIState.js';
+import { HistoryState } from '../state/HistoryState.js';
+
 export class CanvasManager {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-
-        // Mode
-        this.mode = 'point';
 
         // Settings
         this.isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
         this.pointRadius = this.isTouchDevice ? 14 : 9;
         this.snapThreshold = this.isTouchDevice ? 25 : 15;
         this.clickThreshold = this.isTouchDevice ? 8 : 5;
-        this.rayOpacity = 1.0; // Default opacity for rays
 
-        // Initialize managers
+        // ============================================================================
+        // NEW: Initialize state classes (Phase 1)
+        // ============================================================================
+        this.configuration = new Configuration();
+        this.interactionState = new InteractionState();
+        this.transformState = new TransformState();
+        this.uiState = new UIState();
+        this.historyState = new HistoryState();
+
+        // ============================================================================
+        // OLD: Keep old managers for compatibility (will be removed in later phases)
+        // ============================================================================
         this.stateManager = new StateManager();
         this.transformManager = new TransformManager(canvas);
         this.pointLineManager = new PointLineManager(this.transformManager.scale);
@@ -48,6 +62,11 @@ export class CanvasManager {
         // Callback for state changes
         this.onStateChange = null;
 
+        // ============================================================================
+        // NEW: Wire up observers (Phase 1)
+        // ============================================================================
+        this.setupObservers();
+
         // Load state from URL on startup
         this.loadStateFromURL();
 
@@ -63,6 +82,47 @@ export class CanvasManager {
         this.setupCanvas();
         this.eventHandler.setupEventListeners();
         this.draw();
+    }
+
+    /**
+     * Setup observers for all state classes (Phase 1)
+     */
+    setupObservers() {
+        // Configuration changes → re-render and notify app
+        this.configuration.subscribe((event) => {
+            console.log('Configuration changed:', event.type);
+            this.updateURL();
+            this.draw();
+            if (this.onStateChange) {
+                this.onStateChange();
+            }
+        });
+
+        // Interaction state changes → re-render
+        this.interactionState.subscribe(() => {
+            console.log('Interaction state changed');
+            this.draw();
+        });
+
+        // Transform changes → re-render
+        this.transformState.subscribe(() => {
+            console.log('Transform changed');
+            this.draw();
+        });
+
+        // UI state changes → re-render
+        this.uiState.subscribe(() => {
+            console.log('UI state changed');
+            this.draw();
+        });
+
+        // History state changes → notify app (for updating undo/redo buttons)
+        this.historyState.subscribe(() => {
+            console.log('History state changed');
+            if (this.onStateChange) {
+                this.onStateChange();
+            }
+        });
     }
 
     setupCanvas() {
@@ -179,21 +239,9 @@ export class CanvasManager {
             );
         }
 
-        // Draw all line intersection previews (non-snapped)
-        if (visuals.allLineIntersections && visuals.allLineIntersections.length > 0) {
-            visuals.allLineIntersections.forEach((intersection) => {
-                // Draw all intersections, but highlight the snapped one differently
-                const isSnapped = visuals.lineEndSnap &&
-                    Math.hypot(intersection.x - visuals.lineEndSnap.x, intersection.y - visuals.lineEndSnap.y) < 0.1;
-
-                if (isSnapped) {
-                    // Draw snapped one with full style
-                    this.renderer.drawSnapPreview(intersection);
-                } else {
-                    // Draw others with subtle style
-                    this.renderer.drawIntersectionPreview(intersection);
-                }
-            });
+        // Draw snap preview for line endpoint
+        if (visuals.lineEndSnap) {
+            this.renderer.drawSnapPreview(visuals.lineEndSnap);
         }
 
         // Draw snap preview

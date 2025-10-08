@@ -5,7 +5,7 @@ export class HistoryModel {
     constructor(geometryModel) {
         this.geometryModel = geometryModel;
         this.actions = [];
-        this.currentIndex = -1; // -1 means no actions, 0 means after first action
+        this.currentIndex = -1;
         this.maxHistorySize = 100;
     }
 
@@ -13,14 +13,10 @@ export class HistoryModel {
      * Record a new action
      */
     recordAction(action) {
-        // Truncate forward history if we're not at the end
         this.actions = this.actions.slice(0, this.currentIndex + 1);
-
-        // Add new action
         this.actions.push(action);
         this.currentIndex++;
 
-        // Limit history size (remove oldest)
         if (this.actions.length > this.maxHistorySize) {
             this.actions.shift();
             this.currentIndex--;
@@ -63,24 +59,16 @@ export class HistoryModel {
                 this._undoAddLine(action);
                 break;
             case 'movePoint':
-                this._undoMovePoint(action);
-                break;
             case 'mergePoint':
-                this._undoMergePoint(action);
-                break;
             case 'unmergePoint':
-                this._undoUnmergePoint(action);
+                this._undoPointUpdate(action);
                 break;
             default:
                 return false;
         }
 
         this.currentIndex--;
-
-        // Recompute intersections after undo
         this.geometryModel.recomputeIntersections();
-
-        // Notify listeners
         this.geometryModel.notify();
 
         return true;
@@ -107,22 +95,15 @@ export class HistoryModel {
                 this._redoAddLine(action);
                 break;
             case 'movePoint':
-                this._redoMovePoint(action);
-                break;
             case 'mergePoint':
-                this._redoMergePoint(action);
-                break;
             case 'unmergePoint':
-                this._redoUnmergePoint(action);
+                this._redoPointUpdate(action);
                 break;
             default:
                 return false;
         }
 
-        // Recompute intersections after redo
         this.geometryModel.recomputeIntersections();
-
-        // Notify listeners
         this.geometryModel.notify();
 
         return true;
@@ -146,38 +127,16 @@ export class HistoryModel {
     }
 
     _undoAddLine(action) {
-        // Restore affected points to their old state BEFORE removing the line
         for (const change of action.affectedPoints) {
             const point = this.geometryModel.points[change.index];
             point.onLines = [...change.oldOnLines];
             point.isIntersection = change.oldIsIntersection;
             point.intersectionIndex = change.oldIntersectionIndex;
         }
-
-        // Now remove the line
         this.geometryModel.removeLine(action.index);
     }
 
-    _undoMovePoint(action) {
-        this.geometryModel.updatePoint(action.index, {
-            x: action.oldX,
-            y: action.oldY,
-            onLines: action.oldOnLines,
-            isIntersection: action.oldIsIntersection,
-            intersectionIndex: action.oldIntersectionIndex
-        });
-    }
-
-    _undoMergePoint(action) {
-        const point = this.geometryModel.points[action.index];
-        point.x = action.oldX;
-        point.y = action.oldY;
-        point.onLines = [...action.oldOnLines];
-        point.isIntersection = action.oldIsIntersection;
-        point.intersectionIndex = action.oldIntersectionIndex;
-    }
-
-    _undoUnmergePoint(action) {
+    _undoPointUpdate(action) {
         const point = this.geometryModel.points[action.index];
         point.x = action.oldX;
         point.y = action.oldY;
@@ -191,16 +150,12 @@ export class HistoryModel {
     // ============================================================================
 
     _redoAddPoint(action) {
-        // Re-add the point
         this.geometryModel.points.push({ ...action.point });
-        this.geometryModel.notify();
     }
 
     _redoAddLine(action) {
-        // Re-add the line
         this.geometryModel.lines.push({ ...action.line });
 
-        // Update affected points to their new state
         for (const change of action.affectedPoints) {
             const point = this.geometryModel.points[change.index];
             if (!point.onLines.includes(action.index)) {
@@ -208,31 +163,9 @@ export class HistoryModel {
             }
             point.isIntersection = point.onLines.length > 1;
         }
-
-        this.geometryModel.recomputeIntersections();
-        this.geometryModel.notify();
     }
 
-    _redoMovePoint(action) {
-        this.geometryModel.updatePoint(action.index, {
-            x: action.newX,
-            y: action.newY,
-            onLines: action.newOnLines,
-            isIntersection: action.newIsIntersection,
-            intersectionIndex: action.newIntersectionIndex
-        });
-    }
-
-    _redoMergePoint(action) {
-        const point = this.geometryModel.points[action.index];
-        point.x = action.newX;
-        point.y = action.newY;
-        point.onLines = [...action.newOnLines];
-        point.isIntersection = action.newIsIntersection;
-        point.intersectionIndex = action.newIntersectionIndex;
-    }
-
-    _redoUnmergePoint(action) {
+    _redoPointUpdate(action) {
         const point = this.geometryModel.points[action.index];
         point.x = action.newX;
         point.y = action.newY;
@@ -242,7 +175,7 @@ export class HistoryModel {
     }
 
     // ============================================================================
-    // Action factory methods (for convenience)
+    // Action factory methods
     // ============================================================================
 
     createAddPointAction(index, point) {

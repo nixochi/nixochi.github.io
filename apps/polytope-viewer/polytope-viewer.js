@@ -666,14 +666,21 @@ class PolytopeViewer extends HTMLElement {
         if (maxRadius === 0) maxRadius = 1;
 
         // Calculate camera distance based on FOV and aspect ratio
-        // Account for both horizontal and vertical FOV to ensure polytope fits
+        // Ensure polytope fits in the middle square, especially important for mobile
         const fov = this.camera.fov * (Math.PI / 180);
         const aspect = this.camera.aspect;
 
-        // Use the smaller dimension to ensure the polytope fits in the viewport
+        // Calculate distance needed for both dimensions
         const verticalDistance = maxRadius / Math.tan(fov / 2);
         const horizontalDistance = maxRadius / (Math.tan(fov / 2) * aspect);
-        const distance = Math.max(verticalDistance, horizontalDistance) * 1.2;
+
+        // Use the maximum to ensure it fits in both dimensions
+        // Add extra padding (1.5x) to ensure polytope fits comfortably, especially on mobile
+        const baseDistance = Math.max(verticalDistance, horizontalDistance);
+
+        // For mobile/portrait mode (aspect < 1), use even more padding
+        const paddingMultiplier = aspect < 1 ? 1.8 : 1.5;
+        const distance = baseDistance * paddingMultiplier;
 
         // Position camera at this distance
         const direction = new this.THREE.Vector3(1, 1, 1).normalize();
@@ -683,7 +690,7 @@ class PolytopeViewer extends HTMLElement {
         this.camera.far = distance * 1000;
         this.camera.updateProjectionMatrix();
 
-        console.log(`📷 Camera positioned at distance ${distance.toFixed(2)} for radius ${maxRadius.toFixed(2)} (aspect: ${aspect.toFixed(2)})`);
+        console.log(`📷 Camera positioned at distance ${distance.toFixed(2)} for radius ${maxRadius.toFixed(2)} (aspect: ${aspect.toFixed(2)}, padding: ${paddingMultiplier}x)`);
     }
     
     getFacesFromVertices(vertices, options = {}) {

@@ -1,7 +1,7 @@
 // matroid-model.js
 // Model for matroid computations
 
-import { PointLineMatroid } from '../state/matroid.js';
+import { PointLineMatroid } from '../math/matroid.js';
 
 export class MatroidModel {
     constructor(geometryModel) {

@@ -482,9 +482,8 @@ export class InteractionController {
         const point = this.geometryController.geometryModel.points[state.pointIndex];
 
         if (isClick) {
-            // Restore original position (if it was moved)
-            point.x = state.originalX;
-            point.y = state.originalY;
+            // Click - don't move the point, just return
+            return { needsRedraw: true, cursor: 'crosshair' };
         } else {
             // Dragged - apply the new position
             // Capture old state
@@ -501,60 +500,98 @@ export class InteractionController {
             const oldPositionPoints = this.geometryController.getPointsAtPosition(
                 state.originalX,
                 state.originalY,
-                scale,
-                1
+                scale
             ).filter(idx => idx !== state.pointIndex);
             const wasAtMultipoint = oldPositionPoints.length > 0;
 
-            // Get final position from visuals
+            // Get final snap position from current visuals
             const points = this.geometryController.geometryModel.points;
             const lines = this.geometryController.geometryModel.lines;
             const intersections = this.geometryController.geometryModel.intersections;
-            const visuals = this.computeVisualState(points, lines, intersections);
+            
+            let finalX, finalY, finalOnLines, finalIsIntersection, finalIntersectionIndex;
+            
+            if (this.currentMousePos) {
+                const scale = this.viewportController.getScale();
+                const snapPreview = this.snapManager.updateSnapPreview(
+                    this.currentMousePos.worldX,
+                    this.currentMousePos.worldY,
+                    intersections,
+                    lines,
+                    points,
+                    scale
+                );
 
-            if (visuals.ghostPoint) {
-                // Apply ghost position
-                if (visuals.snapPreview) {
-                    // Snap to line/intersection/point
-                    this._applySnapToPoint(point, visuals.snapPreview, intersections);
+                if (snapPreview) {
+                    // Apply snap
+                    if (snapPreview.type === 'intersection') {
+                        const intersection = intersections[snapPreview.intersectionIndex];
+                        finalX = intersection.x;
+                        finalY = intersection.y;
+                        finalOnLines = [...intersection.lineIndices];
+                        finalIsIntersection = true;
+                        finalIntersectionIndex = snapPreview.intersectionIndex;
+                    } else if (snapPreview.type === 'line') {
+                        finalX = snapPreview.x;
+                        finalY = snapPreview.y;
+                        finalOnLines = [snapPreview.lineIndex];
+                        finalIsIntersection = false;
+                        finalIntersectionIndex = null;
+                    } else if (snapPreview.type === 'point') {
+                        const snapTarget = points[snapPreview.pointIndex];
+                        finalX = snapPreview.x;
+                        finalY = snapPreview.y;
+                        finalOnLines = [...snapTarget.onLines];
+                        finalIsIntersection = snapTarget.onLines.length > 1;
+                        finalIntersectionIndex = snapTarget.intersectionIndex;
+                    }
                 } else {
-                    // No snap - move to ghost position
-                    point.x = visuals.ghostPoint.x;
-                    point.y = visuals.ghostPoint.y;
-                    point.onLines = [];
-                    point.isIntersection = false;
-                    point.intersectionIndex = null;
+                    // No snap - use mouse position
+                    finalX = this.currentMousePos.worldX;
+                    finalY = this.currentMousePos.worldY;
+                    finalOnLines = [];
+                    finalIsIntersection = false;
+                    finalIntersectionIndex = null;
                 }
-
-                const newState = {
-                    x: point.x,
-                    y: point.y,
-                    onLines: [...point.onLines],
-                    isIntersection: point.isIntersection,
-                    intersectionIndex: point.intersectionIndex
-                };
-
-                // Check if at multipoint now
-                const newPositionPoints = this.geometryController.getPointsAtPosition(
-                    point.x,
-                    point.y,
-                    scale,
-                    1
-                ).filter(idx => idx !== state.pointIndex);
-                const isAtMultipoint = newPositionPoints.length > 0;
-
-                // Determine action type
-                let actionType;
-                if (!wasAtMultipoint && isAtMultipoint) {
-                    actionType = 'merge';
-                } else if (wasAtMultipoint && !isAtMultipoint) {
-                    actionType = 'unmerge';
-                } else {
-                    actionType = 'move';
-                }
-
-                this.geometryController.updatePoint(state.pointIndex, oldState, newState, actionType);
+            } else {
+                // Fallback to original position if no mouse position
+                return { needsRedraw: true, cursor: 'crosshair' };
             }
+
+            // Apply the new position
+            point.x = finalX;
+            point.y = finalY;
+            point.onLines = finalOnLines;
+            point.isIntersection = finalIsIntersection;
+            point.intersectionIndex = finalIntersectionIndex;
+
+            const newState = {
+                x: point.x,
+                y: point.y,
+                onLines: [...point.onLines],
+                isIntersection: point.isIntersection,
+                intersectionIndex: point.intersectionIndex
+            };
+
+            // Check if at multipoint now
+            const newPositionPoints = this.geometryController.getPointsAtPosition(
+                point.x,
+                point.y,
+                scale
+            ).filter(idx => idx !== state.pointIndex);
+            const isAtMultipoint = newPositionPoints.length > 0;
+
+            // Determine action type
+            let actionType;
+            if (!wasAtMultipoint && isAtMultipoint) {
+                actionType = 'merge';
+            } else if (wasAtMultipoint && !isAtMultipoint) {
+                actionType = 'unmerge';
+            } else {
+                actionType = 'move';
+            }
+
+            this.geometryController.updatePoint(state.pointIndex, oldState, newState, actionType);
         }
 
         return { needsRedraw: true, cursor: 'crosshair' };
@@ -661,10 +698,6 @@ export class InteractionController {
 
     _computeDragPointVisuals(state, points, lines, intersections, scale, visuals) {
         const draggedPoint = points[state.data.pointIndex];
-
-        // Ensure point stays at original position during drag
-        draggedPoint.x = state.data.originalX;
-        draggedPoint.y = state.data.originalY;
 
         if (this.currentMousePos) {
             visuals.snapPreview = this.snapManager.updateSnapPreview(

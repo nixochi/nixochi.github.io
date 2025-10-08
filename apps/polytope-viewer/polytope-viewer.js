@@ -685,7 +685,7 @@ class PolytopeViewer extends HTMLElement {
 
         // For mobile/portrait mode (aspect < 1), make polytopes fit snugly then 15% smaller
         // 1.725 = 1.5 (snug fit) × 1.15 (15% smaller)
-        const paddingMultiplier = aspect < 1 ? 1.725 : 1.5;
+        const paddingMultiplier = aspect < 1 ? 1.5 : 1.5;
         const distance = baseDistance * paddingMultiplier;
 
         // Position camera at this distance

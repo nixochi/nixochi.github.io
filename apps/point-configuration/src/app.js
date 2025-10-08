@@ -17,6 +17,8 @@ import { StatsView } from './views/StatsView.js';
 
 import { SnapManager } from './rendering/snap-manager.js';
 import { DebugMenu } from './ui/debug-menu.js';
+import { OptionsPanel } from './ui/OptionsPanel.js';
+import { ExamplesModal } from './ui/ExamplesModal.js';
 
 // ============================================================================
 // Phase 2: MVC Architecture
@@ -69,9 +71,6 @@ class Application {
                 if (result.needsRedraw) this.render();
             }
         );
-
-        // Debug menu
-        this.debugMenu = new DebugMenu(this);
 
         // Load initial state
         this.loadStateFromURL();
@@ -180,8 +179,10 @@ class Application {
             this.render();
         });
 
-        // Options panel
-        this.setupOptionsPanel();
+        // Initialize UI panels
+        this.optionsPanel = new OptionsPanel(this);
+        this.examplesModal = new ExamplesModal(this);
+        this.debugMenu = new DebugMenu(this);
 
         // History buttons
         this.setupHistoryButtons();
@@ -189,111 +190,8 @@ class Application {
         // Stats dropdown
         this.setupStatsDropdown();
 
-        // Library button
-        document.getElementById('libraryBtn').addEventListener('click', () => {
-            this.openExamplesModal();
-        });
-
-        // Examples modal
-        this.setupExamplesModal();
-
         // Panel resize
         this.setupPanelResize();
-    }
-
-    setupOptionsPanel() {
-        const optionsBtn = document.getElementById('optionsBtn');
-        const optionsPanel = document.getElementById('optionsPanel');
-        let isPanelVisible = false;
-
-        optionsBtn.addEventListener('click', () => {
-            isPanelVisible = !isPanelVisible;
-            if (isPanelVisible) {
-                optionsPanel.style.display = 'block';
-                optionsPanel.offsetHeight;
-                optionsPanel.classList.add('expanded');
-                optionsBtn.textContent = 'close';
-            } else {
-                optionsPanel.classList.remove('expanded');
-                setTimeout(() => {
-                    if (!isPanelVisible) {
-                        optionsPanel.style.display = 'none';
-                    }
-                }, 300);
-                optionsBtn.textContent = 'options';
-            }
-        });
-
-        // Color palette
-        const monoBtn = document.getElementById('monoBtn');
-        const rainbowBtn = document.getElementById('rainbowBtn');
-        const pastelBtn = document.getElementById('pastelBtn');
-        const paletteSwitchIndicator = document.getElementById('paletteSwitchIndicator');
-
-        const updatePaletteSwitchIndicator = (activeBtn) => {
-            const btnRect = activeBtn.getBoundingClientRect();
-            const switchRect = activeBtn.parentElement.getBoundingClientRect();
-            const offset = btnRect.left - switchRect.left - 2;
-            paletteSwitchIndicator.style.width = `${btnRect.width}px`;
-            paletteSwitchIndicator.style.transform = `translateX(${offset}px)`;
-        };
-
-        monoBtn.addEventListener('click', () => {
-            this.uiController.setColorPalette('monochromatic');
-            monoBtn.classList.add('active');
-            rainbowBtn.classList.remove('active');
-            pastelBtn.classList.remove('active');
-            updatePaletteSwitchIndicator(monoBtn);
-        });
-
-        rainbowBtn.addEventListener('click', () => {
-            this.uiController.setColorPalette('rainbow');
-            rainbowBtn.classList.add('active');
-            monoBtn.classList.remove('active');
-            pastelBtn.classList.remove('active');
-            updatePaletteSwitchIndicator(rainbowBtn);
-        });
-
-        pastelBtn.addEventListener('click', () => {
-            this.uiController.setColorPalette('pastel');
-            pastelBtn.classList.add('active');
-            monoBtn.classList.remove('active');
-            rainbowBtn.classList.remove('active');
-            updatePaletteSwitchIndicator(pastelBtn);
-        });
-
-        // Ray opacity slider
-        const rayOpacitySlider = document.getElementById('rayOpacitySlider');
-        const rayOpacityValue = document.getElementById('rayOpacityValue');
-
-        rayOpacitySlider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            const percentage = Math.round(value * 100);
-            rayOpacityValue.textContent = `${percentage}%`;
-            this.uiController.setRayOpacity(value);
-        });
-
-        // Action buttons
-        document.getElementById('cleanBtn').addEventListener('click', () => {
-            this.geometryController.removeNonEssentialLines();
-        });
-
-        document.getElementById('addIntersectionsBtn').addEventListener('click', () => {
-            const viewportBounds = this.viewportController.getViewportBounds();
-            this.geometryController.addIntersectionPoints(viewportBounds);
-        });
-
-        document.getElementById('exportBtn').addEventListener('click', () => {
-            this.exportImage();
-        });
-
-        document.getElementById('clearAllBtn').addEventListener('click', () => {
-            if (confirm('Clear all points and lines?')) {
-                this.geometryController.clearAll();
-                this.updateURL();
-                this.renderStats();
-            }
-        });
     }
 
     setupHistoryButtons() {
@@ -366,25 +264,6 @@ class Application {
                 dropdownTrigger.classList.remove('open');
                 dropdownContent.classList.remove('open');
             });
-        });
-    }
-
-    setupExamplesModal() {
-        const examplesModal = document.getElementById('examplesModal');
-        const closeModal = document.getElementById('closeModal');
-
-        closeModal.addEventListener('click', () => this.closeExamplesModal());
-
-        examplesModal.addEventListener('click', (e) => {
-            if (e.target === examplesModal) {
-                this.closeExamplesModal();
-            }
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && examplesModal.classList.contains('active')) {
-                this.closeExamplesModal();
-            }
         });
     }
 
@@ -711,48 +590,6 @@ class Application {
             link.click();
             URL.revokeObjectURL(url);
         }, 'image/png');
-    }
-
-    async openExamplesModal() {
-        const examplesModal = document.getElementById('examplesModal');
-        const examplesGrid = document.getElementById('examplesGrid');
-
-        examplesModal.classList.add('active');
-        document.body.classList.add('modal-open');
-
-        try {
-            const response = await fetch('src/examples/examples.json');
-            if (!response.ok) throw new Error('Failed to load examples');
-
-            const examples = await response.json();
-            examplesGrid.innerHTML = '';
-
-            Object.keys(examples).forEach(key => {
-                const example = examples[key];
-                const card = document.createElement('div');
-                card.className = 'example-card';
-                card.dataset.example = key;
-                card.innerHTML = `<div class="example-name">${example.name}</div>`;
-
-                card.addEventListener('click', async () => {
-                    await this.loadConfiguration(key);
-                    this.viewportController.centerOrigin();
-                    this.updateURL();
-                    this.closeExamplesModal();
-                });
-
-                examplesGrid.appendChild(card);
-            });
-        } catch (e) {
-            console.error('Failed to load examples:', e);
-            examplesGrid.innerHTML = '<div style="color: var(--fg-secondary); text-align: center;">Failed to load examples</div>';
-        }
-    }
-
-    closeExamplesModal() {
-        const examplesModal = document.getElementById('examplesModal');
-        examplesModal.classList.remove('active');
-        document.body.classList.remove('modal-open');
     }
 }
 

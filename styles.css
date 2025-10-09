@@ -15,14 +15,14 @@
 */
 
 :root {
-  --bg:     #161617;   /* darker background */
-  --fg:     #f3f3f3;   /* unchanged */
-  --muted:  #b9b9b9;   /* unchanged */
-  --line:   #222224;   /* darker divider */
-  --card:   #1c1c1e;   /* card slightly lighter than bg */
+  --bg:     #161617;  
+  --fg:     #f3f3f3;  
+  --muted:  #b9b9b9;  
+  --line:   #222224;   
+  --card:   #1c1c1e;   
   --shadow: rgba(0,0,0,0.5);
   --radius: 12px;
-  --maxw: 68ch;
+  --maxw: 80ch;
 }
 
 
@@ -30,7 +30,7 @@ html, body { height: 100%; }
 body{
   margin:0; background:var(--bg); color:var(--fg);
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-  font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   display: -webkit-box;
   display: -webkit-flex;
   display: flex;
@@ -66,11 +66,11 @@ hr{ border:0; border-top: 1px solid var(--line); margin: 2rem 0; }
   border-bottom: 1px solid var(--line);
 }
 .nav{ display:-webkit-box; display:-webkit-flex; display:flex; -webkit-box-align:center; -webkit-align-items:center; align-items:center; -webkit-box-pack:justify; -webkit-justify-content:space-between; justify-content:space-between; height:64px; }
-.brand{ 
-  font-family: ui-serif, Georgia, serif; 
-  font-size: 18px; 
-  letter-spacing:.2px; 
-  text-decoration: none; 
+.brand{
+  font-family: ui-serif, Georgia, serif;
+  font-size: 18px;
+  letter-spacing:.2px;
+  text-decoration: none;
 }
 .links{ display:-webkit-box; display:-webkit-flex; display:flex; gap: 18px; }
 .links a{ font-size: 14px; opacity:.85; text-decoration:none; }

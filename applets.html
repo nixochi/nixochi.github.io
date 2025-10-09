@@ -14,7 +14,102 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>xochi — applets</title>
   <meta name="description" content="Selected tools and visualizations." />
-  <link rel="stylesheet" href="styles.css" />
+  <style>
+:root {
+  --bg:     #161617;  
+  --fg:     #f3f3f3;  
+  --muted:  #b9b9b9;  
+  --line:   #222224;   
+  --card:   #1c1c1e;   
+  --shadow: rgba(0,0,0,0.5);
+  --radius: 12px;
+  --maxw: 80ch;
+}
+
+
+html, body { height: 100%; }
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+  -webkit-flex-direction: column;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+.wrapper{ max-width: 980px; margin: 0 auto; padding: 0 20px; }
+.prose{ max-width: var(--maxw); }
+
+h1, h2, h3{
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  letter-spacing: -0.01em; line-height: 1.15; margin: 0 0 .5rem;
+}
+h1{ font-size: clamp(28px, 3.6vw, 40px); }
+h2{ font-size: clamp(20px, 2.4vw, 28px); margin-top: 2rem; }
+h3{ font-size: 18px; }
+
+p{ margin: .6rem 0; }
+.muted{ color: var(--muted); }
+a{ color: inherit; text-underline-offset: 3px; }
+
+hr{ border:0; border-top: 1px solid var(--line); margin: 2rem 0; }
+
+.header{
+  position: sticky; top: 0; z-index: 10;
+  backdrop-filter: blur(6px);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+.nav{ display:-webkit-box; display:-webkit-flex; display:flex; -webkit-box-align:center; -webkit-align-items:center; align-items:center; -webkit-box-pack:justify; -webkit-justify-content:space-between; justify-content:space-between; height:64px; }
+.brand{
+  font-family: ui-serif, Georgia, serif;
+  font-size: 18px;
+  letter-spacing:.2px;
+  text-decoration: none;
+}
+.links{ display:-webkit-box; display:-webkit-flex; display:flex; gap: 18px; }
+.links a{ font-size: 14px; opacity:.85; text-decoration:none; }
+.links a:hover{ opacity:1; text-decoration: underline; }
+.links a[aria-current="page"]{ opacity:1; text-decoration: underline; }
+
+main{
+  padding: 48px 0;
+  flex: 1;
+}
+
+.card{
+  border:1px solid var(--line); background: var(--card);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 14px 16px 16px;
+}
+.grid{ display:-webkit-grid; display:grid; gap: 16px; }
+@media (min-width: 720px){ .grid.cols-2{ grid-template-columns: 1fr 1fr; } }
+
+footer { 
+  border-top: 1px solid var(--line); 
+  padding: 28px 0;
+}
+
+footer .wrapper {
+  max-width: 980px;
+  margin: 0 20px 0 auto;
+  padding: 0;
+  text-align: right;
+}
+
+footer small {
+  color: var(--muted);
+}
+
+.skip{ position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
+.skip:focus{ position:static; width:auto; height:auto; padding:8px; background:var(--card); border:1px solid var(--line); border-radius:8px; }
+  </style>
 </head>
 <body>
   <a href="#main" class="skip">skip to content</a>

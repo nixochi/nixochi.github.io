@@ -472,13 +472,6 @@ body.modal-open {
     transform: translateZ(0);
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .skeleton-spinner {
-        -webkit-animation: none;
-        animation: none;
-        border-top-color: var(--border);
-    }
-}
 
 @-webkit-keyframes spin {
     0% { -webkit-transform: rotate(0deg); }

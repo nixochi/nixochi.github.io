@@ -74,8 +74,6 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-bottom: 16px;
-            will-change: transform;
-            transform: translateZ(0); /* Force GPU acceleration */
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -100,7 +98,7 @@
     <!-- Loading skeleton - shows immediately, removed when ready -->
     <div class="skeleton-loader" id="skeleton" aria-live="polite" aria-label="Loading breathing visualization">
         <div class="skeleton-spinner"></div>
-        <div class="skeleton-text">Loading</div>
+    <div class="skeleton-text">Loading</div>
     </div>
 
     <script type="module">

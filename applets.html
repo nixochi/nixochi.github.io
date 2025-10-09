@@ -32,96 +32,86 @@
   </header>
 
   <main id="main">
-    <div class="wrapper">
-      <h1 class="prose">applets</h1>
-      <p class="prose muted">here are some small math apps.</p>
+    <div class="wrapper prose">
+      <h1>applets</h1>
+      <p class="muted">here are some small math apps.</p>
 
-      <div class="grid cols-2" style="margin-top: 16px;">
-        <article class="card" data-href="apps/point-configuration">
-          <h3>point configurations</h3>
-          <p class="muted">study point configurations and their related matroids</p>
-          <p><a href="index.html">read more</a></p>
-        </article>
-
-        <article class="card" data-href="apps/polytope-viewer">
-          <h3>polytope viewer</h3>
-          <p class="muted">explore the 3d polytopes that appear in math.</p>
-          <p><a href="apps/polytope-viewer/about.html">read more</a></p>
-        </article>
-
-        <article class="card" data-href="apps/voronoi-viewer">
-          <h3>voronoi cells</h3>
-          <p class="muted">small, reusable components for charts and tables with careful defaults for accessibility.</p>
-          <p><a href="index.html">read more</a></p>
-        </article>
-
-        <article class="card" data-href="apps/mirror-curves">
-          <h3>mirror curves</h3>
-          <p class="muted">explore the math that has appeared in many cultures around the world.</p>
-          <p><a href ="index.html">read more</a></p>
-        </article>
-
-        <article class="card" data-href="apps/gaussian-periods">
-          <h3>gaussian periods</h3>
-          <p class="muted">see the beauty of gaussian periods.</p>
-          <p><a href="index.html">read more</a></p>
-        </article>
-
-        
+      <div style="margin-top: 16px;">
+        <div class="applet-row">
+          <div class="applet-info">
+            <div class="applet-name"><a href="apps/point-configuration">point configurations</a></div>
+            <div class="applet-text">study point configurations and their related matroids</div>
+          </div>
+          <a href="apps/point-configuration" class="applet-link">more info →</a>
+        </div>
+        <div class="applet-row">
+          <div class="applet-info">
+            <div class="applet-name"><a href="apps/polytope-viewer">polytope viewer</a></div>
+            <div class="applet-text">explore the 3d polytopes that appear in math.</div>
+          </div>
+          <a href="apps/polytope-viewer" class="applet-link">more info →</a>
+        </div>
+        <div class="applet-row">
+          <div class="applet-info">
+            <div class="applet-name"><a href="apps/voronoi-viewer">voronoi cells</a></div>
+            <div class="applet-text">small, reusable components for charts and tables with careful defaults for accessibility.</div>
+          </div>
+          <a href="apps/voronoi-viewer" class="applet-link">more info →</a>
+        </div>
+        <div class="applet-row">
+          <div class="applet-info">
+            <div class="applet-name"><a href="apps/mirror-curves">mirror curves</a></div>
+            <div class="applet-text">explore the math that has appeared in many cultures around the world.</div>
+          </div>
+          <a href="apps/mirror-curves" class="applet-link">more info →</a>
+        </div>
+        <div class="applet-row">
+          <div class="applet-info">
+            <div class="applet-name"><a href="apps/gaussian-periods">gaussian periods</a></div>
+            <div class="applet-text">see the beauty of gaussian periods.</div>
+          </div>
+          <a href="apps/gaussian-periods" class="applet-link">more info →</a>
+        </div>
       </div>
     </div>
   </main>
 
-  <script>
-function setupCards() {
-  const cards = document.querySelectorAll('.card[data-href]');
+  <style>
+    .applet-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .applet-row:last-child { border-bottom: none; }
+    .applet-info { flex: 1; }
+    .applet-name {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    .applet-name a {
+      color: #4a9eff;
+      text-decoration: none;
+    }
+    .applet-name a:hover {
+      text-decoration: underline;
+    }
+    .applet-text {
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .applet-link {
+      flex-shrink: 0;
+      margin-left: 16px;
+      font-size: 14px;
+      text-decoration: none;
+    }
+    .applet-link:hover {
+      text-decoration: underline;
+    }
+  </style>
 
-  cards.forEach(card => {
-    // Reset styles first
-    card.style.cursor = 'pointer';
-    card.style.transform = 'translateY(0)';
-    card.style.boxShadow = 'var(--shadow)';
-    card.style.borderColor = 'var(--line)';
-  });
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  const cards = document.querySelectorAll('.card[data-href]');
-
-  cards.forEach(card => {
-    card.style.cursor = 'pointer';
-
-    card.addEventListener('click', function(e) {
-      // Don't trigger if clicking on a link inside the card
-      if (e.target.tagName === 'A') return;
-
-      const href = this.getAttribute('data-href');
-      if (href) {
-        window.location.href = href;
-      }
-    });
-
-    card.addEventListener('mouseenter', function() {
-      this.style.transform = 'translateY(-1px)';
-      this.style.boxShadow = '0 1px 0 rgba(0,0,0,.02), 0 12px 28px rgba(0,0,0,.08)';
-      this.style.borderColor = 'color-mix(in srgb, var(--line) 80%, var(--fg) 20%)';
-    });
-
-    card.addEventListener('mouseleave', function() {
-      this.style.transform = 'translateY(0)';
-      this.style.boxShadow = 'var(--shadow)';
-      this.style.borderColor = 'var(--line)';
-    });
-  });
-});
-
-// Reset styles when page is restored from cache (back button)
-window.addEventListener('pageshow', function(event) {
-  if (event.persisted) {
-    setupCards();
-  }
-});
-  </script>
 
   <footer>
     <div class="wrapper">

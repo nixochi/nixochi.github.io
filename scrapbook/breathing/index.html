@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nested Permutahedra</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: monospace;
+            color: #fff;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { Line2 } from 'three/addons/lines/Line2.js';
+        import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+        import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+
+        // Load QuickHull for proper face computation
+        const qhMod = await import('https://esm.sh/quickhull3d@3.1.1');
+        const qh = qhMod.default || qhMod.quickhull3d || qhMod.qh || qhMod;
+
+        // Permutahedron vertices from your polytope-data.js
+        const permutahedronVertices = [
+            [-2.121320343559642, -0.408248290463863,  0.577350269189626],
+            [-2.121320343559642,  0.408248290463863, -0.577350269189626],
+            [-1.414213562373095, -1.632993161855452,  0.577350269189626],
+            [-1.414213562373095,  0.000000000000000, -1.732050807568877],
+            [-1.414213562373095,  0.000000000000000,  1.732050807568877],
+            [-1.414213562373095,  1.632993161855452, -0.577350269189626],
+            [-0.707106781186548, -2.041241452319315, -0.577350269189626],
+            [-0.707106781186548, -1.224744871391589, -1.732050807568877],
+            [-0.707106781186548, -1.224744871391589,  1.732050807568877],
+            [-0.707106781186548,  1.224744871391589, -1.732050807568877],
+            [-0.707106781186548,  1.224744871391589,  1.732050807568877],
+            [-0.707106781186548,  2.041241452319315,  0.577350269189626],
+            [ 0.707106781186548, -2.041241452319315, -0.577350269189626],
+            [ 0.707106781186548, -1.224744871391589, -1.732050807568877],
+            [ 0.707106781186548, -1.224744871391589,  1.732050807568877],
+            [ 0.707106781186548,  1.224744871391589, -1.732050807568877],
+            [ 0.707106781186548,  1.224744871391589,  1.732050807568877],
+            [ 0.707106781186548,  2.041241452319315,  0.577350269189626],
+            [ 1.414213562373095, -1.632993161855452,  0.577350269189626],
+            [ 1.414213562373095,  0.000000000000000, -1.732050807568877],
+            [ 1.414213562373095,  0.000000000000000,  1.732050807568877],
+            [ 1.414213562373095,  1.632993161855452, -0.577350269189626],
+            [ 2.121320343559642, -0.408248290463863,  0.577350269189626],
+            [ 2.121320343559642,  0.408248290463863, -0.577350269189626]
+        ];
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Add orbit controls for zoom and rotation
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.enableZoom = true;
+        controls.zoomSpeed = 1.2;
+
+        // Get edges from faces (proper wireframe)
+        function getEdgesFromFaces(faces) {
+            const edgeSet = new Set();
+
+            faces.forEach(face => {
+                if (!face || face.length < 3) return;
+
+                const n = face.length;
+                for (let i = 0; i < n; i++) {
+                    const a = face[i];
+                    const b = face[(i + 1) % n];
+
+                    const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+                    edgeSet.add(key);
+                }
+            });
+
+            return Array.from(edgeSet, key => {
+                const [a, b] = key.split('-').map(Number);
+                return [a, b];
+            });
+        }
+
+        // Global rendering parameters
+        let lineThickness = 1.5;
+        let polytopeSpacing = 0.29;
+
+        // Create permutahedron wireframe geometry
+        function createPermutahedron(scale, color, opacity) {
+            const group = new THREE.Group();
+
+            // Get faces using QuickHull
+            const faces = qh(permutahedronVertices, { skipTriangulation: true });
+
+            // Get edges from faces
+            const edges = getEdgesFromFaces(faces);
+
+            // Create line for each edge using Line2 for proper thickness support
+            edges.forEach(([a, b]) => {
+                const vertexA = permutahedronVertices[a];
+                const vertexB = permutahedronVertices[b];
+
+                const geometry = new LineGeometry();
+                const positions = [
+                    vertexA[0], vertexA[1], vertexA[2],
+                    vertexB[0], vertexB[1], vertexB[2]
+                ];
+                geometry.setPositions(positions);
+
+                const material = new LineMaterial({
+                    color: color,
+                    linewidth: lineThickness,
+                    transparent: true,
+                    opacity: opacity,
+                    resolution: new THREE.Vector2(window.innerWidth, window.innerHeight)
+                });
+
+                const line = new Line2(geometry, material);
+                group.add(line);
+            });
+
+            group.scale.set(scale, scale, scale);
+            group.userData.baseScale = scale;
+            group.userData.color = color;
+            group.userData.opacity = opacity;
+            return group;
+        }
+
+        // Create 5 nested permutahedra at different scales with bigger spacing
+        const permutahedra = [
+            createPermutahedron(0.1, 0xffffff, 0.95),   // Smallest, white
+            createPermutahedron(0.3, 0x3366ff, 0.85),   // Small, blue
+            createPermutahedron(0.5, 0x00ff66, 0.75),   // Medium, green
+            createPermutahedron(0.7, 0xffcc00, 0.65),   // Large, gold
+            createPermutahedron(0.9, 0xff3366, 0.55)    // Largest, red-pink
+        ];
+
+        // Function to update polytope spacing
+        function updatePolytopeSpacing() {
+            permutahedra.forEach((p, i) => {
+                const newScale = (i + 1) * polytopeSpacing;
+                p.scale.set(newScale, newScale, newScale);
+                p.userData.baseScale = newScale;
+            });
+        }
+
+        permutahedra.forEach(p => scene.add(p));
+
+        // Apply initial spacing
+        updatePolytopeSpacing();
+
+        // Position camera
+        camera.position.z = 8;
+
+        // Animation state - controlled by sliders
+        let time = 0;
+        let cycleDuration = 18000;
+        let syncRotationSpeed = 0.01;
+        let easingPower = 2;
+        let offsetMultiplier = 1.5;
+
+        // Sync target angle (continuously rotating)
+        let syncAngleX = 0;
+        let syncAngleY = 0;
+
+        // Base offsets (multiplied by offsetMultiplier and individual values)
+        const baseOffsets = [
+            { x: 0, y: 0 },
+            { x: 0.15, y: 0.18 },
+            { x: 0.30, y: 0.36 },
+            { x: 0.45, y: 0.54 },
+            { x: 0.60, y: 0.72 }
+        ];
+
+        // Size variation factors (how much each polytope scales beyond base size)
+        // Smaller polytopes get smaller, larger get larger
+        const sizeVariationFactors = [
+            -0.45, // Smallest: shrinks to 55% of base
+            -0.22, // Gets smaller
+            0.0,   // Middle stays at base
+            0.22,  // Gets larger
+            0.45   // Largest: grows to 145% of base
+        ];
+
+        // Random phase offsets for size oscillation
+        const sizePhaseOffsets = [
+            Math.random() * Math.PI * 2,
+            Math.random() * Math.PI * 2,
+            Math.random() * Math.PI * 2,
+            Math.random() * Math.PI * 2,
+            Math.random() * Math.PI * 2
+        ];
+
+        // Dynamic easing function
+        function easeInOutDynamic(t, power) {
+            const divisor = Math.pow(2, power - 1);
+            return t < 0.5 ? divisor * Math.pow(t, power) : 1 - Math.pow(-2 * t + 2, power) / 2;
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const deltaTime = 16; // approximately 60fps
+            time += deltaTime;
+
+            // Calculate cycle progress (0 to 1)
+            const cycleProgress = (time % cycleDuration) / cycleDuration;
+
+            // Calculate asyncAmount using a sine wave
+            // 0 = fully synced, 1 = maximum async
+            const rawCycle = Math.sin(cycleProgress * Math.PI * 2);
+            const asyncAmount = easeInOutDynamic(Math.abs(rawCycle), easingPower);
+
+            // Update sync target angle (always rotating)
+            syncAngleX += syncRotationSpeed;
+            syncAngleY += syncRotationSpeed;
+
+            // Update each permutahedron
+            permutahedra.forEach((p, i) => {
+                // Calculate current offset with multiplier
+                const offsetX = baseOffsets[i].x * Math.PI * offsetMultiplier;
+                const offsetY = baseOffsets[i].y * Math.PI * offsetMultiplier;
+
+                // Set rotation to: syncAngle + (offset * asyncAmount)
+                p.rotation.x = syncAngleX + (offsetX * asyncAmount);
+                p.rotation.y = syncAngleY + (offsetY * asyncAmount);
+
+                // Calculate size variation with phase offset for non-uniform timing
+                const sizePhase = cycleProgress * Math.PI * 2 + sizePhaseOffsets[i];
+                const sizeOscillation = Math.sin(sizePhase);
+                const sizeFactor = easeInOutDynamic(Math.abs(sizeOscillation), easingPower);
+
+                // Calculate scale: baseScale + (sizeVariation * sizeFactor)
+                const baseScale = (i + 1) * polytopeSpacing;
+                const sizeVariation = baseScale * sizeVariationFactors[i];
+                const finalScale = baseScale + (sizeVariation * sizeFactor);
+
+                p.scale.set(finalScale, finalScale, finalScale);
+            });
+
+            // Update controls
+            controls.update();
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            // Update line material resolutions
+            permutahedra.forEach(p => {
+                p.traverse(child => {
+                    if (child.material && child.material.isLineMaterial) {
+                        child.material.resolution.set(window.innerWidth, window.innerHeight);
+                    }
+                });
+            });
+        });
+
+        animate();
+    </script>
+</body>
+</html>

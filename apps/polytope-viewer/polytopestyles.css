@@ -464,19 +464,30 @@ body.modal-open {
     border: 3px solid var(--border);
     border-top-color: var(--fg-secondary);
     border-radius: 50%;
+    -webkit-animation: spin 1s linear infinite;
     animation: spin 1s linear infinite;
     margin-bottom: 16px;
+    will-change: transform;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
 }
 
 @media (prefers-reduced-motion: reduce) {
     .skeleton-spinner {
+        -webkit-animation: none;
         animation: none;
         border-top-color: var(--border);
     }
 }
 
+@-webkit-keyframes spin {
+    0% { -webkit-transform: rotate(0deg); }
+    100% { -webkit-transform: rotate(360deg); }
+}
+
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 .skeleton-text {

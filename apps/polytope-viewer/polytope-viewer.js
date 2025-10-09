@@ -105,11 +105,15 @@ class PolytopeViewer extends HTMLElement {
         
         this.setupEventListeners();
         this.parseAttributes();
-        this.initialize().catch(err => {
-            console.error('❌ PolytopeViewer initialization error:', err);
-            this.showError(err.message || 'Unknown error occurred');
+
+        // Defer initialization to next frame to allow loading spinner to render
+        requestAnimationFrame(() => {
+            this.initialize().catch(err => {
+                console.error('❌ PolytopeViewer initialization error:', err);
+                this.showError(err.message || 'Unknown error occurred');
+            });
         });
-        
+
         console.log('✅ PolytopeViewer HTML rendered successfully');
     }
     

@@ -92,3 +92,8 @@ footer small {
 
 .skip{ position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
 .skip:focus{ position:static; width:auto; height:auto; padding:8px; background:var(--card); border:1px solid var(--line); border-radius:8px; }
+
+/* Entry name styling for blue links */
+.entry-name { font-weight: 500; margin-bottom: 2px; }
+.entry-name a { color: #4a9eff; text-decoration: none; }
+.entry-name a:hover { text-decoration: underline; }

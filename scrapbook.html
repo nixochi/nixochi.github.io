@@ -109,6 +109,11 @@ footer small {
 
 .skip{ position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden; }
 .skip:focus{ position:static; width:auto; height:auto; padding:8px; background:var(--card); border:1px solid var(--line); border-radius:8px; }
+
+/* Entry name styling for blue links */
+.entry-name { font-weight: 500; margin-bottom: 2px; }
+.entry-name a { color: #4a9eff; text-decoration: none; }
+.entry-name a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -130,9 +135,10 @@ footer small {
     <div class="wrapper prose">
       <h1>scrapbook</h1>
       <p class="muted">small ideas</p>
-      <ul style="list-style:none; padding-left:0;">
-        <li><a href="scrapbook/nested/" style="color: #4a9eff; text-decoration: none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">nested</a></li>
-      </ul>
+      <div class="grid cols-2" style="margin-top: 16px;">
+        <div class="entry-name"><a href="scrapbook/nested/">200 nested permutahedra</a></div>
+        <div class="entry-name"><a href="scrapbook/rain/">raining polytopes</a></div>
+      </div>
     </div>
   </main>
 

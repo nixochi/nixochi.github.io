@@ -12,7 +12,7 @@ const NUM_NESTED_POLYTOPES = 200;  // Number of nested polytopes to render
 const TIME_MULTIPLIER = 0.3;
 
 // Animation Phase Durations (in milliseconds)
-const SYNCED_SLOW_DURATION = 1000 / TIME_MULTIPLIER;        // Phase 1: Synced, slow rotation
+const SYNCED_SLOW_DURATION = 500 / TIME_MULTIPLIER;        // Phase 1: Synced, slow rotation
 const DESYNC_SPEEDUP_DURATION = 4000 / TIME_MULTIPLIER;     // Phase 2: Desyncing and speeding up
 const DESYNC_SLOWDOWN_DURATION = 4000 / TIME_MULTIPLIER;    // Phase 3: Desynced, slowing down
 const DESYNCED_SLOW_DURATION = 2000 / TIME_MULTIPLIER;      // Phase 4: Desynced, slow rotation

@@ -25,7 +25,7 @@ const FAST_ROTATION_SPEED = 0.04;         // Fast rotation speed
 
 // Size settings (based on speed)
 const MAX_SPEED_SIZE = 1;              // Size multiplier at slow speed
-const MIN_SPEED_SIZE = 0.7;              // Size multiplier at fast speed
+const MIN_SPEED_SIZE = 0.6;              // Size multiplier at fast speed
 
 // Camera settings
 const INITIAL_RADIUS = 110;              // Initial camera distance from origin
@@ -731,7 +731,7 @@ void main() {
             isSyncing = false;
         } else if (cycleTime < t5) {
             // Phase 5: smoothly speed up (in reversed direction)
-            phaseName = "5: Sync 30% & Speed Up";
+            phaseName = "5: Sync Halfway & Speed Up";
             phaseProgress = (cycleTime - t4) / SYNC_SPEEDUP_DURATION;
             speedProgress = this.smootherstep(phaseProgress);
             baseSpeed = SLOW_ROTATION_SPEED + (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
@@ -748,7 +748,7 @@ void main() {
         }
 
         // Calculate desync using a globally smooth curve
-        // Desync transitions: 0 -> 1 -> 1 -> 1 -> 0.7 -> 0
+        // Desync transitions: 0 -> 1 -> 1 -> 1 -> 0.5 -> 0
         if (cycleTime < t1) {
             // Phase 1: synced
             desyncAmount = 0;
@@ -759,13 +759,13 @@ void main() {
             // Phases 3-4: stay desynced at 1
             desyncAmount = 1;
         } else if (cycleTime < t5) {
-            // Phase 5: smoothly sync 30% from 1 to 0.7
+            // Phase 5: smoothly sync halfway from 1 to 0.5
             const progress = this.smootherstep((cycleTime - t4) / SYNC_SPEEDUP_DURATION);
-            desyncAmount = 1 - (progress * 0.3);
+            desyncAmount = 1 - (progress * 0.5);
         } else {
-            // Phase 6: smoothly sync rest of way from 0.7 to 0
+            // Phase 6: smoothly sync rest of way from 0.5 to 0
             const progress = this.smootherstep((cycleTime - t5) / SYNC_SLOWDOWN_DURATION);
-            desyncAmount = 0.7 - (progress * 0.7);
+            desyncAmount = 0.5 - (progress * 0.5);
         }
 
         return { desyncAmount, rotationSpeed, phaseName, phaseProgress, isSyncing };

@@ -18,7 +18,7 @@ const SYNC_SLOWDOWN_DURATION = 4000;      // Phase 6: Syncing rest of way and sl
 
 // Speed settings
 const SLOW_ROTATION_SPEED = 0.01;        // Slow rotation speed
-const FAST_ROTATION_SPEED = 0.2;         // Fast rotation speed
+const FAST_ROTATION_SPEED = 0.05;         // Fast rotation speed
 
 // Desync settings
 const MAX_DESYNC_PERCENTAGE = 1;       // Maximum desync as percentage of full rotation (1.0 = full rotation)
@@ -36,7 +36,7 @@ class BreathingViz extends HTMLElement {
         // Camera state (spherical coordinates)
         // Start zoomed out enough to see the largest polytope
         const largestPolytopeSize = NUM_NESTED_POLYTOPES * (20 / NUM_NESTED_POLYTOPES);
-        const initialRadius =largestPolytopeSize * 5.0;
+        const initialRadius =largestPolytopeSize * 6.0;
         this.spherical = {
             radius: initialRadius,
             theta: Math.PI / 4,
@@ -72,6 +72,10 @@ class BreathingViz extends HTMLElement {
         // Shared base angles (all polytopes sync to these)
         this.baseAngleX = 0;
         this.baseAngleY = 0;
+
+        // Rotation direction: 1 for forward, -1 for reverse
+        // Flips during phase 4 of each cycle
+        this.rotationDirection = 1;
 
         // Generate speed multipliers for each polytope
         // When fully desynced, each polytope rotates at a different speed
@@ -176,7 +180,57 @@ class BreathingViz extends HTMLElement {
             transition: opacity 0.5s ease;
         `;
 
+        // Create debug UI
+        const debugDiv = document.createElement('div');
+        debugDiv.id = 'debug-ui';
+        debugDiv.style.cssText = `
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            min-width: 300px;
+            z-index: 1000;
+        `;
+
+        // Progress bar
+        const progressBar = document.createElement('div');
+        progressBar.id = 'progress-bar';
+        progressBar.style.cssText = `
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        `;
+
+        const progressFill = document.createElement('div');
+        progressFill.id = 'progress-fill';
+        progressFill.style.cssText = `
+            height: 100%;
+            background: #4CAF50;
+            width: 0%;
+            transition: width 0.1s linear;
+        `;
+
+        progressBar.appendChild(progressFill);
+
+        // Phase text
+        const phaseText = document.createElement('div');
+        phaseText.id = 'phase-text';
+        phaseText.textContent = 'Phase: Loading...';
+
+        debugDiv.appendChild(progressBar);
+        debugDiv.appendChild(phaseText);
+
         container.appendChild(canvas);
+        container.appendChild(debugDiv);
         this.innerHTML = '';
         this.appendChild(container);
 
@@ -551,7 +605,17 @@ void main() {
         this.time += deltaTime;
 
         const cycleTime = this.time % this.cycleDuration;
-        const { desyncAmount, rotationSpeed } = this.calculatePhaseValues(cycleTime);
+        const lastCycleTime = (this.time - deltaTime) % this.cycleDuration;
+
+        // Flip direction at cycle boundary (when we wrap from phase 6 back to phase 1)
+        if (cycleTime < lastCycleTime) {
+            this.rotationDirection *= -1;
+        }
+
+        const { desyncAmount, rotationSpeed, phaseName, phaseProgress, isSyncing } = this.calculatePhaseValues(cycleTime);
+
+        // Update debug UI
+        this.updateDebugUI(phaseName, phaseProgress, desyncAmount, rotationSpeed);
 
         // Update shared base angles (all polytopes sync to these)
         this.baseAngleX += rotationSpeed;
@@ -568,11 +632,21 @@ void main() {
             p.driftX += driftSpeedX;
             p.driftY += driftSpeedY;
 
-            // Final rotation = base + drift * desyncAmount
-            // When desyncAmount = 0: all polytopes at baseAngle (synced)
-            // When desyncAmount = 1: each polytope at baseAngle + full drift (desynced)
-            p.rotationX = this.baseAngleX + (p.driftX * desyncAmount);
-            p.rotationY = this.baseAngleY + (p.driftY * desyncAmount);
+            // Apply decay to drift ONLY during active syncing phases (5 and 6)
+            // Decay strength is proportional to how much we've synced (1 - desyncAmount)
+            // This ensures smooth, continuous transitions with no discontinuities
+            if (isSyncing) {
+                const syncProgress = 1 - desyncAmount; // 0 at phase 5 start, 1 at phase 6 end
+                const maxDecay = 0.015; // Maximum decay per frame (when fully synced)
+                const decayFactor = 1 - (syncProgress * maxDecay);
+                p.driftX *= decayFactor;
+                p.driftY *= decayFactor;
+            }
+
+            // Final rotation = base + drift (no scaling to avoid visual reversal)
+            // Drift naturally decays to zero when syncing, maintaining forward rotation
+            p.rotationX = this.baseAngleX + p.driftX;
+            p.rotationY = this.baseAngleY + p.driftY;
 
             // Size oscillation
             const cycleProgress = cycleTime / this.cycleDuration;
@@ -593,6 +667,26 @@ void main() {
         return t * t * t * (t * (t * 6 - 15) + 10);
     }
 
+    updateDebugUI(phaseName, phaseProgress, desyncAmount, rotationSpeed) {
+        const phaseText = this.querySelector('#phase-text');
+        const progressFill = this.querySelector('#progress-fill');
+
+        if (phaseText && this.polytopes.length > 0) {
+            // Sample drift from last polytope (most drift)
+            const lastPoly = this.polytopes[this.polytopes.length - 1];
+            phaseText.innerHTML = `
+                Phase: ${phaseName}<br>
+                Desync: ${desyncAmount.toFixed(2)} | Speed: ${rotationSpeed.toFixed(3)}<br>
+                Drift: ${lastPoly.driftX.toFixed(3)} | Dir: ${this.rotationDirection > 0 ? '+' : '-'}
+            `;
+        }
+
+        if (progressFill) {
+            const progressPercent = (phaseProgress * 100).toFixed(1);
+            progressFill.style.width = `${progressPercent}%`;
+        }
+    }
+
     calculatePhaseValues(cycleTime) {
         const t1 = SYNCED_SLOW_DURATION;
         const t2 = t1 + DESYNC_SPEEDUP_DURATION;
@@ -600,34 +694,60 @@ void main() {
         const t4 = t3 + DESYNCED_SLOW_DURATION;
         const t5 = t4 + SYNC_SPEEDUP_DURATION;
 
-        let desyncAmount, rotationSpeed;
+        let desyncAmount, rotationSpeed, phaseName, phaseProgress, isSyncing;
 
-        // Calculate speed using a globally smooth curve
-        // Speed transitions: SLOW -> FAST -> SLOW -> SLOW -> FAST -> SLOW
+        // Calculate base speed (magnitude) for each phase
         let speedProgress = 0;
+        let baseSpeed; // Speed magnitude before applying direction
 
         if (cycleTime < t1) {
             // Phase 1: constant slow
-            rotationSpeed = SLOW_ROTATION_SPEED;
+            phaseName = "1: Synced Slow";
+            phaseProgress = cycleTime / SYNCED_SLOW_DURATION;
+            baseSpeed = SLOW_ROTATION_SPEED;
+            rotationSpeed = baseSpeed * this.rotationDirection;
+            isSyncing = false;
         } else if (cycleTime < t2) {
             // Phase 2: smoothly speed up
-            speedProgress = this.smootherstep((cycleTime - t1) / DESYNC_SPEEDUP_DURATION);
-            rotationSpeed = SLOW_ROTATION_SPEED + (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
+            phaseName = "2: Desync & Speed Up";
+            phaseProgress = (cycleTime - t1) / DESYNC_SPEEDUP_DURATION;
+            speedProgress = this.smootherstep(phaseProgress);
+            baseSpeed = SLOW_ROTATION_SPEED + (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
+            rotationSpeed = baseSpeed * this.rotationDirection;
+            isSyncing = false;
         } else if (cycleTime < t3) {
             // Phase 3: smoothly slow down
-            speedProgress = this.smootherstep((cycleTime - t2) / DESYNC_SLOWDOWN_DURATION);
-            rotationSpeed = FAST_ROTATION_SPEED - (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
+            phaseName = "3: Desync & Slow Down";
+            phaseProgress = (cycleTime - t2) / DESYNC_SLOWDOWN_DURATION;
+            speedProgress = this.smootherstep(phaseProgress);
+            baseSpeed = FAST_ROTATION_SPEED - (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
+            rotationSpeed = baseSpeed * this.rotationDirection;
+            isSyncing = false;
         } else if (cycleTime < t4) {
-            // Phase 4: constant slow
-            rotationSpeed = SLOW_ROTATION_SPEED;
+            // Phase 4: smoothly reverse from rotationDirection to -rotationDirection
+            phaseName = "4: Desynced Slow (Reversing)";
+            phaseProgress = (cycleTime - t3) / DESYNCED_SLOW_DURATION;
+            speedProgress = this.smootherstep(phaseProgress);
+            // Smoothly transition the direction multiplier from +1 to -1 (relative to rotationDirection)
+            const directionMultiplier = 1 - (speedProgress * 2); // Goes from 1 to -1
+            rotationSpeed = SLOW_ROTATION_SPEED * this.rotationDirection * directionMultiplier;
+            isSyncing = false;
         } else if (cycleTime < t5) {
-            // Phase 5: smoothly speed up
-            speedProgress = this.smootherstep((cycleTime - t4) / SYNC_SPEEDUP_DURATION);
-            rotationSpeed = SLOW_ROTATION_SPEED + (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
+            // Phase 5: smoothly speed up (in reversed direction)
+            phaseName = "5: Sync Halfway & Speed Up";
+            phaseProgress = (cycleTime - t4) / SYNC_SPEEDUP_DURATION;
+            speedProgress = this.smootherstep(phaseProgress);
+            baseSpeed = SLOW_ROTATION_SPEED + (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
+            rotationSpeed = baseSpeed * (-this.rotationDirection); // Reversed from phases 1-3
+            isSyncing = true;
         } else {
-            // Phase 6: smoothly slow down
-            speedProgress = this.smootherstep((cycleTime - t5) / SYNC_SLOWDOWN_DURATION);
-            rotationSpeed = FAST_ROTATION_SPEED - (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
+            // Phase 6: smoothly slow down (in reversed direction)
+            phaseName = "6: Sync Complete & Slow Down";
+            phaseProgress = (cycleTime - t5) / SYNC_SLOWDOWN_DURATION;
+            speedProgress = this.smootherstep(phaseProgress);
+            baseSpeed = FAST_ROTATION_SPEED - (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
+            rotationSpeed = baseSpeed * (-this.rotationDirection); // Reversed from phases 1-3
+            isSyncing = true;
         }
 
         // Calculate desync using a globally smooth curve
@@ -651,7 +771,7 @@ void main() {
             desyncAmount = 0.5 - (progress * 0.5);
         }
 
-        return { desyncAmount, rotationSpeed };
+        return { desyncAmount, rotationSpeed, phaseName, phaseProgress, isSyncing };
     }
 
     render() {

@@ -12,8 +12,8 @@ const NUM_NESTED_POLYTOPES = 200;  // Number of nested polytopes to render
 const TIME_MULTIPLIER = 0.3;
 
 // Animation Phase Durations (in milliseconds)
-const SYNCED_SLOW_DURATION = 1500 / TIME_MULTIPLIER;        // Phase 1: Synced, slow rotation
-const DESYNC_SPEEDUP_DURATION = 5500 / TIME_MULTIPLIER;     // Phase 2: Desyncing and speeding up
+const SYNCED_SLOW_DURATION = 1000 / TIME_MULTIPLIER;        // Phase 1: Synced, slow rotation
+const DESYNC_SPEEDUP_DURATION = 4000 / TIME_MULTIPLIER;     // Phase 2: Desyncing and speeding up
 const DESYNC_SLOWDOWN_DURATION = 4000 / TIME_MULTIPLIER;    // Phase 3: Desynced, slowing down
 const DESYNCED_SLOW_DURATION = 2000 / TIME_MULTIPLIER;      // Phase 4: Desynced, slow rotation
 const SYNC_SPEEDUP_DURATION = 4000 / TIME_MULTIPLIER;       // Phase 5: Syncing halfway and speeding up
@@ -731,7 +731,7 @@ void main() {
             isSyncing = false;
         } else if (cycleTime < t5) {
             // Phase 5: smoothly speed up (in reversed direction)
-            phaseName = "5: Sync Halfway & Speed Up";
+            phaseName = "5: Sync 30% & Speed Up";
             phaseProgress = (cycleTime - t4) / SYNC_SPEEDUP_DURATION;
             speedProgress = this.smootherstep(phaseProgress);
             baseSpeed = SLOW_ROTATION_SPEED + (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
@@ -748,7 +748,7 @@ void main() {
         }
 
         // Calculate desync using a globally smooth curve
-        // Desync transitions: 0 -> 1 -> 1 -> 1 -> 0.5 -> 0
+        // Desync transitions: 0 -> 1 -> 1 -> 1 -> 0.7 -> 0
         if (cycleTime < t1) {
             // Phase 1: synced
             desyncAmount = 0;
@@ -759,13 +759,13 @@ void main() {
             // Phases 3-4: stay desynced at 1
             desyncAmount = 1;
         } else if (cycleTime < t5) {
-            // Phase 5: smoothly sync halfway from 1 to 0.5
+            // Phase 5: smoothly sync 30% from 1 to 0.7
             const progress = this.smootherstep((cycleTime - t4) / SYNC_SPEEDUP_DURATION);
-            desyncAmount = 1 - (progress * 0.5);
+            desyncAmount = 1 - (progress * 0.3);
         } else {
-            // Phase 6: smoothly sync rest of way from 0.5 to 0
+            // Phase 6: smoothly sync rest of way from 0.7 to 0
             const progress = this.smootherstep((cycleTime - t5) / SYNC_SLOWDOWN_DURATION);
-            desyncAmount = 0.5 - (progress * 0.5);
+            desyncAmount = 0.7 - (progress * 0.7);
         }
 
         return { desyncAmount, rotationSpeed, phaseName, phaseProgress, isSyncing };

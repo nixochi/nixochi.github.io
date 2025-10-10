@@ -1,6 +1,6 @@
 /**
- * Polytope Rain Visualization Web Component (Instanced Rendering)
- * Permutahedra falling like rain drops - optimized version
+ * polytope rain webcomponent
+ * i had a dream like this once
  */
 
 // ============================================
@@ -18,47 +18,41 @@ const MIN_ROTATION_SPEED = 0;        // Minimum rotation speed per axis
 const ROTATION_SPEED_VARIATION = 0.1; // Additional random rotation speed
 const MIN_POLYTOPE_SIZE = 0.4;       // Minimum size of each polytope
 const POLYTOPE_SIZE_VARIATION = 0.5; // Additional random size (0 to this value)
-const MAX_POLYTOPES = 30000;           // Maximum polytopes at once (can be much higher now!)
+const MAX_POLYTOPES = 30000;           // Maximum polytopes at once 
 // ============================================
 
 class PolytopeRain extends HTMLElement {
     constructor() {
         super();
 
-        // WebGL objects
         this.gl = null;
         this.prog = null;
         this.polytopeGeometry = null;
         this.instanceBuffer = null;
         this.instanceData = null;
 
-        // Object pool for particles
         this.particlePool = [];
         this.activeParticleCount = 0;
-        this.freeParticleIndices = []; // Stack of available particle indices (O(1) access)
-        this.activeParticleIndices = []; // List of currently active particle indices
+        this.freeParticleIndices = [];
+        this.activeParticleIndices = [];
         this.initializeParticlePool();
 
-        // Animation
         this.animationId = null;
         this._ro = null;
-        this.spawnAccumulator = 0; // Accumulator for fractional spawn rates
-        this.currentSpawnRate = DRIZZLE_RATE; // Default to drizzle mode
+        this.spawnAccumulator = 0;
+        this.currentSpawnRate = DRIZZLE_RATE;
 
-        // FPS tracking
         this.frameInterval = 1000 / TARGET_FPS;
         this.lastFrameTime = 0;
         this.frameCount = 0;
         this.lastSecondTimestamp = 0;
         this.currentFPS = 0;
-        this.fpsUpdateInterval = 500; // Update FPS display every 500ms
+        this.fpsUpdateInterval = 500;
         this.lastFpsUpdate = 0;
 
-        // Screen dimensions for spawning
         this.viewWidth = 100;
         this.viewHeight = 100;
 
-        // Permutahedron data
         this.permutahedron = {
             vertices: [
                 [-2.121320343559642, -0.408248290463863,  0.577350269189626],
@@ -97,7 +91,6 @@ class PolytopeRain extends HTMLElement {
     }
 
     connectedCallback() {
-        // Inject CSS variables and styles
         if (!document.getElementById('polytope-rain-styles')) {
             const style = document.createElement('style');
             style.id = 'polytope-rain-styles';
@@ -115,7 +108,7 @@ class PolytopeRain extends HTMLElement {
 
                 .intensity-toggle-container {
                     position: absolute;
-                    bottom: 40px;
+                    bottom: 30px;
                     left: 50%;
                     transform: translateX(-50%);
                     z-index: 1000;
@@ -134,7 +127,6 @@ class PolytopeRain extends HTMLElement {
             document.head.appendChild(style);
         }
 
-        // Create container
         const container = document.createElement('div');
         container.style.cssText = `
             width: 100%;
@@ -144,7 +136,6 @@ class PolytopeRain extends HTMLElement {
             background: transparent;
         `;
 
-        // Create canvas
         const canvas = document.createElement('canvas');
         canvas.id = 'canvas';
         canvas.style.cssText = `
@@ -155,7 +146,6 @@ class PolytopeRain extends HTMLElement {
             transition: opacity 0.5s ease;
         `;
 
-        // Create FPS counter (bottom right corner)
         const fpsCounter = document.createElement('div');
         fpsCounter.id = 'fps-counter';
         fpsCounter.style.cssText = `
@@ -173,7 +163,6 @@ class PolytopeRain extends HTMLElement {
         `;
         fpsCounter.textContent = 'FPS: --';
 
-        // Create polytopes counter (bottom left corner)
         const polytopesCounter = document.createElement('div');
         polytopesCounter.id = 'polytopes-counter';
         polytopesCounter.style.cssText = `
@@ -191,7 +180,6 @@ class PolytopeRain extends HTMLElement {
         `;
         polytopesCounter.textContent = 'Polytopes: 0';
 
-        // Create intensity toggle
         const intensityToggle = document.createElement('div');
         intensityToggle.className = 'intensity-toggle-container';
 
@@ -322,7 +310,6 @@ class PolytopeRain extends HTMLElement {
         this.innerHTML = '';
         this.appendChild(container);
 
-        // Initialize in next frame
         requestAnimationFrame(() => {
             try {
                 this.initialize();
@@ -372,7 +359,6 @@ class PolytopeRain extends HTMLElement {
         };
 
         const setActiveButton = (activeBtn, spawnRate) => {
-            // Update button states
             drizzleBtn.classList.remove('active');
             rainBtn.classList.remove('active');
             stormBtn.classList.remove('active');
@@ -380,7 +366,6 @@ class PolytopeRain extends HTMLElement {
             apocalypseBtn.classList.remove('active');
             activeBtn.classList.add('active');
 
-            // Update colors using CSS variables
             drizzleBtn.style.color = 'var(--fg-secondary)';
             rainBtn.style.color = 'var(--fg-secondary)';
             stormBtn.style.color = 'var(--fg-secondary)';
@@ -388,10 +373,8 @@ class PolytopeRain extends HTMLElement {
             apocalypseBtn.style.color = 'var(--fg-secondary)';
             activeBtn.style.color = 'var(--fg-primary)';
 
-            // Update indicator
             updateIndicator(activeBtn);
 
-            // Update spawn rate
             this.currentSpawnRate = spawnRate;
         };
 
@@ -415,7 +398,6 @@ class PolytopeRain extends HTMLElement {
             setActiveButton(apocalypseBtn, APOCALYPSE_RATE);
         });
 
-        // Initialize indicator position
         requestAnimationFrame(() => {
             updateIndicator(drizzleBtn);
         });
@@ -437,10 +419,8 @@ class PolytopeRain extends HTMLElement {
         const gl = this.gl;
 
         const vs = `#version 300 es
-// Per-vertex attributes (shared geometry)
 layout(location=0) in vec3 aPos;
 
-// Per-instance attributes (unique per particle)
 layout(location=1) in vec3 aInstancePos;
 layout(location=2) in vec3 aInstanceRot;
 layout(location=3) in float aInstanceScale;
@@ -452,7 +432,6 @@ uniform mat4 uProjection;
 out vec3 vColor;
 out float vOpacity;
 
-// Build rotation matrix from euler angles
 mat4 rotateX(float angle) {
     float c = cos(angle);
     float s = sin(angle);
@@ -505,13 +484,12 @@ mat4 scale(float s) {
 }
 
 void main() {
-    // Build model matrix: scale -> rotate -> translate
-    mat4 model = translate(aInstancePos) 
-               * rotateZ(aInstanceRot.z) 
-               * rotateY(aInstanceRot.y) 
-               * rotateX(aInstanceRot.x) 
+    mat4 model = translate(aInstancePos)
+               * rotateZ(aInstanceRot.z)
+               * rotateY(aInstanceRot.y)
+               * rotateX(aInstanceRot.x)
                * scale(aInstanceScale);
-    
+
     vColor = aInstanceColor;
     vOpacity = aInstanceOpacity;
     gl_Position = uProjection * model * vec4(aPos, 1.0);
@@ -565,7 +543,6 @@ void main() {
     }
 
     initializeParticlePool() {
-        // Pre-allocate all particle objects
         for (let i = 0; i < MAX_POLYTOPES; i++) {
             this.particlePool.push({
                 active: false,
@@ -583,7 +560,7 @@ void main() {
                 opacity: 0,
                 color: [1, 1, 1]
             });
-            this.freeParticleIndices.push(i); // All particles start as free
+            this.freeParticleIndices.push(i);
         }
     }
 
@@ -592,7 +569,6 @@ void main() {
         const vertices = this.permutahedron.vertices;
         const edges = this.permutahedron.edges;
 
-        // Create a single geometry that we'll instance
         const positions = [];
 
         edges.forEach(([a, b]) => {
@@ -606,13 +582,12 @@ void main() {
         const vao = gl.createVertexArray();
         gl.bindVertexArray(vao);
 
-        // Position buffer (per-vertex, not instanced)
         const posBuf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
         gl.enableVertexAttribArray(0);
         gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-        gl.vertexAttribDivisor(0, 0); // Not instanced
+        gl.vertexAttribDivisor(0, 0);
 
         gl.bindVertexArray(null);
 
@@ -625,8 +600,6 @@ void main() {
     setupInstanceBuffer() {
         const gl = this.gl;
 
-        // Create buffer to hold per-instance data
-        // Per particle: position(3) + rotation(3) + scale(1) + color(3) + opacity(1) = 11 floats
         this.instanceData = new Float32Array(MAX_POLYTOPES * 11);
         this.instanceBuffer = gl.createBuffer();
 
@@ -634,61 +607,51 @@ void main() {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, this.instanceData, gl.DYNAMIC_DRAW);
 
-        // Setup instance attributes
-        const stride = 11 * 4; // 11 floats * 4 bytes per float
+        const stride = 11 * 4;
 
-        // aInstancePos (location 1)
         gl.enableVertexAttribArray(1);
         gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 0);
-        gl.vertexAttribDivisor(1, 1); // Instanced
+        gl.vertexAttribDivisor(1, 1);
 
-        // aInstanceRot (location 2)
         gl.enableVertexAttribArray(2);
         gl.vertexAttribPointer(2, 3, gl.FLOAT, false, stride, 12);
-        gl.vertexAttribDivisor(2, 1); // Instanced
+        gl.vertexAttribDivisor(2, 1);
 
-        // aInstanceScale (location 3)
         gl.enableVertexAttribArray(3);
         gl.vertexAttribPointer(3, 1, gl.FLOAT, false, stride, 24);
-        gl.vertexAttribDivisor(3, 1); // Instanced
+        gl.vertexAttribDivisor(3, 1);
 
-        // aInstanceColor (location 4)
         gl.enableVertexAttribArray(4);
         gl.vertexAttribPointer(4, 3, gl.FLOAT, false, stride, 28);
-        gl.vertexAttribDivisor(4, 1); // Instanced
+        gl.vertexAttribDivisor(4, 1);
 
-        // aInstanceOpacity (location 5)
         gl.enableVertexAttribArray(5);
         gl.vertexAttribPointer(5, 1, gl.FLOAT, false, stride, 40);
-        gl.vertexAttribDivisor(5, 1); // Instanced
+        gl.vertexAttribDivisor(5, 1);
 
         gl.bindVertexArray(null);
     }
 
     activateParticle() {
-        // Get a free particle from the stack (O(1) instead of O(n) find!)
-        if (this.freeParticleIndices.length === 0) return null; // Pool is full
+        if (this.freeParticleIndices.length === 0) return null;
 
         const particleIndex = this.freeParticleIndices.pop();
         const particle = this.particlePool[particleIndex];
 
-        // Generate random color
         const hue = Math.random() * 360;
-        const sat = 70 + Math.random() * 30; // 70-100% saturation
-        const light = 50 + Math.random() * 20; // 50-70% lightness
+        const sat = 70 + Math.random() * 30;
+        const light = 50 + Math.random() * 20;
         const color = this.hslToRgb(hue, sat, light);
 
-        // Random rotation speeds with sign for direction
         const randomRotSpeed = () => {
             const sign = Math.random() < 0.5 ? -1 : 1;
             return sign * (MIN_ROTATION_SPEED + Math.random() * ROTATION_SPEED_VARIATION);
         };
 
-        // Reset particle properties
         particle.active = true;
         particle.x = (Math.random() - 0.5) * this.viewWidth;
-        particle.y = this.viewHeight / 2 + 10; // Spawn above visible area
-        particle.z = 0; // No depth variation
+        particle.y = this.viewHeight / 2 + 10;
+        particle.z = 0;
         particle.rotX = Math.random() * Math.PI * 2;
         particle.rotY = Math.random() * Math.PI * 2;
         particle.rotZ = Math.random() * Math.PI * 2;
@@ -702,23 +665,18 @@ void main() {
         particle.color[1] = color[1];
         particle.color[2] = color[2];
 
-        // Add to active list
         this.activeParticleIndices.push(particleIndex);
 
         return particle;
     }
 
     updateParticles() {
-        // Spawn new particles based on spawn rate per frame
-        // Accumulator allows fractional rates (e.g., 0.5 = spawn 1 every 2 frames)
         this.spawnAccumulator += this.currentSpawnRate;
         while (this.spawnAccumulator >= 1) {
             this.activateParticle();
             this.spawnAccumulator -= 1;
         }
 
-        // Update active particles and pack into instance buffer
-        // Iterate backwards so we can safely remove deactivated particles
         const groundLevel = -this.viewHeight / 2 - 10;
         let instanceIndex = 0;
 
@@ -726,21 +684,18 @@ void main() {
             const particleIndex = this.activeParticleIndices[i];
             const p = this.particlePool[particleIndex];
 
-            // Update position and rotation
             p.y -= p.fallSpeed;
             p.rotX += p.rotSpeedX;
             p.rotY += p.rotSpeedY;
             p.rotZ += p.rotSpeedZ;
 
-            // Deactivate particles that fall below screen
             if (p.y < groundLevel) {
                 p.active = false;
-                this.freeParticleIndices.push(particleIndex); // Return to free pool
-                this.activeParticleIndices.splice(i, 1); // Remove from active list
+                this.freeParticleIndices.push(particleIndex);
+                this.activeParticleIndices.splice(i, 1);
                 continue;
             }
 
-            // Pack into instance data
             const offset = instanceIndex * 11;
             this.instanceData[offset + 0] = p.x;
             this.instanceData[offset + 1] = p.y;
@@ -777,9 +732,8 @@ void main() {
 
             this.gl.viewport(0, 0, canvas.width, canvas.height);
 
-            // Update view dimensions for orthographic projection
             const aspect = width / height;
-            this.viewHeight = 50; // Fixed height in world units
+            this.viewHeight = 50;
             this.viewWidth = this.viewHeight * aspect;
         };
 
@@ -806,16 +760,13 @@ void main() {
         const animate = (currentTime) => {
             this.animationId = requestAnimationFrame(animate);
 
-            // Throttle to target FPS
             const elapsed = currentTime - this.lastFrameTime;
             if (elapsed < this.frameInterval) {
-                return; // Skip this frame
+                return;
             }
 
-            // Track FPS
             this.lastFrameTime = currentTime - (elapsed % this.frameInterval);
 
-            // Count frames in current second
             if (currentTime - this.lastSecondTimestamp >= 1000) {
                 this.currentFPS = this.frameCount;
                 this.frameCount = 0;
@@ -823,7 +774,6 @@ void main() {
             }
             this.frameCount++;
 
-            // Update FPS display
             if (currentTime - this.lastFpsUpdate > this.fpsUpdateInterval) {
                 const fpsCounter = this.querySelector('#fps-counter');
                 const polytopesCounter = this.querySelector('#polytopes-counter');
@@ -852,24 +802,20 @@ void main() {
         gl.useProgram(this.prog);
         gl.lineWidth(2.0);
 
-        // Orthographic projection
         const halfWidth = this.viewWidth / 2;
         const halfHeight = this.viewHeight / 2;
         const P = this.mat4Ortho(-halfWidth, halfWidth, -halfHeight, halfHeight, -100, 100);
 
         gl.uniformMatrix4fv(gl.getUniformLocation(this.prog, 'uProjection'), false, P);
 
-        // Upload instance data to GPU
         gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.instanceData, 0, this.activeParticleCount * 11);
 
-        // Draw all instances in one call!
         gl.bindVertexArray(this.polytopeGeometry.vao);
         gl.drawArraysInstanced(gl.LINES, 0, this.polytopeGeometry.vertexCount, this.activeParticleCount);
         gl.bindVertexArray(null);
     }
 
-    // Matrix helper
     mat4Ortho(left, right, bottom, top, near, far) {
         const lr = 1 / (left - right);
         const bt = 1 / (bottom - top);

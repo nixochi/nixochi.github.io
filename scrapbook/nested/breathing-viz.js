@@ -18,7 +18,7 @@ const SYNC_SLOWDOWN_DURATION = 4000;      // Phase 6: Syncing rest of way and sl
 
 // Speed settings
 const SLOW_ROTATION_SPEED = 0.01;        // Slow rotation speed
-const FAST_ROTATION_SPEED = 0.5;         // Fast rotation speed
+const FAST_ROTATION_SPEED = 0.2;         // Fast rotation speed
 
 // Desync settings
 const MAX_DESYNC_PERCENTAGE = 1;       // Maximum desync as percentage of full rotation (1.0 = full rotation)
@@ -631,20 +631,24 @@ void main() {
         }
 
         // Calculate desync using a globally smooth curve
-        // Desync transitions: 0 -> 1 -> 1 -> 1 -> 1 -> 0
+        // Desync transitions: 0 -> 1 -> 1 -> 1 -> 0.5 -> 0
         if (cycleTime < t1) {
             // Phase 1: synced
             desyncAmount = 0;
         } else if (cycleTime < t2) {
             // Phase 2: smoothly desync from 0 to 1
             desyncAmount = this.smootherstep((cycleTime - t1) / DESYNC_SPEEDUP_DURATION);
-        } else if (cycleTime < t5) {
-            // Phases 3-5: stay desynced at 1
+        } else if (cycleTime < t4) {
+            // Phases 3-4: stay desynced at 1
             desyncAmount = 1;
+        } else if (cycleTime < t5) {
+            // Phase 5: smoothly sync halfway from 1 to 0.5
+            const progress = this.smootherstep((cycleTime - t4) / SYNC_SPEEDUP_DURATION);
+            desyncAmount = 1 - (progress * 0.5);
         } else {
-            // Phase 6: smoothly sync from 1 to 0 (reverse of phase 2)
+            // Phase 6: smoothly sync rest of way from 0.5 to 0
             const progress = this.smootherstep((cycleTime - t5) / SYNC_SLOWDOWN_DURATION);
-            desyncAmount = 1 - progress;
+            desyncAmount = 0.5 - (progress * 0.5);
         }
 
         return { desyncAmount, rotationSpeed };

@@ -9,7 +9,7 @@
 const NUM_NESTED_POLYTOPES = 200;  // Number of nested polytopes to render
 
 // Time multiplier (1.0 = normal speed, 2.0 = twice as fast, 0.5 = half speed)
-const TIME_MULTIPLIER = 0.5;
+const TIME_MULTIPLIER = 0.25;
 
 // Animation Phase Durations (in milliseconds)
 const SYNCED_SLOW_DURATION = 3000 / TIME_MULTIPLIER;        // Phase 1: Synced, slow rotation
@@ -25,10 +25,10 @@ const FAST_ROTATION_SPEED = 0.05;         // Fast rotation speed
 
 // Size settings (based on speed)
 const MAX_SPEED_SIZE = 1;              // Size multiplier at slow speed
-const MIN_SPEED_SIZE = 0.5;              // Size multiplier at fast speed
+const MIN_SPEED_SIZE = 0.7;              // Size multiplier at fast speed
 
 // Camera settings
-const INITIAL_RADIUS = 90;              // Initial camera distance from origin
+const INITIAL_RADIUS = 110;              // Initial camera distance from origin
 
 // Desync settings
 const MAX_DESYNC_PERCENTAGE = 1;       // Maximum desync as percentage of full rotation (1.0 = full rotation)
@@ -190,6 +190,7 @@ class BreathingViz extends HTMLElement {
             font-size: 14px;
             min-width: 300px;
             z-index: 1000;
+            display: none;
         `;
 
         // Progress bar

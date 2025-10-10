@@ -25,10 +25,10 @@ const FAST_ROTATION_SPEED = 0.05;         // Fast rotation speed
 
 // Size settings (based on speed)
 const MAX_SPEED_SIZE = 1;              // Size multiplier at slow speed
-const MIN_SPEED_SIZE = 0.8;              // Size multiplier at fast speed
+const MIN_SPEED_SIZE = 0.5;              // Size multiplier at fast speed
 
 // Camera settings
-const INITIAL_RADIUS = 80;              // Initial camera distance from origin
+const INITIAL_RADIUS = 90;              // Initial camera distance from origin
 
 // Desync settings
 const MAX_DESYNC_PERCENTAGE = 1;       // Maximum desync as percentage of full rotation (1.0 = full rotation)

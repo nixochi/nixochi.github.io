@@ -7,7 +7,7 @@
 // CONFIGURATION PARAMETERS
 // ============================================
 const TARGET_FPS = 30;               // Target framerate (30fps)
-const SPAWN_RATE = 5;              // Polytopes to spawn per frame (0.5 = 1 every 2 frames, 2 = 2 per frame)
+const SPAWN_RATE = 5.6;              // Polytopes to spawn per frame (0.5 = 1 every 2 frames, 2 = 2 per frame)
 const MIN_FALL_SPEED = 0.2;          // Minimum fall speed (units per frame)
 const FALL_SPEED_VARIATION = 0.4;    // Additional random speed (0 to this value)
 const MIN_ROTATION_SPEED = 0;        // Minimum rotation speed per axis

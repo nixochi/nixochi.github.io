@@ -6,7 +6,7 @@
 // ============================================
 // CONFIGURATION PARAMETERS
 // ============================================
-const NUM_NESTED_POLYTOPES = 100;  // Number of nested polytopes to render
+const NUM_NESTED_POLYTOPES = 200;  // Number of nested polytopes to render
 
 // Animation Phase Durations (in milliseconds)
 const SYNCED_SLOW_DURATION = 3000;        // Phase 1: Synced, slow rotation
@@ -19,6 +19,13 @@ const SYNC_SLOWDOWN_DURATION = 4000;      // Phase 6: Syncing rest of way and sl
 // Speed settings
 const SLOW_ROTATION_SPEED = 0.01;        // Slow rotation speed
 const FAST_ROTATION_SPEED = 0.05;         // Fast rotation speed
+
+// Size settings (based on speed)
+const MAX_SPEED_SIZE = 1;              // Size multiplier at slow speed
+const MIN_SPEED_SIZE = 0.8;              // Size multiplier at fast speed
+
+// Camera settings
+const INITIAL_RADIUS = 60;              // Initial camera distance from origin
 
 // Desync settings
 const MAX_DESYNC_PERCENTAGE = 1;       // Maximum desync as percentage of full rotation (1.0 = full rotation)
@@ -35,12 +42,10 @@ class BreathingViz extends HTMLElement {
 
         // Camera state (spherical coordinates)
         // Start zoomed out enough to see the largest polytope
-        const largestPolytopeSize = NUM_NESTED_POLYTOPES * (20 / NUM_NESTED_POLYTOPES);
-        const initialRadius =largestPolytopeSize * 6.0;
         this.spherical = {
-            radius: initialRadius,
+            radius: INITIAL_RADIUS,
             theta: Math.PI / 4,
-        phi: Math.PI / 3
+            phi: Math.PI / 3
         };
 
         this.sphericalDelta = {
@@ -88,20 +93,6 @@ class BreathingViz extends HTMLElement {
             };
         });
 
-        // Generate size variation factors dynamically based on NUM_NESTED_POLYTOPES
-        this.sizeVariationFactors = Array.from(
-            { length: NUM_NESTED_POLYTOPES },
-            (_, i) => {
-                const mid = (NUM_NESTED_POLYTOPES - 1) / 2;
-                return (i - mid) * (0.9 / (NUM_NESTED_POLYTOPES - 1));
-            }
-        );
-
-        // Generate size phase offsets based on NUM_NESTED_POLYTOPES
-        this.sizePhaseOffsets = Array.from(
-            { length: NUM_NESTED_POLYTOPES },
-            () => Math.random() * Math.PI * 2
-        );
 
         // Permutahedron data
         this.permutahedron = {
@@ -648,15 +639,17 @@ void main() {
             p.rotationX = this.baseAngleX + p.driftX;
             p.rotationY = this.baseAngleY + p.driftY;
 
-            // Size oscillation
-            const cycleProgress = cycleTime / this.cycleDuration;
-            const sizePhase = cycleProgress * Math.PI * 2 + this.sizePhaseOffsets[i];
-            const sizeOscillation = Math.sin(sizePhase);
-            const sizeFactor = Math.abs(sizeOscillation);
+            // Size based on current speed percentage
+            // Calculate speed percentage: 0 = slow speed, 1 = fast speed
+            const speedMagnitude = Math.abs(rotationSpeed);
+            const speedPercentage = (speedMagnitude - SLOW_ROTATION_SPEED) / (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED);
+            const clampedSpeedPercentage = Math.max(0, Math.min(1, speedPercentage));
+
+            // Linear interpolation: at slow speed (0%) use MAX_SPEED_SIZE, at fast speed (100%) use MIN_SPEED_SIZE
+            const sizeMultiplier = MAX_SPEED_SIZE + (clampedSpeedPercentage * (MIN_SPEED_SIZE - MAX_SPEED_SIZE));
 
             const baseScale = (i + 1) * this.polytopeSpacing;
-            const sizeVariation = baseScale * this.sizeVariationFactors[i];
-            p.scale = baseScale + (sizeVariation * sizeFactor);
+            p.scale = baseScale * sizeMultiplier;
         });
     }
 

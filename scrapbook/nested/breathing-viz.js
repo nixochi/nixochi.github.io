@@ -36,7 +36,7 @@ class BreathingViz extends HTMLElement {
         // Camera state (spherical coordinates)
         // Start zoomed out enough to see the largest polytope
         const largestPolytopeSize = NUM_NESTED_POLYTOPES * (20 / NUM_NESTED_POLYTOPES);
-        const initialRadius =largestPolytopeSize * 3.0;
+        const initialRadius =largestPolytopeSize * 5.0;
         this.spherical = {
             radius: initialRadius,
             theta: Math.PI / 4,

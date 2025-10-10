@@ -11,28 +11,16 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 
     <style>
-        /* CSS Variables for theming */
+        /* CSS Variables - Dark mode only */
         :root {
-            --bg-primary: #fafafa;
-            --bg-secondary: #ffffff;
-            --fg-primary: #161616;
-            --fg-secondary: #5e5e5e;
-            --border: #e7e7e7;
-            --shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
-            --backdrop-blur: rgba(255, 255, 255, 0.9);
+            --bg-primary: #161617;
+            --bg-secondary: #1c1c1e;
+            --fg-primary: #f3f3f3;
+            --fg-secondary: #b9b9b9;
+            --border: #222224;
+            --shadow: rgba(0,0,0,0.5);
+            --backdrop-blur: rgba(28, 28, 30, 0.9);
             --radius: 12px;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-primary: #161617;
-                --bg-secondary: #1c1c1e;
-                --fg-primary: #f3f3f3;
-                --fg-secondary: #b9b9b9;
-                --border: #222224;
-                --shadow: rgba(0,0,0,0.5);
-                --backdrop-blur: rgba(28, 28, 30, 0.9);
-            }
         }
 
         * {
@@ -337,10 +325,10 @@
             // Export button functionality
             const exportBtn = document.getElementById('exportBtn');
             exportBtn.addEventListener('click', () => {
-                // Access canvas through THREE.js renderer
-                if (viewer.renderer) {
+                // Access canvas directly (works with WebGL2 version)
+                const canvas = viewer.querySelector('#gl');
+                if (canvas) {
                     try {
-                        const canvas = viewer.renderer.domElement;
                         const dataURL = canvas.toDataURL('image/png');
                         const link = document.createElement('a');
                         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
@@ -379,6 +367,16 @@
             opacityValue.textContent = '90%';
             generatePolytopeCards();
             setupPolytopeSelection();
+
+            // Remove skeleton loader after WebGL2 viewer initializes
+            // Give it time to set up the canvas and start rendering
+            setTimeout(() => {
+                const skeleton = viewer.querySelector('.skeleton-loader');
+                if (skeleton) {
+                    skeleton.classList.add('fade-out');
+                    setTimeout(() => skeleton.remove(), 300);
+                }
+            }, 500);
         });
     </script>
 </body>

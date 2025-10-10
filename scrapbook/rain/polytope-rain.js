@@ -1,19 +1,20 @@
 /**
- * Polytope Rain Visualization Web Component (Raw WebGL2)
- * Permutahedra falling like rain drops
+ * Polytope Rain Visualization Web Component (Instanced Rendering)
+ * Permutahedra falling like rain drops - optimized version
  */
 
 // ============================================
 // CONFIGURATION PARAMETERS
 // ============================================
-const SPAWN_RATE = 100;              // Milliseconds between spawns
+const TARGET_FPS = 30;               // Target framerate (30fps)
+const SPAWN_RATE = 4;              // Polytopes to spawn per frame (0.5 = 1 every 2 frames, 2 = 2 per frame)
 const MIN_FALL_SPEED = 0.2;          // Minimum fall speed (units per frame)
 const FALL_SPEED_VARIATION = 0.4;    // Additional random speed (0 to this value)
-const MIN_ROTATION_SPEED = 0;     // Minimum rotation speed per axis
+const MIN_ROTATION_SPEED = 0;        // Minimum rotation speed per axis
 const ROTATION_SPEED_VARIATION = 0.1; // Additional random rotation speed
 const MIN_POLYTOPE_SIZE = 0.4;       // Minimum size of each polytope
 const POLYTOPE_SIZE_VARIATION = 0.5; // Additional random size (0 to this value)
-const MAX_POLYTOPES = 200;           // Maximum polytopes at once
+const MAX_POLYTOPES = 1000;           // Maximum polytopes at once (can be much higher now!)
 // ============================================
 
 class PolytopeRain extends HTMLElement {
@@ -24,16 +25,25 @@ class PolytopeRain extends HTMLElement {
         this.gl = null;
         this.prog = null;
         this.polytopeGeometry = null;
+        this.instanceBuffer = null;
+        this.instanceData = null;
 
         // Object pool for particles
         this.particlePool = [];
+        this.activeParticleCount = 0;
         this.initializeParticlePool();
 
         // Animation
         this.animationId = null;
         this._ro = null;
-        this.time = 0;
-        this.lastSpawnTime = 0;
+        this.spawnAccumulator = 0; // Accumulator for fractional spawn rates
+
+        // FPS tracking
+        this.frameInterval = 1000 / TARGET_FPS;
+        this.lastFrameTime = 0;
+        this.fpsFrames = [];
+        this.fpsUpdateInterval = 500; // Update FPS display every 500ms
+        this.lastFpsUpdate = 0;
 
         // Screen dimensions for spawning
         this.viewWidth = 100;
@@ -99,7 +109,28 @@ class PolytopeRain extends HTMLElement {
             transition: opacity 0.5s ease;
         `;
 
+        // Create FPS counter
+        const fpsCounter = document.createElement('div');
+        fpsCounter.id = 'fps-counter';
+        fpsCounter.style.cssText = `
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 14px;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 1000;
+            text-align: right;
+        `;
+        fpsCounter.innerHTML = 'FPS: --<br>Polytopes: 0';
+
         container.appendChild(canvas);
+        container.appendChild(fpsCounter);
         this.innerHTML = '';
         this.appendChild(container);
 
@@ -129,6 +160,7 @@ class PolytopeRain extends HTMLElement {
         this.setupWebGL();
         this.setupShaders();
         this.buildPolytopeGeometry();
+        this.setupInstanceBuffer();
         this.setupResizeObserver();
         this.removeLoadingSkeleton();
         this.startAnimationLoop();
@@ -150,22 +182,93 @@ class PolytopeRain extends HTMLElement {
         const gl = this.gl;
 
         const vs = `#version 300 es
+// Per-vertex attributes (shared geometry)
 layout(location=0) in vec3 aPos;
-uniform mat4 uMVP;
-uniform vec3 uColor;
+
+// Per-instance attributes (unique per particle)
+layout(location=1) in vec3 aInstancePos;
+layout(location=2) in vec3 aInstanceRot;
+layout(location=3) in float aInstanceScale;
+layout(location=4) in vec3 aInstanceColor;
+layout(location=5) in float aInstanceOpacity;
+
+uniform mat4 uProjection;
+
 out vec3 vColor;
+out float vOpacity;
+
+// Build rotation matrix from euler angles
+mat4 rotateX(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat4(
+        1.0, 0.0, 0.0, 0.0,
+        0.0, c,   s,   0.0,
+        0.0, -s,  c,   0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
+}
+
+mat4 rotateY(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat4(
+        c,   0.0, -s,  0.0,
+        0.0, 1.0, 0.0, 0.0,
+        s,   0.0, c,   0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
+}
+
+mat4 rotateZ(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat4(
+        c,   s,   0.0, 0.0,
+        -s,  c,   0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
+}
+
+mat4 translate(vec3 pos) {
+    return mat4(
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        pos.x, pos.y, pos.z, 1.0
+    );
+}
+
+mat4 scale(float s) {
+    return mat4(
+        s,   0.0, 0.0, 0.0,
+        0.0, s,   0.0, 0.0,
+        0.0, 0.0, s,   0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
+}
+
 void main() {
-    vColor = uColor;
-    gl_Position = uMVP * vec4(aPos, 1.0);
+    // Build model matrix: scale -> rotate -> translate
+    mat4 model = translate(aInstancePos) 
+               * rotateZ(aInstanceRot.z) 
+               * rotateY(aInstanceRot.y) 
+               * rotateX(aInstanceRot.x) 
+               * scale(aInstanceScale);
+    
+    vColor = aInstanceColor;
+    vOpacity = aInstanceOpacity;
+    gl_Position = uProjection * model * vec4(aPos, 1.0);
 }`;
 
         const fs = `#version 300 es
 precision mediump float;
 in vec3 vColor;
+in float vOpacity;
 out vec4 fragColor;
-uniform float uOpacity;
 void main() {
-    fragColor = vec4(vColor, uOpacity);
+    fragColor = vec4(vColor, vOpacity);
 }`;
 
         const compileShader = (type, src) => {
@@ -233,7 +336,7 @@ void main() {
         const vertices = this.permutahedron.vertices;
         const edges = this.permutahedron.edges;
 
-        // Create a single geometry that we'll reuse for all particles
+        // Create a single geometry that we'll instance
         const positions = [];
 
         edges.forEach(([a, b]) => {
@@ -247,11 +350,13 @@ void main() {
         const vao = gl.createVertexArray();
         gl.bindVertexArray(vao);
 
+        // Position buffer (per-vertex, not instanced)
         const posBuf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
         gl.enableVertexAttribArray(0);
         gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribDivisor(0, 0); // Not instanced
 
         gl.bindVertexArray(null);
 
@@ -259,6 +364,49 @@ void main() {
             vao,
             vertexCount: positions.length / 3
         };
+    }
+
+    setupInstanceBuffer() {
+        const gl = this.gl;
+
+        // Create buffer to hold per-instance data
+        // Per particle: position(3) + rotation(3) + scale(1) + color(3) + opacity(1) = 11 floats
+        this.instanceData = new Float32Array(MAX_POLYTOPES * 11);
+        this.instanceBuffer = gl.createBuffer();
+
+        gl.bindVertexArray(this.polytopeGeometry.vao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.instanceData, gl.DYNAMIC_DRAW);
+
+        // Setup instance attributes
+        const stride = 11 * 4; // 11 floats * 4 bytes per float
+
+        // aInstancePos (location 1)
+        gl.enableVertexAttribArray(1);
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 0);
+        gl.vertexAttribDivisor(1, 1); // Instanced
+
+        // aInstanceRot (location 2)
+        gl.enableVertexAttribArray(2);
+        gl.vertexAttribPointer(2, 3, gl.FLOAT, false, stride, 12);
+        gl.vertexAttribDivisor(2, 1); // Instanced
+
+        // aInstanceScale (location 3)
+        gl.enableVertexAttribArray(3);
+        gl.vertexAttribPointer(3, 1, gl.FLOAT, false, stride, 24);
+        gl.vertexAttribDivisor(3, 1); // Instanced
+
+        // aInstanceColor (location 4)
+        gl.enableVertexAttribArray(4);
+        gl.vertexAttribPointer(4, 3, gl.FLOAT, false, stride, 28);
+        gl.vertexAttribDivisor(4, 1); // Instanced
+
+        // aInstanceOpacity (location 5)
+        gl.enableVertexAttribArray(5);
+        gl.vertexAttribPointer(5, 1, gl.FLOAT, false, stride, 40);
+        gl.vertexAttribDivisor(5, 1); // Instanced
+
+        gl.bindVertexArray(null);
     }
 
     activateParticle() {
@@ -299,18 +447,18 @@ void main() {
         return particle;
     }
 
-    updateParticles() {
-        const deltaTime = 16;
-        this.time += deltaTime;
-
-        // Spawn new particles from the pool
-        if (this.time - this.lastSpawnTime > SPAWN_RATE) {
+    updateParticles(currentTime) {
+        // Spawn new particles based on spawn rate per frame
+        // Accumulator allows fractional rates (e.g., 0.5 = spawn 1 every 2 frames)
+        this.spawnAccumulator += SPAWN_RATE;
+        while (this.spawnAccumulator >= 1) {
             this.activateParticle();
-            this.lastSpawnTime = this.time;
+            this.spawnAccumulator -= 1;
         }
 
-        // Update active particles
+        // Update active particles and pack into instance buffer
         const groundLevel = -this.viewHeight / 2 - 10;
+        let instanceIndex = 0;
 
         this.particlePool.forEach(p => {
             if (!p.active) return;
@@ -324,8 +472,27 @@ void main() {
             // Deactivate particles that fall below screen
             if (p.y < groundLevel) {
                 p.active = false;
+                return;
             }
+
+            // Pack into instance data
+            const offset = instanceIndex * 11;
+            this.instanceData[offset + 0] = p.x;
+            this.instanceData[offset + 1] = p.y;
+            this.instanceData[offset + 2] = p.z;
+            this.instanceData[offset + 3] = p.rotX;
+            this.instanceData[offset + 4] = p.rotY;
+            this.instanceData[offset + 5] = p.rotZ;
+            this.instanceData[offset + 6] = p.size;
+            this.instanceData[offset + 7] = p.color[0];
+            this.instanceData[offset + 8] = p.color[1];
+            this.instanceData[offset + 9] = p.color[2];
+            this.instanceData[offset + 10] = p.opacity;
+
+            instanceIndex++;
         });
+
+        this.activeParticleCount = instanceIndex;
     }
 
     setupResizeObserver() {
@@ -371,20 +538,49 @@ void main() {
     }
 
     startAnimationLoop() {
-        const animate = () => {
+        const animate = (currentTime) => {
             this.animationId = requestAnimationFrame(animate);
-            this.updateParticles();
+
+            // Throttle to target FPS
+            const elapsed = currentTime - this.lastFrameTime;
+            if (elapsed < this.frameInterval) {
+                return; // Skip this frame
+            }
+
+            // Track FPS
+            this.lastFrameTime = currentTime - (elapsed % this.frameInterval);
+            this.fpsFrames.push(currentTime);
+
+            // Remove frames older than 1 second for accurate FPS calculation
+            const oneSecondAgo = currentTime - 1000;
+            while (this.fpsFrames.length > 0 && this.fpsFrames[0] < oneSecondAgo) {
+                this.fpsFrames.shift();
+            }
+
+            // Update FPS display
+            if (currentTime - this.lastFpsUpdate > this.fpsUpdateInterval) {
+                const fps = this.fpsFrames.length;
+                const fpsCounter = this.querySelector('#fps-counter');
+                if (fpsCounter) {
+                    fpsCounter.innerHTML = `FPS: ${fps}<br>Polytopes: ${this.activeParticleCount}`;
+                }
+                this.lastFpsUpdate = currentTime;
+            }
+
+            this.updateParticles(currentTime);
             this.render();
         };
-        animate();
+        animate(performance.now());
     }
 
     render() {
         const gl = this.gl;
 
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        gl.useProgram(this.prog);
+        
+        if (this.activeParticleCount === 0) return;
 
+        gl.useProgram(this.prog);
         gl.lineWidth(2.0);
 
         // Orthographic projection
@@ -392,65 +588,19 @@ void main() {
         const halfHeight = this.viewHeight / 2;
         const P = this.mat4Ortho(-halfWidth, halfWidth, -halfHeight, halfHeight, -100, 100);
 
-        // Render only active particles that are on screen
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.prog, 'uProjection'), false, P);
+
+        // Upload instance data to GPU
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.instanceData, 0, this.activeParticleCount * 11);
+
+        // Draw all instances in one call!
         gl.bindVertexArray(this.polytopeGeometry.vao);
-
-        this.particlePool.forEach(p => {
-            // Skip inactive particles
-            if (!p.active) return;
-
-            // Skip particles that are completely off-screen (with some margin)
-            const margin = p.size * 3; // Account for polytope size
-            if (p.y < -halfHeight - margin || p.y > halfHeight + margin ||
-                p.x < -halfWidth - margin || p.x > halfWidth + margin) {
-                return;
-            }
-
-            const rotX = this.mat4RotateX(p.rotX);
-            const rotY = this.mat4RotateY(p.rotY);
-            const rotZ = this.mat4RotateZ(p.rotZ);
-            const scale = this.mat4Scale(p.size, p.size, p.size);
-            const translation = this.mat4Translate(p.x, p.y, p.z);
-
-            const M = this.mat4Multiply(
-                translation,
-                this.mat4Multiply(
-                    this.mat4Multiply(rotZ, this.mat4Multiply(rotY, rotX)),
-                    scale
-                )
-            );
-
-            const MVP = this.mat4Multiply(P, M);
-
-            gl.uniformMatrix4fv(gl.getUniformLocation(this.prog, 'uMVP'), false, MVP);
-            gl.uniform3f(gl.getUniformLocation(this.prog, 'uColor'), p.color[0], p.color[1], p.color[2]);
-            gl.uniform1f(gl.getUniformLocation(this.prog, 'uOpacity'), p.opacity);
-
-            gl.drawArrays(gl.LINES, 0, this.polytopeGeometry.vertexCount);
-        });
-
+        gl.drawArraysInstanced(gl.LINES, 0, this.polytopeGeometry.vertexCount, this.activeParticleCount);
         gl.bindVertexArray(null);
     }
 
-    // Matrix math helpers
-    mat4Identity() {
-        return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
-    }
-
-    mat4Multiply(a, b) {
-        const o = new Float32Array(16);
-        for (let c = 0; c < 4; c++) {
-            for (let r = 0; r < 4; r++) {
-                o[c * 4 + r] =
-                    a[0 * 4 + r] * b[c * 4 + 0] +
-                    a[1 * 4 + r] * b[c * 4 + 1] +
-                    a[2 * 4 + r] * b[c * 4 + 2] +
-                    a[3 * 4 + r] * b[c * 4 + 3];
-            }
-        }
-        return o;
-    }
-
+    // Matrix helper
     mat4Ortho(left, right, bottom, top, near, far) {
         const lr = 1 / (left - right);
         const bt = 1 / (bottom - top);
@@ -466,62 +616,14 @@ void main() {
         return o;
     }
 
-    mat4RotateX(angle) {
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
-        return new Float32Array([
-            1, 0, 0, 0,
-            0, c, s, 0,
-            0, -s, c, 0,
-            0, 0, 0, 1
-        ]);
-    }
-
-    mat4RotateY(angle) {
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
-        return new Float32Array([
-            c, 0, -s, 0,
-            0, 1, 0, 0,
-            s, 0, c, 0,
-            0, 0, 0, 1
-        ]);
-    }
-
-    mat4RotateZ(angle) {
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
-        return new Float32Array([
-            c, s, 0, 0,
-            -s, c, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1
-        ]);
-    }
-
-    mat4Scale(sx, sy, sz) {
-        return new Float32Array([
-            sx, 0, 0, 0,
-            0, sy, 0, 0,
-            0, 0, sz, 0,
-            0, 0, 0, 1
-        ]);
-    }
-
-    mat4Translate(tx, ty, tz) {
-        return new Float32Array([
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            tx, ty, tz, 1
-        ]);
-    }
-
     cleanup() {
         if (this.gl && this.polytopeGeometry) {
             if (this.polytopeGeometry.vao) {
                 this.gl.deleteVertexArray(this.polytopeGeometry.vao);
             }
+        }
+        if (this.gl && this.instanceBuffer) {
+            this.gl.deleteBuffer(this.instanceBuffer);
         }
         if (this.gl && this.prog) {
             this.gl.deleteProgram(this.prog);

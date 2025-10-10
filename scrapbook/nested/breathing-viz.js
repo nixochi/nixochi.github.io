@@ -8,13 +8,16 @@
 // ============================================
 const NUM_NESTED_POLYTOPES = 200;  // Number of nested polytopes to render
 
+// Time multiplier (1.0 = normal speed, 2.0 = twice as fast, 0.5 = half speed)
+const TIME_MULTIPLIER = 0.5;
+
 // Animation Phase Durations (in milliseconds)
-const SYNCED_SLOW_DURATION = 3000;        // Phase 1: Synced, slow rotation
-const DESYNC_SPEEDUP_DURATION = 4000;     // Phase 2: Desyncing and speeding up
-const DESYNC_SLOWDOWN_DURATION = 4000;    // Phase 3: Desynced, slowing down
-const DESYNCED_SLOW_DURATION = 2000;      // Phase 4: Desynced, slow rotation
-const SYNC_SPEEDUP_DURATION = 4000;       // Phase 5: Syncing halfway and speeding up
-const SYNC_SLOWDOWN_DURATION = 4000;      // Phase 6: Syncing rest of way and slowing down
+const SYNCED_SLOW_DURATION = 3000 / TIME_MULTIPLIER;        // Phase 1: Synced, slow rotation
+const DESYNC_SPEEDUP_DURATION = 4000 / TIME_MULTIPLIER;     // Phase 2: Desyncing and speeding up
+const DESYNC_SLOWDOWN_DURATION = 4000 / TIME_MULTIPLIER;    // Phase 3: Desynced, slowing down
+const DESYNCED_SLOW_DURATION = 2000 / TIME_MULTIPLIER;      // Phase 4: Desynced, slow rotation
+const SYNC_SPEEDUP_DURATION = 4000 / TIME_MULTIPLIER;       // Phase 5: Syncing halfway and speeding up
+const SYNC_SLOWDOWN_DURATION = 4000 / TIME_MULTIPLIER;      // Phase 6: Syncing rest of way and slowing down
 
 // Speed settings
 const SLOW_ROTATION_SPEED = 0.01;        // Slow rotation speed
@@ -25,7 +28,7 @@ const MAX_SPEED_SIZE = 1;              // Size multiplier at slow speed
 const MIN_SPEED_SIZE = 0.8;              // Size multiplier at fast speed
 
 // Camera settings
-const INITIAL_RADIUS = 60;              // Initial camera distance from origin
+const INITIAL_RADIUS = 80;              // Initial camera distance from origin
 
 // Desync settings
 const MAX_DESYNC_PERCENTAGE = 1;       // Maximum desync as percentage of full rotation (1.0 = full rotation)

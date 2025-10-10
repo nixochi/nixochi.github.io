@@ -11,13 +11,14 @@ const DRIZZLE_RATE = 0.2;              // Light rain spawn rate
 const RAIN_RATE = 2;                 // Normal rain spawn rate
 const STORM_RATE = 15;               // Heavy rain spawn rate
 const DELUGE_RATE = 55;              // Extreme rain spawn rate
+const APOCALYPSE_RATE = 155;         // Apocalyptic rain spawn rate
 const MIN_FALL_SPEED = 0.2;          // Minimum fall speed (units per frame)
 const FALL_SPEED_VARIATION = 0.4;    // Additional random speed (0 to this value)
 const MIN_ROTATION_SPEED = 0;        // Minimum rotation speed per axis
 const ROTATION_SPEED_VARIATION = 0.1; // Additional random rotation speed
 const MIN_POLYTOPE_SIZE = 0.4;       // Minimum size of each polytope
 const POLYTOPE_SIZE_VARIATION = 0.5; // Additional random size (0 to this value)
-const MAX_POLYTOPES = 10000;           // Maximum polytopes at once (can be much higher now!)
+const MAX_POLYTOPES = 30000;           // Maximum polytopes at once (can be much higher now!)
 // ============================================
 
 class PolytopeRain extends HTMLElement {
@@ -114,7 +115,7 @@ class PolytopeRain extends HTMLElement {
 
                 .intensity-toggle-container {
                     position: absolute;
-                    bottom: 20px;
+                    bottom: 40px;
                     left: 50%;
                     transform: translateX(-50%);
                     z-index: 1000;
@@ -289,11 +290,29 @@ class PolytopeRain extends HTMLElement {
             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         `;
 
+        const apocalypseBtn = document.createElement('button');
+        apocalypseBtn.id = 'apocalypse-btn';
+        apocalypseBtn.textContent = 'apocalypse';
+        apocalypseBtn.style.cssText = `
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--fg-secondary);
+            cursor: pointer;
+            transition: color 0.2s ease;
+            position: relative;
+            z-index: 1;
+            border: none;
+            background: transparent;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
         switchContainer.appendChild(indicator);
         switchContainer.appendChild(drizzleBtn);
         switchContainer.appendChild(rainBtn);
         switchContainer.appendChild(stormBtn);
         switchContainer.appendChild(delugeBtn);
+        switchContainer.appendChild(apocalypseBtn);
         intensityToggle.appendChild(switchContainer);
 
         container.appendChild(canvas);
@@ -341,6 +360,7 @@ class PolytopeRain extends HTMLElement {
         const rainBtn = this.querySelector('#rain-btn');
         const stormBtn = this.querySelector('#storm-btn');
         const delugeBtn = this.querySelector('#deluge-btn');
+        const apocalypseBtn = this.querySelector('#apocalypse-btn');
         const indicator = this.querySelector('#intensity-indicator');
 
         const updateIndicator = (activeBtn) => {
@@ -357,6 +377,7 @@ class PolytopeRain extends HTMLElement {
             rainBtn.classList.remove('active');
             stormBtn.classList.remove('active');
             delugeBtn.classList.remove('active');
+            apocalypseBtn.classList.remove('active');
             activeBtn.classList.add('active');
 
             // Update colors using CSS variables
@@ -364,6 +385,7 @@ class PolytopeRain extends HTMLElement {
             rainBtn.style.color = 'var(--fg-secondary)';
             stormBtn.style.color = 'var(--fg-secondary)';
             delugeBtn.style.color = 'var(--fg-secondary)';
+            apocalypseBtn.style.color = 'var(--fg-secondary)';
             activeBtn.style.color = 'var(--fg-primary)';
 
             // Update indicator
@@ -387,6 +409,10 @@ class PolytopeRain extends HTMLElement {
 
         delugeBtn.addEventListener('click', () => {
             setActiveButton(delugeBtn, DELUGE_RATE);
+        });
+
+        apocalypseBtn.addEventListener('click', () => {
+            setActiveButton(apocalypseBtn, APOCALYPSE_RATE);
         });
 
         // Initialize indicator position

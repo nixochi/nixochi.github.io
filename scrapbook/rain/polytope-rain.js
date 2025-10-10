@@ -7,14 +7,14 @@
 // CONFIGURATION PARAMETERS
 // ============================================
 const TARGET_FPS = 30;               // Target framerate (30fps)
-const SPAWN_RATE = 9.3;              // Polytopes to spawn per frame (0.5 = 1 every 2 frames, 2 = 2 per frame)
+const SPAWN_RATE = 77.3;              // Polytopes to spawn per frame (0.5 = 1 every 2 frames, 2 = 2 per frame)
 const MIN_FALL_SPEED = 0.2;          // Minimum fall speed (units per frame)
 const FALL_SPEED_VARIATION = 0.4;    // Additional random speed (0 to this value)
 const MIN_ROTATION_SPEED = 0;        // Minimum rotation speed per axis
 const ROTATION_SPEED_VARIATION = 0.1; // Additional random rotation speed
 const MIN_POLYTOPE_SIZE = 0.4;       // Minimum size of each polytope
 const POLYTOPE_SIZE_VARIATION = 0.5; // Additional random size (0 to this value)
-const MAX_POLYTOPES = 2000;           // Maximum polytopes at once (can be much higher now!)
+const MAX_POLYTOPES = 10000;           // Maximum polytopes at once (can be much higher now!)
 // ============================================
 
 class PolytopeRain extends HTMLElement {
@@ -31,6 +31,8 @@ class PolytopeRain extends HTMLElement {
         // Object pool for particles
         this.particlePool = [];
         this.activeParticleCount = 0;
+        this.freeParticleIndices = []; // Stack of available particle indices (O(1) access)
+        this.activeParticleIndices = []; // List of currently active particle indices
         this.initializeParticlePool();
 
         // Animation
@@ -41,7 +43,9 @@ class PolytopeRain extends HTMLElement {
         // FPS tracking
         this.frameInterval = 1000 / TARGET_FPS;
         this.lastFrameTime = 0;
-        this.fpsFrames = [];
+        this.frameCount = 0;
+        this.lastSecondTimestamp = 0;
+        this.currentFPS = 0;
         this.fpsUpdateInterval = 500; // Update FPS display every 500ms
         this.lastFpsUpdate = 0;
 
@@ -328,6 +332,7 @@ void main() {
                 opacity: 0,
                 color: [1, 1, 1]
             });
+            this.freeParticleIndices.push(i); // All particles start as free
         }
     }
 
@@ -410,9 +415,11 @@ void main() {
     }
 
     activateParticle() {
-        // Find an inactive particle in the pool
-        const particle = this.particlePool.find(p => !p.active);
-        if (!particle) return null; // Pool is full
+        // Get a free particle from the stack (O(1) instead of O(n) find!)
+        if (this.freeParticleIndices.length === 0) return null; // Pool is full
+
+        const particleIndex = this.freeParticleIndices.pop();
+        const particle = this.particlePool[particleIndex];
 
         // Generate random color
         const hue = Math.random() * 360;
@@ -444,6 +451,9 @@ void main() {
         particle.color[1] = color[1];
         particle.color[2] = color[2];
 
+        // Add to active list
+        this.activeParticleIndices.push(particleIndex);
+
         return particle;
     }
 
@@ -457,11 +467,13 @@ void main() {
         }
 
         // Update active particles and pack into instance buffer
+        // Iterate backwards so we can safely remove deactivated particles
         const groundLevel = -this.viewHeight / 2 - 10;
         let instanceIndex = 0;
 
-        this.particlePool.forEach(p => {
-            if (!p.active) return;
+        for (let i = this.activeParticleIndices.length - 1; i >= 0; i--) {
+            const particleIndex = this.activeParticleIndices[i];
+            const p = this.particlePool[particleIndex];
 
             // Update position and rotation
             p.y -= p.fallSpeed;
@@ -472,7 +484,9 @@ void main() {
             // Deactivate particles that fall below screen
             if (p.y < groundLevel) {
                 p.active = false;
-                return;
+                this.freeParticleIndices.push(particleIndex); // Return to free pool
+                this.activeParticleIndices.splice(i, 1); // Remove from active list
+                continue;
             }
 
             // Pack into instance data
@@ -490,7 +504,7 @@ void main() {
             this.instanceData[offset + 10] = p.opacity;
 
             instanceIndex++;
-        });
+        }
 
         this.activeParticleCount = instanceIndex;
     }
@@ -549,20 +563,20 @@ void main() {
 
             // Track FPS
             this.lastFrameTime = currentTime - (elapsed % this.frameInterval);
-            this.fpsFrames.push(currentTime);
 
-            // Remove frames older than 1 second for accurate FPS calculation
-            const oneSecondAgo = currentTime - 1000;
-            while (this.fpsFrames.length > 0 && this.fpsFrames[0] < oneSecondAgo) {
-                this.fpsFrames.shift();
+            // Count frames in current second
+            if (currentTime - this.lastSecondTimestamp >= 1000) {
+                this.currentFPS = this.frameCount;
+                this.frameCount = 0;
+                this.lastSecondTimestamp = currentTime;
             }
+            this.frameCount++;
 
             // Update FPS display
             if (currentTime - this.lastFpsUpdate > this.fpsUpdateInterval) {
-                const fps = this.fpsFrames.length;
                 const fpsCounter = this.querySelector('#fps-counter');
                 if (fpsCounter) {
-                    fpsCounter.innerHTML = `FPS: ${fps}<br>Polytopes: ${this.activeParticleCount}`;
+                    fpsCounter.innerHTML = `FPS: ${this.currentFPS}<br>Polytopes: ${this.activeParticleCount}`;
                 }
                 this.lastFpsUpdate = currentTime;
             }

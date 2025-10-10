@@ -9,11 +9,11 @@
 const NUM_NESTED_POLYTOPES = 200;  // Number of nested polytopes to render
 
 // Time multiplier (1.0 = normal speed, 2.0 = twice as fast, 0.5 = half speed)
-const TIME_MULTIPLIER = 0.25;
+const TIME_MULTIPLIER = 0.3;
 
 // Animation Phase Durations (in milliseconds)
-const SYNCED_SLOW_DURATION = 3000 / TIME_MULTIPLIER;        // Phase 1: Synced, slow rotation
-const DESYNC_SPEEDUP_DURATION = 4000 / TIME_MULTIPLIER;     // Phase 2: Desyncing and speeding up
+const SYNCED_SLOW_DURATION = 1500 / TIME_MULTIPLIER;        // Phase 1: Synced, slow rotation
+const DESYNC_SPEEDUP_DURATION = 5500 / TIME_MULTIPLIER;     // Phase 2: Desyncing and speeding up
 const DESYNC_SLOWDOWN_DURATION = 4000 / TIME_MULTIPLIER;    // Phase 3: Desynced, slowing down
 const DESYNCED_SLOW_DURATION = 2000 / TIME_MULTIPLIER;      // Phase 4: Desynced, slow rotation
 const SYNC_SPEEDUP_DURATION = 4000 / TIME_MULTIPLIER;       // Phase 5: Syncing halfway and speeding up
@@ -21,7 +21,7 @@ const SYNC_SLOWDOWN_DURATION = 4000 / TIME_MULTIPLIER;      // Phase 6: Syncing 
 
 // Speed settings
 const SLOW_ROTATION_SPEED = 0.01;        // Slow rotation speed
-const FAST_ROTATION_SPEED = 0.05;         // Fast rotation speed
+const FAST_ROTATION_SPEED = 0.04;         // Fast rotation speed
 
 // Size settings (based on speed)
 const MAX_SPEED_SIZE = 1;              // Size multiplier at slow speed
@@ -592,7 +592,7 @@ void main() {
 
         this.spherical.radius *= this.sphericalDelta.radius;
         this.sphericalDelta.radius = 1;
-        this.spherical.radius = Math.max(1, this.spherical.radius); // Can zoom out as much as wanted
+        //this.spherical.radius = Math.max(1, this.spherical.radius); // Can zoom out as much as wanted
     }
 
     updatePolytopes() {

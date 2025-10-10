@@ -9,7 +9,7 @@
 const NUM_NESTED_POLYTOPES = 100;  // Number of nested polytopes to render
 
 // Animation Phase Durations (in milliseconds)
-const SYNCED_SLOW_DURATION = 2000;        // Phase 1: Synced, slow rotation
+const SYNCED_SLOW_DURATION = 3000;        // Phase 1: Synced, slow rotation
 const DESYNC_SPEEDUP_DURATION = 4000;     // Phase 2: Desyncing and speeding up
 const DESYNC_SLOWDOWN_DURATION = 4000;    // Phase 3: Desynced, slowing down
 const DESYNCED_SLOW_DURATION = 2000;      // Phase 4: Desynced, slow rotation
@@ -18,7 +18,7 @@ const SYNC_SLOWDOWN_DURATION = 4000;      // Phase 6: Syncing rest of way and sl
 
 // Speed settings
 const SLOW_ROTATION_SPEED = 0.01;        // Slow rotation speed
-const FAST_ROTATION_SPEED = 0.1;         // Fast rotation speed
+const FAST_ROTATION_SPEED = 0.5;         // Fast rotation speed
 
 // Desync settings
 const MAX_DESYNC_PERCENTAGE = 1;       // Maximum desync as percentage of full rotation (1.0 = full rotation)
@@ -36,7 +36,7 @@ class BreathingViz extends HTMLElement {
         // Camera state (spherical coordinates)
         // Start zoomed out enough to see the largest polytope
         const largestPolytopeSize = NUM_NESTED_POLYTOPES * (20 / NUM_NESTED_POLYTOPES);
-        const initialRadius = Math.max(8, largestPolytopeSize * 3.0);
+        const initialRadius =largestPolytopeSize * 3.0;
         this.spherical = {
             radius: initialRadius,
             theta: Math.PI / 4,

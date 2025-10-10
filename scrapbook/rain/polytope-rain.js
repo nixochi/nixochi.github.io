@@ -7,9 +7,9 @@
 // CONFIGURATION PARAMETERS
 // ============================================
 const TARGET_FPS = 30;               // Target framerate (30fps)
-const DRIZZLE_RATE = 0.5;              // Light rain spawn rate
-const RAIN_RATE = 6;                 // Normal rain spawn rate
-const STORM_RATE = 25;               // Heavy rain spawn rate
+const DRIZZLE_RATE = 0.2;              // Light rain spawn rate
+const RAIN_RATE = 2;                 // Normal rain spawn rate
+const STORM_RATE = 15;               // Heavy rain spawn rate
 const DELUGE_RATE = 55;              // Extreme rain spawn rate
 const MIN_FALL_SPEED = 0.2;          // Minimum fall speed (units per frame)
 const FALL_SPEED_VARIATION = 0.4;    // Additional random speed (0 to this value)
@@ -154,25 +154,41 @@ class PolytopeRain extends HTMLElement {
             transition: opacity 0.5s ease;
         `;
 
-        // Create FPS counter
+        // Create FPS counter (bottom right corner)
         const fpsCounter = document.createElement('div');
         fpsCounter.id = 'fps-counter';
         fpsCounter.style.cssText = `
             position: absolute;
-            bottom: 10px;
-            right: 10px;
+            bottom: 0;
+            right: 0;
             color: #00ff00;
             font-family: monospace;
-            font-size: 14px;
+            font-size: 11px;
             font-weight: bold;
             background: rgba(0, 0, 0, 0.5);
-            padding: 5px 10px;
-            border-radius: 4px;
+            padding: 3px 5px;
             pointer-events: none;
             z-index: 1000;
-            text-align: right;
         `;
-        fpsCounter.innerHTML = 'FPS: --<br>Polytopes: 0';
+        fpsCounter.textContent = 'FPS: --';
+
+        // Create polytopes counter (bottom left corner)
+        const polytopesCounter = document.createElement('div');
+        polytopesCounter.id = 'polytopes-counter';
+        polytopesCounter.style.cssText = `
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 11px;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 3px 5px;
+            pointer-events: none;
+            z-index: 1000;
+        `;
+        polytopesCounter.textContent = 'Polytopes: 0';
 
         // Create intensity toggle
         const intensityToggle = document.createElement('div');
@@ -282,6 +298,7 @@ class PolytopeRain extends HTMLElement {
 
         container.appendChild(canvas);
         container.appendChild(fpsCounter);
+        container.appendChild(polytopesCounter);
         container.appendChild(intensityToggle);
         this.innerHTML = '';
         this.appendChild(container);
@@ -783,8 +800,12 @@ void main() {
             // Update FPS display
             if (currentTime - this.lastFpsUpdate > this.fpsUpdateInterval) {
                 const fpsCounter = this.querySelector('#fps-counter');
+                const polytopesCounter = this.querySelector('#polytopes-counter');
                 if (fpsCounter) {
-                    fpsCounter.innerHTML = `FPS: ${this.currentFPS}<br>Polytopes: ${this.activeParticleCount}`;
+                    fpsCounter.textContent = `FPS: ${this.currentFPS}`;
+                }
+                if (polytopesCounter) {
+                    polytopesCounter.textContent = `Polytopes: ${this.activeParticleCount}`;
                 }
                 this.lastFpsUpdate = currentTime;
             }

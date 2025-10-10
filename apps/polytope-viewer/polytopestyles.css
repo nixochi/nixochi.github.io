@@ -264,6 +264,7 @@ polytope-viewer {
 /* Action buttons */
 .action-btn {
     width: 100%;
+    min-width: 140px;
     padding: 8px 12px;
     margin-bottom: 8px;
     background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);

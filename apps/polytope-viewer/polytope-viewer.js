@@ -18,6 +18,7 @@ class PolytopeViewer extends HTMLElement {
         this.vertices = null;
         this.isWireframe = false;
         this.faceOpacity = 0.9;
+        this.currentPolytopeName = 'Permutahedron';
 
         // WebGL objects
         this.gl = null;
@@ -865,6 +866,33 @@ void main(){
             [ 2.121320343559642, -0.408248290463863,  0.577350269189626],
             [ 2.121320343559642,  0.408248290463863, -0.577350269189626]
         ];
+    }
+
+    /**
+     * Export polytope data to clipboard in JSON format
+     * @returns {Object} The polytope data as an object
+     */
+    exportPolytopeData() {
+        if (!this.vertices || this.vertices.length === 0) {
+            console.warn('No vertices to export');
+            return null;
+        }
+
+        // Get faces from vertices using QuickHull
+        const faces = this.getFacesFromVertices(this.vertices);
+
+        // Get edges from faces
+        const edges = this.getEdgesFromFaces(faces);
+
+        // Create export object
+        const exportData = {
+            name: this.currentPolytopeName,
+            vertices: this.vertices,
+            faces: faces,
+            edges: edges
+        };
+
+        return exportData;
     }
 
     disposeGeometry() {

@@ -193,6 +193,7 @@
         <div class="control-group">
             <label class="control-label">Actions</label>
             <button class="action-btn" id="exportBtn">Export Image</button>
+            <button class="action-btn" id="exportPolytopeBtn">Export Polytope</button>
         </div>
     </div>
 
@@ -342,6 +343,59 @@
                 }
             });
 
+            // Export Polytope button functionality
+            const exportPolytopeBtn = document.getElementById('exportPolytopeBtn');
+            exportPolytopeBtn.addEventListener('click', async () => {
+                try {
+                    // Get polytope data from viewer
+                    const polytopeData = viewer.exportPolytopeData();
+
+                    if (!polytopeData) {
+                        alert('No polytope data to export.');
+                        return;
+                    }
+
+                    // Format JSON with compact arrays for vertices, faces, and edges
+                    const formatCompactJSON = (data) => {
+                        const parts = [];
+                        parts.push('{');
+                        parts.push(`\n  "name": ${JSON.stringify(data.name)},`);
+                        parts.push(`\n  "vertices": [`);
+                        data.vertices.forEach((v, i) => {
+                            parts.push(`${i === 0 ? '' : ','}\n    ${JSON.stringify(v)}`);
+                        });
+                        parts.push(`\n  ],`);
+                        parts.push(`\n  "faces": [`);
+                        data.faces.forEach((f, i) => {
+                            parts.push(`${i === 0 ? '' : ','}\n    ${JSON.stringify(f)}`);
+                        });
+                        parts.push(`\n  ],`);
+                        parts.push(`\n  "edges": [`);
+                        data.edges.forEach((e, i) => {
+                            parts.push(`${i === 0 ? '' : ','}\n    ${JSON.stringify(e)}`);
+                        });
+                        parts.push(`\n  ]`);
+                        parts.push('\n}');
+                        return parts.join('');
+                    };
+
+                    const jsonString = formatCompactJSON(polytopeData);
+
+                    // Copy to clipboard using the Clipboard API
+                    await navigator.clipboard.writeText(jsonString);
+
+                    // Show success feedback (change button text temporarily)
+                    const originalText = exportPolytopeBtn.textContent;
+                    exportPolytopeBtn.textContent = 'Copied!';
+                    setTimeout(() => {
+                        exportPolytopeBtn.textContent = originalText;
+                    }, 2000);
+                } catch (e) {
+                    console.error('Export polytope failed:', e);
+                    alert('Failed to copy polytope data to clipboard. Please try again.');
+                }
+            });
+
             // Polytope selection functionality
             function setupPolytopeSelection() {
                 polytopeGrid.addEventListener('click', (e) => {
@@ -357,6 +411,10 @@
                     const polytopeType = card.dataset.polytope;
                     const vertices = getPolytopeVertices(polytopeType);
                     viewer.setAttribute('vertices', JSON.stringify(vertices));
+
+                    // Update the polytope name in the viewer
+                    const polytopeName = polytopeOptions.find(p => p.id === polytopeType)?.name || polytopeType;
+                    viewer.currentPolytopeName = polytopeName;
 
                     // Close modal
                     closeModalFunc();

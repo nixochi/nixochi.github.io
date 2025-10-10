@@ -7,7 +7,10 @@
 // CONFIGURATION PARAMETERS
 // ============================================
 const TARGET_FPS = 30;               // Target framerate (30fps)
-const SPAWN_RATE = 77.3;              // Polytopes to spawn per frame (0.5 = 1 every 2 frames, 2 = 2 per frame)
+const DRIZZLE_RATE = 0.5;              // Light rain spawn rate
+const RAIN_RATE = 6;                 // Normal rain spawn rate
+const STORM_RATE = 25;               // Heavy rain spawn rate
+const DELUGE_RATE = 55;              // Extreme rain spawn rate
 const MIN_FALL_SPEED = 0.2;          // Minimum fall speed (units per frame)
 const FALL_SPEED_VARIATION = 0.4;    // Additional random speed (0 to this value)
 const MIN_ROTATION_SPEED = 0;        // Minimum rotation speed per axis
@@ -39,6 +42,7 @@ class PolytopeRain extends HTMLElement {
         this.animationId = null;
         this._ro = null;
         this.spawnAccumulator = 0; // Accumulator for fractional spawn rates
+        this.currentSpawnRate = DRIZZLE_RATE; // Default to drizzle mode
 
         // FPS tracking
         this.frameInterval = 1000 / TARGET_FPS;
@@ -92,6 +96,43 @@ class PolytopeRain extends HTMLElement {
     }
 
     connectedCallback() {
+        // Inject CSS variables and styles
+        if (!document.getElementById('polytope-rain-styles')) {
+            const style = document.createElement('style');
+            style.id = 'polytope-rain-styles';
+            style.textContent = `
+                :root {
+                    --bg-primary: #161617;
+                    --bg-secondary: #1c1c1e;
+                    --fg-primary: #f3f3f3;
+                    --fg-secondary: #b9b9b9;
+                    --border: #222224;
+                    --shadow: rgba(0,0,0,0.5);
+                    --backdrop-blur: rgba(28, 28, 30, 0.9);
+                    --radius: 12px;
+                }
+
+                .intensity-toggle-container {
+                    position: absolute;
+                    bottom: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    z-index: 1000;
+                }
+
+                @media (min-width: 768px) {
+                    .intensity-toggle-container {
+                        top: 20px;
+                        right: 20px;
+                        bottom: auto;
+                        left: auto;
+                        transform: none;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
         // Create container
         const container = document.createElement('div');
         container.style.cssText = `
@@ -133,8 +174,115 @@ class PolytopeRain extends HTMLElement {
         `;
         fpsCounter.innerHTML = 'FPS: --<br>Polytopes: 0';
 
+        // Create intensity toggle
+        const intensityToggle = document.createElement('div');
+        intensityToggle.className = 'intensity-toggle-container';
+
+        const switchContainer = document.createElement('div');
+        switchContainer.id = 'intensity-switch';
+        switchContainer.style.cssText = `
+            display: inline-flex;
+            background: var(--backdrop-blur);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2px;
+            position: relative;
+            box-shadow: var(--shadow);
+        `;
+
+        const indicator = document.createElement('div');
+        indicator.id = 'intensity-indicator';
+        indicator.style.cssText = `
+            position: absolute;
+            background: color-mix(in srgb, var(--bg-secondary) 70%, var(--fg-primary) 30%);
+            border-radius: 6px;
+            transition: transform 0.2s ease, width 0.2s ease;
+            height: calc(100% - 4px);
+            top: 2px;
+            left: 2px;
+            z-index: 0;
+        `;
+
+        const drizzleBtn = document.createElement('button');
+        drizzleBtn.id = 'drizzle-btn';
+        drizzleBtn.textContent = 'drizzle';
+        drizzleBtn.classList.add('active');
+        drizzleBtn.style.cssText = `
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--fg-primary);
+            cursor: pointer;
+            transition: color 0.2s ease;
+            position: relative;
+            z-index: 1;
+            border: none;
+            background: transparent;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
+        const rainBtn = document.createElement('button');
+        rainBtn.id = 'rain-btn';
+        rainBtn.textContent = 'rain';
+        rainBtn.style.cssText = `
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--fg-secondary);
+            cursor: pointer;
+            transition: color 0.2s ease;
+            position: relative;
+            z-index: 1;
+            border: none;
+            background: transparent;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
+        const stormBtn = document.createElement('button');
+        stormBtn.id = 'storm-btn';
+        stormBtn.textContent = 'storm';
+        stormBtn.style.cssText = `
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--fg-secondary);
+            cursor: pointer;
+            transition: color 0.2s ease;
+            position: relative;
+            z-index: 1;
+            border: none;
+            background: transparent;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
+        const delugeBtn = document.createElement('button');
+        delugeBtn.id = 'deluge-btn';
+        delugeBtn.textContent = 'deluge';
+        delugeBtn.style.cssText = `
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--fg-secondary);
+            cursor: pointer;
+            transition: color 0.2s ease;
+            position: relative;
+            z-index: 1;
+            border: none;
+            background: transparent;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
+        switchContainer.appendChild(indicator);
+        switchContainer.appendChild(drizzleBtn);
+        switchContainer.appendChild(rainBtn);
+        switchContainer.appendChild(stormBtn);
+        switchContainer.appendChild(delugeBtn);
+        intensityToggle.appendChild(switchContainer);
+
         container.appendChild(canvas);
         container.appendChild(fpsCounter);
+        container.appendChild(intensityToggle);
         this.innerHTML = '';
         this.appendChild(container);
 
@@ -165,9 +313,69 @@ class PolytopeRain extends HTMLElement {
         this.setupShaders();
         this.buildPolytopeGeometry();
         this.setupInstanceBuffer();
+        this.setupIntensityToggle();
         this.setupResizeObserver();
         this.removeLoadingSkeleton();
         this.startAnimationLoop();
+    }
+
+    setupIntensityToggle() {
+        const drizzleBtn = this.querySelector('#drizzle-btn');
+        const rainBtn = this.querySelector('#rain-btn');
+        const stormBtn = this.querySelector('#storm-btn');
+        const delugeBtn = this.querySelector('#deluge-btn');
+        const indicator = this.querySelector('#intensity-indicator');
+
+        const updateIndicator = (activeBtn) => {
+            const btnRect = activeBtn.getBoundingClientRect();
+            const switchRect = activeBtn.parentElement.getBoundingClientRect();
+            const offset = btnRect.left - switchRect.left - 2;
+            indicator.style.width = `${btnRect.width}px`;
+            indicator.style.transform = `translateX(${offset}px)`;
+        };
+
+        const setActiveButton = (activeBtn, spawnRate) => {
+            // Update button states
+            drizzleBtn.classList.remove('active');
+            rainBtn.classList.remove('active');
+            stormBtn.classList.remove('active');
+            delugeBtn.classList.remove('active');
+            activeBtn.classList.add('active');
+
+            // Update colors using CSS variables
+            drizzleBtn.style.color = 'var(--fg-secondary)';
+            rainBtn.style.color = 'var(--fg-secondary)';
+            stormBtn.style.color = 'var(--fg-secondary)';
+            delugeBtn.style.color = 'var(--fg-secondary)';
+            activeBtn.style.color = 'var(--fg-primary)';
+
+            // Update indicator
+            updateIndicator(activeBtn);
+
+            // Update spawn rate
+            this.currentSpawnRate = spawnRate;
+        };
+
+        drizzleBtn.addEventListener('click', () => {
+            setActiveButton(drizzleBtn, DRIZZLE_RATE);
+        });
+
+        rainBtn.addEventListener('click', () => {
+            setActiveButton(rainBtn, RAIN_RATE);
+        });
+
+        stormBtn.addEventListener('click', () => {
+            setActiveButton(stormBtn, STORM_RATE);
+        });
+
+        delugeBtn.addEventListener('click', () => {
+            setActiveButton(delugeBtn, DELUGE_RATE);
+        });
+
+        // Initialize indicator position
+        requestAnimationFrame(() => {
+            updateIndicator(drizzleBtn);
+        });
     }
 
     setupWebGL() {
@@ -457,10 +665,10 @@ void main() {
         return particle;
     }
 
-    updateParticles(currentTime) {
+    updateParticles() {
         // Spawn new particles based on spawn rate per frame
         // Accumulator allows fractional rates (e.g., 0.5 = spawn 1 every 2 frames)
-        this.spawnAccumulator += SPAWN_RATE;
+        this.spawnAccumulator += this.currentSpawnRate;
         while (this.spawnAccumulator >= 1) {
             this.activateParticle();
             this.spawnAccumulator -= 1;
@@ -581,7 +789,7 @@ void main() {
                 this.lastFpsUpdate = currentTime;
             }
 
-            this.updateParticles(currentTime);
+            this.updateParticles();
             this.render();
         };
         animate(performance.now());

@@ -6,19 +6,19 @@
 // ============================================
 // CONFIGURATION PARAMETERS
 // ============================================
-const TARGET_FPS = 30;
+const TARGET_FPS = 60;
 const DRIZZLE_RATE = 0.2;
 const RAIN_RATE = 2;
 const STORM_RATE = 15;
 const DELUGE_RATE = 55;
-const APOCALYPSE_RATE = 255;
+const APOCALYPSE_RATE = 155;
 const MIN_FALL_SPEED = 0.2;
 const FALL_SPEED_VARIATION = 0.4;
 const MIN_ROTATION_SPEED = 0;
 const ROTATION_SPEED_VARIATION = 0.1;
 const MIN_POLYTOPE_SIZE = 0.4;
 const POLYTOPE_SIZE_VARIATION = 0.5;
-const MAX_POLYTOPES = 50000;
+const MAX_POLYTOPES = 30000;
 // ============================================
 
 class PolytopeRain extends HTMLElement {

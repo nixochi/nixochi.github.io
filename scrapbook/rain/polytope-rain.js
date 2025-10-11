@@ -100,7 +100,6 @@ class PolytopeRain extends HTMLElement {
                     --fg-secondary: #b9b9b9;
                     --border: #222224;
                     --shadow: rgba(0,0,0,0.5);
-                    --backdrop-blur: rgba(28, 28, 30, 0.9);
                     --radius: 12px;
                 }
 
@@ -132,6 +131,8 @@ class PolytopeRain extends HTMLElement {
             position: relative;
             overflow: hidden;
             background: transparent;
+        {};
+
         `;
 
         const canvas = document.createElement('canvas');
@@ -142,6 +143,9 @@ class PolytopeRain extends HTMLElement {
             display: block;
             opacity: 0;
             transition: opacity 0.5s ease;
+            background: #000;            /* keep opaque look when alpha:true */
+            transform: translateZ(0);    /* isolate compositing */
+            will-change: transform;
         `;
 
         const fpsCounter = document.createElement('div');
@@ -185,13 +189,14 @@ class PolytopeRain extends HTMLElement {
         switchContainer.id = 'intensity-switch';
         switchContainer.style.cssText = `
             display: inline-flex;
-            background: var(--backdrop-blur);
-            backdrop-filter: blur(16px);
+            background: rgba(28, 28, 30, 0.75); /* replaced backdrop-filter */
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 2px;
             position: relative;
             box-shadow: var(--shadow);
+            contain: paint;               /* isolate painting */
+            will-change: transform;       /* keep on its own layer */
         `;
 
         const indicator = document.createElement('div');
@@ -207,91 +212,44 @@ class PolytopeRain extends HTMLElement {
             z-index: 0;
         `;
 
+        const btnBase = `
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: color 0.2s ease;
+            position: relative;
+            z-index: 1;
+            border: none;
+            background: transparent;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
         const drizzleBtn = document.createElement('button');
         drizzleBtn.id = 'drizzle-btn';
         drizzleBtn.textContent = 'drizzle';
         drizzleBtn.classList.add('active');
-        drizzleBtn.style.cssText = `
-            padding: 6px 12px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--fg-primary);
-            cursor: pointer;
-            transition: color 0.2s ease;
-            position: relative;
-            z-index: 1;
-            border: none;
-            background: transparent;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        `;
+        drizzleBtn.style.cssText = btnBase + 'color: var(--fg-primary);';
 
         const rainBtn = document.createElement('button');
         rainBtn.id = 'rain-btn';
         rainBtn.textContent = 'rain';
-        rainBtn.style.cssText = `
-            padding: 6px 12px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--fg-secondary);
-            cursor: pointer;
-            transition: color 0.2s ease;
-            position: relative;
-            z-index: 1;
-            border: none;
-            background: transparent;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        `;
+        rainBtn.style.cssText = btnBase + 'color: var(--fg-secondary);';
 
         const stormBtn = document.createElement('button');
         stormBtn.id = 'storm-btn';
         stormBtn.textContent = 'storm';
-        stormBtn.style.cssText = `
-            padding: 6px 12px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--fg-secondary);
-            cursor: pointer;
-            transition: color 0.2s ease;
-            position: relative;
-            z-index: 1;
-            border: none;
-            background: transparent;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        `;
+        stormBtn.style.cssText = btnBase + 'color: var(--fg-secondary);';
 
         const delugeBtn = document.createElement('button');
         delugeBtn.id = 'deluge-btn';
         delugeBtn.textContent = 'deluge';
-        delugeBtn.style.cssText = `
-            padding: 6px 12px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--fg-secondary);
-            cursor: pointer;
-            transition: color 0.2s ease;
-            position: relative;
-            z-index: 1;
-            border: none;
-            background: transparent;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        `;
+        delugeBtn.style.cssText = btnBase + 'color: var(--fg-secondary);';
 
         const apocalypseBtn = document.createElement('button');
         apocalypseBtn.id = 'apocalypse-btn';
         apocalypseBtn.textContent = 'apocalypse';
-        apocalypseBtn.style.cssText = `
-            padding: 6px 12px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--fg-secondary);
-            cursor: pointer;
-            transition: color 0.2s ease;
-            position: relative;
-            z-index: 1;
-            border: none;
-            background: transparent;
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        `;
+        apocalypseBtn.style.cssText = btnBase + 'color: var(--fg-secondary);';
 
         switchContainer.appendChild(indicator);
         switchContainer.appendChild(drizzleBtn);
@@ -403,7 +361,14 @@ class PolytopeRain extends HTMLElement {
 
     setupWebGL() {
         const canvas = this.querySelector('#canvas');
-        this.gl = canvas.getContext('webgl2', { antialias: true, alpha: false });
+        this.gl = canvas.getContext('webgl2', {
+            antialias: true,
+            alpha: true,                 // allow proper compositing
+            premultipliedAlpha: true,
+            preserveDrawingBuffer: false,
+            powerPreference: 'high-performance',
+            desynchronized: true
+        });
 
         if (!this.gl) {
             throw new Error('WebGL2 not supported');
@@ -612,34 +577,34 @@ void main() {
         gl.bindVertexArray(this.polytopeGeometry.vao);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
 
-        const stride = 13 * 4; // 13 floats * 4 bytes = 52 bytes per instance
+        const stride = 13 * 4; // 52 bytes per instance
 
-        // Position (location=1) - 3 floats at byte offset 0
+        // Position (location=1)
         gl.enableVertexAttribArray(1);
         gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 0);
         gl.vertexAttribDivisor(1, 1);
 
-        // SinCosX (location=2) - 2 floats at byte offset 12
+        // SinCosX (location=2)
         gl.enableVertexAttribArray(2);
         gl.vertexAttribPointer(2, 2, gl.FLOAT, false, stride, 12);
         gl.vertexAttribDivisor(2, 1);
 
-        // SinCosY (location=3) - 2 floats at byte offset 20
+        // SinCosY (location=3)
         gl.enableVertexAttribArray(3);
         gl.vertexAttribPointer(3, 2, gl.FLOAT, false, stride, 20);
         gl.vertexAttribDivisor(3, 1);
 
-        // SinCosZ (location=4) - 2 floats at byte offset 28
+        // SinCosZ (location=4)
         gl.enableVertexAttribArray(4);
         gl.vertexAttribPointer(4, 2, gl.FLOAT, false, stride, 28);
         gl.vertexAttribDivisor(4, 1);
 
-        // Scale (location=5) - 1 float at byte offset 36
+        // Scale (location=5)
         gl.enableVertexAttribArray(5);
         gl.vertexAttribPointer(5, 1, gl.FLOAT, false, stride, 36);
         gl.vertexAttribDivisor(5, 1);
 
-        // Color (location=6) - 3 floats at byte offset 40
+        // Color (location=6)
         gl.enableVertexAttribArray(6);
         gl.vertexAttribPointer(6, 3, gl.FLOAT, false, stride, 40);
         gl.vertexAttribDivisor(6, 1);
@@ -832,7 +797,7 @@ void main() {
         if (this.activeParticleCount === 0) return;
 
         gl.useProgram(this.prog);
-        gl.lineWidth(2.0);
+        gl.lineWidth(2.0); // keep as requested
 
         const halfWidth = this.viewWidth / 2;
         const halfHeight = this.viewHeight / 2;
@@ -841,19 +806,9 @@ void main() {
         gl.uniformMatrix4fv(gl.getUniformLocation(this.prog, 'uProjection'), false, P);
 
         gl.bindVertexArray(this.polytopeGeometry.vao);
-        
-        // Bind buffer and rebind vertex attributes (simpler approach)
+
+        // Update buffer data (no re-specifying attrib pointers each frame)
         gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
-        
-        const stride = 13 * 4;
-        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 0);
-        gl.vertexAttribPointer(2, 2, gl.FLOAT, false, stride, 12);
-        gl.vertexAttribPointer(3, 2, gl.FLOAT, false, stride, 20);
-        gl.vertexAttribPointer(4, 2, gl.FLOAT, false, stride, 28);
-        gl.vertexAttribPointer(5, 1, gl.FLOAT, false, stride, 36);
-        gl.vertexAttribPointer(6, 3, gl.FLOAT, false, stride, 40);
-        
-        // Update buffer data
         const uploadData = this.instanceData.subarray(0, this.activeParticleCount * 13);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, uploadData);
         

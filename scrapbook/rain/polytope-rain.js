@@ -1,6 +1,8 @@
 /**
- * polytope rain webcomponent (OPTIMIZED - No Opacity/Blending)
- * Performance improvement: ~2-3× faster fragment shader execution
+ * polytope rain webcomponent (optimized)
+ * - removed opacity channel (always 1.0)
+ * - precompute sin/cos on cpu (once per polytope instead of per vertex)
+ * - reduced instance buffer from 11 to 13 floats per polytope
  */
 
 // ============================================
@@ -412,29 +414,33 @@ class PolytopeRain extends HTMLElement {
         }
 
         this.gl.enable(this.gl.DEPTH_TEST);
-        this.gl.disable(this.gl.BLEND); // ← OPTIMIZATION: No blending needed!
+        this.gl.disable(this.gl.BLEND);  // Critical: explicitly disable blending
         this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
     }
 
     setupShaders() {
         const gl = this.gl;
 
-        // OPTIMIZED: Removed opacity from vertex shader
+        // Optimized vertex shader: receives precomputed sin/cos values
         const vs = `#version 300 es
 layout(location=0) in vec3 aPos;
 
+// Instance attributes - precomputed sin/cos for rotations
 layout(location=1) in vec3 aInstancePos;
-layout(location=2) in vec3 aInstanceRot;
-layout(location=3) in float aInstanceScale;
-layout(location=4) in vec3 aInstanceColor;
+layout(location=2) in vec2 aSinCosX;  // (sin, cos) for X rotation
+layout(location=3) in vec2 aSinCosY;  // (sin, cos) for Y rotation
+layout(location=4) in vec2 aSinCosZ;  // (sin, cos) for Z rotation
+layout(location=5) in float aInstanceScale;
+layout(location=6) in vec3 aInstanceColor;
 
 uniform mat4 uProjection;
 
 out vec3 vColor;
 
-mat4 rotateX(float angle) {
-    float c = cos(angle);
-    float s = sin(angle);
+// Build rotation matrices from precomputed sin/cos values
+mat4 rotateX(vec2 sincos) {
+    float s = sincos.x;
+    float c = sincos.y;
     return mat4(
         1.0, 0.0, 0.0, 0.0,
         0.0, c,   s,   0.0,
@@ -443,9 +449,9 @@ mat4 rotateX(float angle) {
     );
 }
 
-mat4 rotateY(float angle) {
-    float c = cos(angle);
-    float s = sin(angle);
+mat4 rotateY(vec2 sincos) {
+    float s = sincos.x;
+    float c = sincos.y;
     return mat4(
         c,   0.0, -s,  0.0,
         0.0, 1.0, 0.0, 0.0,
@@ -454,9 +460,9 @@ mat4 rotateY(float angle) {
     );
 }
 
-mat4 rotateZ(float angle) {
-    float c = cos(angle);
-    float s = sin(angle);
+mat4 rotateZ(vec2 sincos) {
+    float s = sincos.x;
+    float c = sincos.y;
     return mat4(
         c,   s,   0.0, 0.0,
         -s,  c,   0.0, 0.0,
@@ -485,16 +491,16 @@ mat4 scale(float s) {
 
 void main() {
     mat4 model = translate(aInstancePos)
-               * rotateZ(aInstanceRot.z)
-               * rotateY(aInstanceRot.y)
-               * rotateX(aInstanceRot.x)
+               * rotateZ(aSinCosZ)
+               * rotateY(aSinCosY)
+               * rotateX(aSinCosX)
                * scale(aInstanceScale);
 
     vColor = aInstanceColor;
     gl_Position = uProjection * model * vec4(aPos, 1.0);
 }`;
 
-        // OPTIMIZED: Hardcoded opacity to 1.0 (fully opaque)
+        // Simplified fragment shader: hardcoded opacity
         const fs = `#version 300 es
 precision mediump float;
 in vec3 vColor;
@@ -542,7 +548,6 @@ void main() {
     }
 
     initializeParticlePool() {
-        // OPTIMIZED: Removed opacity from particle data
         for (let i = 0; i < MAX_POLYTOPES; i++) {
             this.particlePool.push({
                 active: false,
@@ -599,34 +604,48 @@ void main() {
     setupInstanceBuffer() {
         const gl = this.gl;
 
-        // OPTIMIZED: Changed from 11 to 10 floats per instance (no opacity)
-        this.instanceData = new Float32Array(MAX_POLYTOPES * 10);
+        // Instance data layout (13 floats per instance):
+        // pos(3) + sinCosX(2) + sinCosY(2) + sinCosZ(2) + scale(1) + color(3) = 13 floats
+        this.instanceData = new Float32Array(MAX_POLYTOPES * 13);
         this.instanceBuffer = gl.createBuffer();
 
         gl.bindVertexArray(this.polytopeGeometry.vao);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, this.instanceData, gl.DYNAMIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, this.instanceData.byteLength, gl.DYNAMIC_DRAW);
 
-        const stride = 10 * 4;  // 10 floats × 4 bytes = 40 bytes
+        const stride = 13 * 4; // 13 floats * 4 bytes = 52 bytes per instance
 
+        // Position (location=1) - 3 floats at byte offset 0
         gl.enableVertexAttribArray(1);
         gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 0);
         gl.vertexAttribDivisor(1, 1);
 
+        // SinCosX (location=2) - 2 floats at byte offset 12
         gl.enableVertexAttribArray(2);
-        gl.vertexAttribPointer(2, 3, gl.FLOAT, false, stride, 12);
+        gl.vertexAttribPointer(2, 2, gl.FLOAT, false, stride, 12);
         gl.vertexAttribDivisor(2, 1);
 
+        // SinCosY (location=3) - 2 floats at byte offset 20
         gl.enableVertexAttribArray(3);
-        gl.vertexAttribPointer(3, 1, gl.FLOAT, false, stride, 24);
+        gl.vertexAttribPointer(3, 2, gl.FLOAT, false, stride, 20);
         gl.vertexAttribDivisor(3, 1);
 
+        // SinCosZ (location=4) - 2 floats at byte offset 28
         gl.enableVertexAttribArray(4);
-        gl.vertexAttribPointer(4, 3, gl.FLOAT, false, stride, 28);
+        gl.vertexAttribPointer(4, 2, gl.FLOAT, false, stride, 28);
         gl.vertexAttribDivisor(4, 1);
 
-        // OPTIMIZED: Removed opacity attribute (was location 5)
+        // Scale (location=5) - 1 float at byte offset 36
+        gl.enableVertexAttribArray(5);
+        gl.vertexAttribPointer(5, 1, gl.FLOAT, false, stride, 36);
+        gl.vertexAttribDivisor(5, 1);
 
+        // Color (location=6) - 3 floats at byte offset 40
+        gl.enableVertexAttribArray(6);
+        gl.vertexAttribPointer(6, 3, gl.FLOAT, false, stride, 40);
+        gl.vertexAttribDivisor(6, 1);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
         gl.bindVertexArray(null);
     }
 
@@ -662,8 +681,6 @@ void main() {
         particle.color[1] = color[1];
         particle.color[2] = color[2];
 
-        // OPTIMIZED: Removed opacity assignment
-
         this.activeParticleIndices.push(particleIndex);
 
         return particle;
@@ -683,11 +700,13 @@ void main() {
             const particleIndex = this.activeParticleIndices[i];
             const p = this.particlePool[particleIndex];
 
+            // Update physics
             p.y -= p.fallSpeed;
             p.rotX += p.rotSpeedX;
             p.rotY += p.rotSpeedY;
             p.rotZ += p.rotSpeedZ;
 
+            // Check if particle fell off screen
             if (p.y < groundLevel) {
                 p.active = false;
                 this.freeParticleIndices.push(particleIndex);
@@ -695,19 +714,29 @@ void main() {
                 continue;
             }
 
-            // OPTIMIZED: Changed from 11 to 10 floats per instance
-            const offset = instanceIndex * 10;
+            // Precompute sin/cos on CPU (once per particle, not per vertex!)
+            const sinX = Math.sin(p.rotX);
+            const cosX = Math.cos(p.rotX);
+            const sinY = Math.sin(p.rotY);
+            const cosY = Math.cos(p.rotY);
+            const sinZ = Math.sin(p.rotZ);
+            const cosZ = Math.cos(p.rotZ);
+
+            // Pack instance data: pos(3) + sinCosX(2) + sinCosY(2) + sinCosZ(2) + scale(1) + color(3)
+            const offset = instanceIndex * 13;
             this.instanceData[offset + 0] = p.x;
             this.instanceData[offset + 1] = p.y;
             this.instanceData[offset + 2] = p.z;
-            this.instanceData[offset + 3] = p.rotX;
-            this.instanceData[offset + 4] = p.rotY;
-            this.instanceData[offset + 5] = p.rotZ;
-            this.instanceData[offset + 6] = p.size;
-            this.instanceData[offset + 7] = p.color[0];
-            this.instanceData[offset + 8] = p.color[1];
-            this.instanceData[offset + 9] = p.color[2];
-            // OPTIMIZED: Removed opacity packing (was offset + 10)
+            this.instanceData[offset + 3] = sinX;
+            this.instanceData[offset + 4] = cosX;
+            this.instanceData[offset + 5] = sinY;
+            this.instanceData[offset + 6] = cosY;
+            this.instanceData[offset + 7] = sinZ;
+            this.instanceData[offset + 8] = cosZ;
+            this.instanceData[offset + 9] = p.size;
+            this.instanceData[offset + 10] = p.color[0];
+            this.instanceData[offset + 11] = p.color[1];
+            this.instanceData[offset + 12] = p.color[2];
 
             instanceIndex++;
         }
@@ -809,8 +838,7 @@ void main() {
         gl.uniformMatrix4fv(gl.getUniformLocation(this.prog, 'uProjection'), false, P);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
-        // OPTIMIZED: Changed from 11 to 10 floats per instance
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.instanceData, 0, this.activeParticleCount * 10);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.instanceData, 0, this.activeParticleCount * 13);
 
         gl.bindVertexArray(this.polytopeGeometry.vao);
         gl.drawArraysInstanced(gl.LINES, 0, this.polytopeGeometry.vertexCount, this.activeParticleCount);

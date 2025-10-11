@@ -13,7 +13,7 @@
 // ============================================
 // CONFIGURATION
 // ============================================
-const TARGET_FPS = 60;
+const TARGET_FPS = 30;
 const MAX_PARTICLES = 100000;
 
 // spawn rates (particles per frame)

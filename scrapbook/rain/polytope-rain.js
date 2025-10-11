@@ -29,8 +29,6 @@ class PolytopeRain extends HTMLElement {
         this.prog = null;
         this.polytopeGeometry = null;
         this.instanceBuffer = null;
-        this.instanceBufferB = null;  // Second buffer for double buffering
-        this.currentBuffer = 0;  // Track which buffer to use (0 or 1)
         this.instanceData = null;
 
         this.particlePool = [];
@@ -44,8 +42,6 @@ class PolytopeRain extends HTMLElement {
         this.spawnAccumulator = 0;
         this.currentSpawnRate = DRIZZLE_RATE;
 
-        this.frameInterval = 1000 / TARGET_FPS;
-        this.lastFrameTime = 0;
         this.frameCount = 0;
         this.lastSecondTimestamp = 0;
         this.currentFPS = 0;
@@ -607,17 +603,12 @@ void main() {
         // pos(3) + sinCosX(2) + sinCosY(2) + sinCosZ(2) + scale(1) + color(3) = 13 floats
         this.instanceData = new Float32Array(MAX_POLYTOPES * 13);
         
-        // Create TWO instance buffers for double buffering
+        // Single buffer - let WebGL handle synchronization
         this.instanceBuffer = gl.createBuffer();
-        this.instanceBufferB = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.instanceData.byteLength, gl.DYNAMIC_DRAW);
 
-        // Set up both buffers identically
-        [this.instanceBuffer, this.instanceBufferB].forEach(buffer => {
-            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-            gl.bufferData(gl.ARRAY_BUFFER, this.instanceData.byteLength, gl.DYNAMIC_DRAW);
-        });
-
-        // Set up VAO with instance buffer A (we'll swap during render)
+        // Set up VAO
         gl.bindVertexArray(this.polytopeGeometry.vao);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
 
@@ -694,8 +685,9 @@ void main() {
         return particle;
     }
 
-    updateParticles() {
-        this.spawnAccumulator += this.currentSpawnRate;
+    updateParticles(deltaTime) {
+        // Scale spawn rate by delta time (*60 to match old frame-based behavior)
+        this.spawnAccumulator += this.currentSpawnRate * deltaTime * 60;
         while (this.spawnAccumulator >= 1) {
             this.activateParticle();
             this.spawnAccumulator -= 1;
@@ -708,11 +700,11 @@ void main() {
             const particleIndex = this.activeParticleIndices[i];
             const p = this.particlePool[particleIndex];
 
-            // Update physics
-            p.y -= p.fallSpeed;
-            p.rotX += p.rotSpeedX;
-            p.rotY += p.rotSpeedY;
-            p.rotZ += p.rotSpeedZ;
+            // Time-based physics (*60 to match old frame-based speed)
+            p.y -= p.fallSpeed * deltaTime * 60;
+            p.rotX += p.rotSpeedX * deltaTime * 60;
+            p.rotY += p.rotSpeedY * deltaTime * 60;
+            p.rotZ += p.rotSpeedZ * deltaTime * 60;
 
             // Check if particle fell off screen
             if (p.y < groundLevel) {
@@ -794,16 +786,19 @@ void main() {
     }
 
     startAnimationLoop() {
+        let lastTime = performance.now();
+        
         const animate = (currentTime) => {
             this.animationId = requestAnimationFrame(animate);
-
-            const elapsed = currentTime - this.lastFrameTime;
-            if (elapsed < this.frameInterval) {
-                return;
-            }
-
-            this.lastFrameTime = currentTime - (elapsed % this.frameInterval);
-
+            
+            // Calculate delta time in seconds
+            const deltaTime = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+            
+            // Clamp to prevent huge jumps (if tab was backgrounded)
+            const clampedDelta = Math.min(deltaTime, 0.1);
+            
+            // Update FPS counter
             if (currentTime - this.lastSecondTimestamp >= 1000) {
                 this.currentFPS = this.frameCount;
                 this.frameCount = 0;
@@ -823,7 +818,7 @@ void main() {
                 this.lastFpsUpdate = currentTime;
             }
 
-            this.updateParticles();
+            this.updateParticles(clampedDelta);
             this.render();
         };
         animate(performance.now());
@@ -845,15 +840,10 @@ void main() {
 
         gl.uniformMatrix4fv(gl.getUniformLocation(this.prog, 'uProjection'), false, P);
 
-        // Double buffering: alternate between two buffers
-        // This prevents updating a buffer the GPU is still reading from
-        const currentBuffer = this.currentBuffer === 0 ? this.instanceBuffer : this.instanceBufferB;
-        this.currentBuffer = 1 - this.currentBuffer;  // Swap for next frame
-
         gl.bindVertexArray(this.polytopeGeometry.vao);
         
-        // Rebind attributes to current buffer
-        gl.bindBuffer(gl.ARRAY_BUFFER, currentBuffer);
+        // Bind buffer and rebind vertex attributes (simpler approach)
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
         
         const stride = 13 * 4;
         gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 0);
@@ -894,9 +884,6 @@ void main() {
         }
         if (this.gl && this.instanceBuffer) {
             this.gl.deleteBuffer(this.instanceBuffer);
-        }
-        if (this.gl && this.instanceBufferB) {
-            this.gl.deleteBuffer(this.instanceBufferB);
         }
         if (this.gl && this.prog) {
             this.gl.deleteProgram(this.prog);

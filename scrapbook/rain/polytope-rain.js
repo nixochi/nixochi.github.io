@@ -143,8 +143,8 @@ class PolytopeRain extends HTMLElement {
             display: block;
             opacity: 0;
             transition: opacity 0.5s ease;
-            background: #000;            /* keep opaque look when alpha:true */
-            transform: translateZ(0);    /* isolate compositing */
+            background: #000;          
+            transform: translateZ(0);    
             will-change: transform;
         `;
 
@@ -189,14 +189,14 @@ class PolytopeRain extends HTMLElement {
         switchContainer.id = 'intensity-switch';
         switchContainer.style.cssText = `
             display: inline-flex;
-            background: rgba(28, 28, 30, 0.75); /* replaced backdrop-filter */
+            background: rgba(28, 28, 30, 0.75); 
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 2px;
             position: relative;
             box-shadow: var(--shadow);
-            contain: paint;               /* isolate painting */
-            will-change: transform;       /* keep on its own layer */
+            contain: paint;            
+            will-change: transform;    
         `;
 
         const indicator = document.createElement('div');
@@ -363,7 +363,7 @@ class PolytopeRain extends HTMLElement {
         const canvas = this.querySelector('#canvas');
         this.gl = canvas.getContext('webgl2', {
             antialias: true,
-            alpha: true,                 // allow proper compositing
+            alpha: true,                
             premultipliedAlpha: true,
             preserveDrawingBuffer: false,
             powerPreference: 'high-performance',
@@ -381,7 +381,6 @@ class PolytopeRain extends HTMLElement {
     setupShaders() {
         const gl = this.gl;
 
-        // Optimized vertex shader: receives precomputed sin/cos values
         const vs = `#version 300 es
 layout(location=0) in vec3 aPos;
 
@@ -460,7 +459,6 @@ void main() {
     gl_Position = uProjection * model * vec4(aPos, 1.0);
 }`;
 
-        // Simplified fragment shader: hardcoded opacity
         const fs = `#version 300 es
 precision mediump float;
 in vec3 vColor;
@@ -564,7 +562,6 @@ void main() {
     setupInstanceBuffer() {
         const gl = this.gl;
 
-        // Instance data layout (13 floats per instance):
         // pos(3) + sinCosX(2) + sinCosY(2) + sinCosZ(2) + scale(1) + color(3) = 13 floats
         this.instanceData = new Float32Array(MAX_POLYTOPES * 13);
         
@@ -651,7 +648,6 @@ void main() {
     }
 
     updateParticles(deltaTime) {
-        // Scale spawn rate by delta time (*60 to match old frame-based behavior)
         this.spawnAccumulator += this.currentSpawnRate * deltaTime * 60;
         while (this.spawnAccumulator >= 1) {
             this.activateParticle();
@@ -665,13 +661,11 @@ void main() {
             const particleIndex = this.activeParticleIndices[i];
             const p = this.particlePool[particleIndex];
 
-            // Time-based physics (*60 to match old frame-based speed)
             p.y -= p.fallSpeed * deltaTime * 60;
             p.rotX += p.rotSpeedX * deltaTime * 60;
             p.rotY += p.rotSpeedY * deltaTime * 60;
             p.rotZ += p.rotSpeedZ * deltaTime * 60;
 
-            // Check if particle fell off screen
             if (p.y < groundLevel) {
                 p.active = false;
                 this.freeParticleIndices.push(particleIndex);
@@ -679,7 +673,6 @@ void main() {
                 continue;
             }
 
-            // Precompute sin/cos on CPU (once per particle, not per vertex!)
             const sinX = Math.sin(p.rotX);
             const cosX = Math.cos(p.rotX);
             const sinY = Math.sin(p.rotY);
@@ -756,11 +749,9 @@ void main() {
         const animate = (currentTime) => {
             this.animationId = requestAnimationFrame(animate);
             
-            // Calculate delta time in seconds
             const deltaTime = (currentTime - lastTime) / 1000;
             lastTime = currentTime;
             
-            // Clamp to prevent huge jumps (if tab was backgrounded)
             const clampedDelta = Math.min(deltaTime, 0.1);
             
             // Update FPS counter

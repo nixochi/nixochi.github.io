@@ -6,7 +6,7 @@
 // ============================================
 // CONFIGURATION PARAMETERS
 // ============================================
-const NUM_NESTED_POLYTOPES = 200;  // Number of nested polytopes to render
+const NUM_NESTED_POLYTOPES = 1000;  // Number of nested polytopes to render
 
 // Time multiplier (1.0 = normal speed, 2.0 = twice as fast, 0.5 = half speed)
 const TIME_MULTIPLIER = 0.3;
@@ -16,19 +16,42 @@ const SYNCED_SLOW_DURATION = 100 / TIME_MULTIPLIER;        // Phase 1: Synced, s
 const DESYNC_SPEEDUP_DURATION = 4000 / TIME_MULTIPLIER;     // Phase 2: Desyncing and speeding up
 const DESYNC_SLOWDOWN_DURATION = 4000 / TIME_MULTIPLIER;    // Phase 3: Desynced, slowing down
 const DESYNCED_SLOW_DURATION = 2000 / TIME_MULTIPLIER;      // Phase 4: Desynced, slow rotation
-const SYNC_SPEEDUP_DURATION = 4000 / TIME_MULTIPLIER;       // Phase 5: Syncing halfway and speeding up
-const SYNC_SLOWDOWN_DURATION = 4000 / TIME_MULTIPLIER;      // Phase 6: Syncing rest of way and slowing down
+const SYNC_SPEEDUP_DURATION = 5000 / TIME_MULTIPLIER;       // Phase 5: Syncing halfway and speeding up
+const SYNC_SLOWDOWN_DURATION = 2000 / TIME_MULTIPLIER;      // Phase 6: Syncing rest of way and slowing down
 
 // Speed settings
-const SLOW_ROTATION_SPEED = 0.01;        // Slow rotation speed
-const FAST_ROTATION_SPEED = 0.04;         // Fast rotation speed
+const SLOW_ROTATION_SPEED = 0.01;
+const FAST_ROTATION_SPEED = 0.04;
 
-// Size settings (based on speed)
-const MAX_SPEED_SIZE = 1;              // Size multiplier at slow speed
-const MIN_SPEED_SIZE = 0.6;              // Size multiplier at fast speed
+// Size settings for each phase
+const PHASE_1_SIZE = 1.0;
+const PHASE_2_START_SIZE = 1.0;
+const PHASE_2_END_SIZE = 1.5;
+const PHASE_3_START_SIZE = 1.5;
+const PHASE_3_END_SIZE = 8.0;
+const PHASE_4_START_SIZE = 8.0;
+const PHASE_4_END_SIZE = 10.0;
+const PHASE_5_START_SIZE = 10.0;
+const PHASE_5_END_SIZE = 0.3;
+const PHASE_6_START_SIZE = 0.3;
+const PHASE_6_END_SIZE = 1.0;
+
+// Offset settings for each phase
+const PHASE_1_OFFSET = 1.0;
+const PHASE_2_START_OFFSET = 1.0;
+const PHASE_2_END_OFFSET = 1.5;
+const PHASE_3_START_OFFSET = 1.5;
+const PHASE_3_END_OFFSET = 10.0;
+const PHASE_4_START_OFFSET = 10.0;
+const PHASE_4_END_OFFSET = 25.0;
+const PHASE_5_START_OFFSET = 25.0;
+const PHASE_5_END_OFFSET = 20.0;
+const PHASE_6_START_OFFSET = 20.0;
+const PHASE_6_END_OFFSET = 1.0;
 
 // Camera settings
-const INITIAL_RADIUS = 110;              // Initial camera distance from origin
+const INITIAL_RADIUS = 110;
+const BASE_CAMERA_RADIUS = 110;              // Initial camera distance from origin
 
 // Desync settings
 const MAX_DESYNC_PERCENTAGE = 1;       // Maximum desync as percentage of full rotation (1.0 = full rotation)
@@ -41,6 +64,9 @@ class BreathingViz extends HTMLElement {
         // WebGL objects
         this.gl = null;
         this.prog = null;
+        this.sharedGeometry = null;
+        this.instanceBuffer = null;
+        this.instanceData = null;
         this.polytopes = [];
 
         // Camera state (spherical coordinates)
@@ -68,6 +94,7 @@ class BreathingViz extends HTMLElement {
         this.animationId = null;
         this._ro = null;
         this.time = 0;
+        this.currentSizeMultiplier = 1.0;
 
         // Animation parameters
         this.cycleDuration = SYNCED_SLOW_DURATION + DESYNC_SPEEDUP_DURATION +
@@ -255,6 +282,7 @@ class BreathingViz extends HTMLElement {
         this.setupWebGL();
         this.setupShaders();
         this.buildPolytopeGeometry();
+        this.setupInstanceBuffer();
         this.setupEventListeners();
         this.setupResizeObserver();
         this.removeLoadingSkeleton();
@@ -263,7 +291,14 @@ class BreathingViz extends HTMLElement {
 
     setupWebGL() {
         const canvas = this.querySelector('#canvas');
-        this.gl = canvas.getContext('webgl2', { antialias: true, alpha: false });
+        this.gl = canvas.getContext('webgl2', {
+            antialias: true,
+            alpha: false,
+            premultipliedAlpha: false,
+            preserveDrawingBuffer: false,
+            powerPreference: 'high-performance',
+            desynchronized: true
+        });
 
         if (!this.gl) {
             throw new Error('WebGL2 not supported');
@@ -278,22 +313,63 @@ class BreathingViz extends HTMLElement {
 
         const vs = `#version 300 es
 layout(location=0) in vec3 aPos;
-layout(location=1) in vec3 aColor;
-uniform mat4 uMVP;
-uniform mat4 uModel;
+layout(location=1) in vec2 aSinCosX;
+layout(location=2) in vec2 aSinCosY;
+layout(location=3) in float aScale;
+layout(location=4) in vec3 aColor;
+layout(location=5) in float aOpacity;
+
+uniform mat4 uProjection;
+uniform mat4 uView;
+
 out vec3 vColor;
+out float vOpacity;
+
+mat4 rotateX(vec2 sincos) {
+    float s = sincos.x;
+    float c = sincos.y;
+    return mat4(
+        1.0, 0.0, 0.0, 0.0,
+        0.0, c,   s,   0.0,
+        0.0, -s,  c,   0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
+}
+
+mat4 rotateY(vec2 sincos) {
+    float s = sincos.x;
+    float c = sincos.y;
+    return mat4(
+        c,   0.0, -s,  0.0,
+        0.0, 1.0, 0.0, 0.0,
+        s,   0.0, c,   0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
+}
+
+mat4 scale(float s) {
+    return mat4(
+        s,   0.0, 0.0, 0.0,
+        0.0, s,   0.0, 0.0,
+        0.0, 0.0, s,   0.0,
+        0.0, 0.0, 0.0, 1.0
+    );
+}
+
 void main() {
+    mat4 model = rotateY(aSinCosY) * rotateX(aSinCosX) * scale(aScale);
     vColor = aColor;
-    gl_Position = uMVP * vec4(aPos, 1.0);
+    vOpacity = aOpacity;
+    gl_Position = uProjection * uView * model * vec4(aPos, 1.0);
 }`;
 
         const fs = `#version 300 es
 precision mediump float;
 in vec3 vColor;
+in float vOpacity;
 out vec4 fragColor;
-uniform float uOpacity;
 void main() {
-    fragColor = vec4(vColor, uOpacity);
+    fragColor = vec4(vColor, vOpacity);
 }`;
 
         const compileShader = (type, src) => {
@@ -350,62 +426,88 @@ void main() {
         const vertices = this.permutahedron.vertices;
         const edges = this.permutahedron.edges;
 
-        // Generate color configs based on NUM_NESTED_POLYTOPES
-        const polytopeConfigs = Array.from({ length: NUM_NESTED_POLYTOPES }, (_, i) => {
-            // Generate colors along a spectrum
+        const positions = [];
+        edges.forEach(([a, b]) => {
+            const vA = vertices[a];
+            const vB = vertices[b];
+            positions.push(vA[0], vA[1], vA[2]);
+            positions.push(vB[0], vB[1], vB[2]);
+        });
+
+        const vao = gl.createVertexArray();
+        gl.bindVertexArray(vao);
+
+        const posBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribDivisor(0, 0);
+
+        gl.bindVertexArray(null);
+
+        this.sharedGeometry = {
+            vao,
+            vertexCount: positions.length / 3
+        };
+
+        this.polytopes = Array.from({ length: NUM_NESTED_POLYTOPES }, (_, i) => {
             const hue = (i * 360 / NUM_NESTED_POLYTOPES) % 360;
             const sat = i === 0 ? 0 : 100;
             const light = i === 0 ? 100 : 50;
             const color = this.hslToHex(hue, sat, light);
+            const rgb = this.hexToRgb(color);
             const opacity = 0.95 - (i * 0.1);
-            return { color, opacity };
-        });
-
-        this.polytopes = polytopeConfigs.map((config, i) => {
-            const rgb = this.hexToRgb(config.color);
-            const positions = [];
-            const colors = [];
-
-            edges.forEach(([a, b]) => {
-                const vA = vertices[a];
-                const vB = vertices[b];
-
-                positions.push(vA[0], vA[1], vA[2]);
-                positions.push(vB[0], vB[1], vB[2]);
-
-                colors.push(...rgb);
-                colors.push(...rgb);
-            });
-
-            const vao = gl.createVertexArray();
-            gl.bindVertexArray(vao);
-
-            const posBuf = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-            gl.enableVertexAttribArray(0);
-            gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-
-            const colBuf = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
-            gl.enableVertexAttribArray(1);
-            gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
-
-            gl.bindVertexArray(null);
 
             return {
-                vao,
-                vertexCount: positions.length / 3,
-                opacity: config.opacity,
                 rotationX: 0,
                 rotationY: 0,
-                driftX: 0,  // Accumulated drift from base rotation
-                driftY: 0,  // Accumulated drift from base rotation
+                driftX: 0,
+                driftY: 0,
                 scale: 1.0,
-                index: i
+                index: i,
+                color: rgb,
+                opacity: opacity
             };
         });
+    }
+
+    setupInstanceBuffer() {
+        const gl = this.gl;
+
+        this.instanceData = new Float32Array(NUM_NESTED_POLYTOPES * 9);
+
+        this.instanceBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.instanceData.byteLength, gl.DYNAMIC_DRAW);
+
+        gl.bindVertexArray(this.sharedGeometry.vao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
+
+        const stride = 9 * 4;
+
+        gl.enableVertexAttribArray(1);
+        gl.vertexAttribPointer(1, 2, gl.FLOAT, false, stride, 0);
+        gl.vertexAttribDivisor(1, 1);
+
+        gl.enableVertexAttribArray(2);
+        gl.vertexAttribPointer(2, 2, gl.FLOAT, false, stride, 8);
+        gl.vertexAttribDivisor(2, 1);
+
+        gl.enableVertexAttribArray(3);
+        gl.vertexAttribPointer(3, 1, gl.FLOAT, false, stride, 16);
+        gl.vertexAttribDivisor(3, 1);
+
+        gl.enableVertexAttribArray(4);
+        gl.vertexAttribPointer(4, 3, gl.FLOAT, false, stride, 20);
+        gl.vertexAttribDivisor(4, 1);
+
+        gl.enableVertexAttribArray(5);
+        gl.vertexAttribPointer(5, 1, gl.FLOAT, false, stride, 32);
+        gl.vertexAttribDivisor(5, 1);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        gl.bindVertexArray(null);
     }
 
     setupEventListeners() {
@@ -602,58 +704,55 @@ void main() {
         const cycleTime = this.time % this.cycleDuration;
         const lastCycleTime = (this.time - deltaTime) % this.cycleDuration;
 
-        // Flip direction at cycle boundary (when we wrap from phase 6 back to phase 1)
         if (cycleTime < lastCycleTime) {
             this.rotationDirection *= -1;
         }
 
-        const { desyncAmount, rotationSpeed, phaseName, phaseProgress, isSyncing } = this.calculatePhaseValues(cycleTime);
+        const { desyncAmount, rotationSpeed, phaseName, phaseProgress, isSyncing, sizeMultiplier, offsetMultiplier } = this.calculatePhaseValues(cycleTime);
 
-        // Update debug UI
+        this.currentSizeMultiplier = sizeMultiplier;
+
         this.updateDebugUI(phaseName, phaseProgress, desyncAmount, rotationSpeed);
 
-        // Update shared base angles (all polytopes sync to these)
         this.baseAngleX += rotationSpeed;
         this.baseAngleY += rotationSpeed;
 
         this.polytopes.forEach((p, i) => {
-            // Update each polytope's drift (accumulated difference from base)
-            // This is the EXTRA rotation beyond the base, scaled by speed multiplier
-            // Scale drift accumulation by desyncAmount so drift grows when desynced
-            // and stops growing when synced, making sync transitions smoother
             const driftSpeedX = rotationSpeed * (this.speedMultipliers[i].x - 1) * desyncAmount;
             const driftSpeedY = rotationSpeed * (this.speedMultipliers[i].y - 1) * desyncAmount;
 
             p.driftX += driftSpeedX;
             p.driftY += driftSpeedY;
 
-            // Apply decay to drift ONLY during active syncing phases (5 and 6)
-            // Decay strength is proportional to how much we've synced (1 - desyncAmount)
-            // This ensures smooth, continuous transitions with no discontinuities
             if (isSyncing) {
-                const syncProgress = 1 - desyncAmount; // 0 at phase 5 start, 1 at phase 6 end
-                const maxDecay = 0.015; // Maximum decay per frame (when fully synced)
+                const syncProgress = 1 - desyncAmount;
+                const maxDecay = 0.015;
                 const decayFactor = 1 - (syncProgress * maxDecay);
                 p.driftX *= decayFactor;
                 p.driftY *= decayFactor;
             }
 
-            // Final rotation = base + drift (no scaling to avoid visual reversal)
-            // Drift naturally decays to zero when syncing, maintaining forward rotation
             p.rotationX = this.baseAngleX + p.driftX;
             p.rotationY = this.baseAngleY + p.driftY;
 
-            // Size based on current speed percentage
-            // Calculate speed percentage: 0 = slow speed, 1 = fast speed
-            const speedMagnitude = Math.abs(rotationSpeed);
-            const speedPercentage = (speedMagnitude - SLOW_ROTATION_SPEED) / (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED);
-            const clampedSpeedPercentage = Math.max(0, Math.min(1, speedPercentage));
+            const baseScale = (i + 1) * this.polytopeSpacing * offsetMultiplier;
+            p.scale = baseScale;
 
-            // Linear interpolation: at slow speed (0%) use MAX_SPEED_SIZE, at fast speed (100%) use MIN_SPEED_SIZE
-            const sizeMultiplier = MAX_SPEED_SIZE + (clampedSpeedPercentage * (MIN_SPEED_SIZE - MAX_SPEED_SIZE));
+            const sinX = Math.sin(p.rotationX);
+            const cosX = Math.cos(p.rotationX);
+            const sinY = Math.sin(p.rotationY);
+            const cosY = Math.cos(p.rotationY);
 
-            const baseScale = (i + 1) * this.polytopeSpacing;
-            p.scale = baseScale * sizeMultiplier;
+            const offset = i * 9;
+            this.instanceData[offset + 0] = sinX;
+            this.instanceData[offset + 1] = cosX;
+            this.instanceData[offset + 2] = sinY;
+            this.instanceData[offset + 3] = cosY;
+            this.instanceData[offset + 4] = p.scale;
+            this.instanceData[offset + 5] = p.color[0];
+            this.instanceData[offset + 6] = p.color[1];
+            this.instanceData[offset + 7] = p.color[2];
+            this.instanceData[offset + 8] = p.opacity;
         });
     }
 
@@ -691,84 +790,80 @@ void main() {
         const t4 = t3 + DESYNCED_SLOW_DURATION;
         const t5 = t4 + SYNC_SPEEDUP_DURATION;
 
-        let desyncAmount, rotationSpeed, phaseName, phaseProgress, isSyncing;
-
-        // Calculate base speed (magnitude) for each phase
+        let desyncAmount, rotationSpeed, phaseName, phaseProgress, isSyncing, sizeMultiplier, offsetMultiplier;
         let speedProgress = 0;
-        let baseSpeed; // Speed magnitude before applying direction
+        let baseSpeed;
 
         if (cycleTime < t1) {
-            // Phase 1: constant slow
             phaseName = "1: Synced Slow";
             phaseProgress = cycleTime / SYNCED_SLOW_DURATION;
             baseSpeed = SLOW_ROTATION_SPEED;
             rotationSpeed = baseSpeed * this.rotationDirection;
             isSyncing = false;
+            sizeMultiplier = PHASE_1_SIZE;
+            offsetMultiplier = PHASE_1_OFFSET;
         } else if (cycleTime < t2) {
-            // Phase 2: smoothly speed up
             phaseName = "2: Desync & Speed Up";
             phaseProgress = (cycleTime - t1) / DESYNC_SPEEDUP_DURATION;
             speedProgress = this.smootherstep(phaseProgress);
             baseSpeed = SLOW_ROTATION_SPEED + (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
             rotationSpeed = baseSpeed * this.rotationDirection;
             isSyncing = false;
+            sizeMultiplier = PHASE_2_START_SIZE + (speedProgress * (PHASE_2_END_SIZE - PHASE_2_START_SIZE));
+            offsetMultiplier = PHASE_2_START_OFFSET + (speedProgress * (PHASE_2_END_OFFSET - PHASE_2_START_OFFSET));
         } else if (cycleTime < t3) {
-            // Phase 3: smoothly slow down
             phaseName = "3: Desync & Slow Down";
             phaseProgress = (cycleTime - t2) / DESYNC_SLOWDOWN_DURATION;
             speedProgress = this.smootherstep(phaseProgress);
             baseSpeed = FAST_ROTATION_SPEED - (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
             rotationSpeed = baseSpeed * this.rotationDirection;
             isSyncing = false;
+            sizeMultiplier = PHASE_3_START_SIZE + (speedProgress * (PHASE_3_END_SIZE - PHASE_3_START_SIZE));
+            offsetMultiplier = PHASE_3_START_OFFSET + (speedProgress * (PHASE_3_END_OFFSET - PHASE_3_START_OFFSET));
         } else if (cycleTime < t4) {
-            // Phase 4: smoothly reverse from rotationDirection to -rotationDirection
             phaseName = "4: Desynced Slow (Reversing)";
             phaseProgress = (cycleTime - t3) / DESYNCED_SLOW_DURATION;
             speedProgress = this.smootherstep(phaseProgress);
-            // Smoothly transition the direction multiplier from +1 to -1 (relative to rotationDirection)
-            const directionMultiplier = 1 - (speedProgress * 2); // Goes from 1 to -1
+            const directionMultiplier = 1 - (speedProgress * 2);
             rotationSpeed = SLOW_ROTATION_SPEED * this.rotationDirection * directionMultiplier;
             isSyncing = false;
+            sizeMultiplier = PHASE_4_START_SIZE + (speedProgress * (PHASE_4_END_SIZE - PHASE_4_START_SIZE));
+            offsetMultiplier = PHASE_4_START_OFFSET + (speedProgress * (PHASE_4_END_OFFSET - PHASE_4_START_OFFSET));
         } else if (cycleTime < t5) {
-            // Phase 5: smoothly speed up (in reversed direction)
             phaseName = "5: Sync Halfway & Speed Up";
             phaseProgress = (cycleTime - t4) / SYNC_SPEEDUP_DURATION;
             speedProgress = this.smootherstep(phaseProgress);
             baseSpeed = SLOW_ROTATION_SPEED + (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
-            rotationSpeed = baseSpeed * (-this.rotationDirection); // Reversed from phases 1-3
+            rotationSpeed = baseSpeed * (-this.rotationDirection);
             isSyncing = true;
+            sizeMultiplier = PHASE_5_START_SIZE + (speedProgress * (PHASE_5_END_SIZE - PHASE_5_START_SIZE));
+            offsetMultiplier = PHASE_5_START_OFFSET + (speedProgress * (PHASE_5_END_OFFSET - PHASE_5_START_OFFSET));
         } else {
-            // Phase 6: smoothly slow down (in reversed direction)
             phaseName = "6: Sync Complete & Slow Down";
             phaseProgress = (cycleTime - t5) / SYNC_SLOWDOWN_DURATION;
             speedProgress = this.smootherstep(phaseProgress);
             baseSpeed = FAST_ROTATION_SPEED - (speedProgress * (FAST_ROTATION_SPEED - SLOW_ROTATION_SPEED));
-            rotationSpeed = baseSpeed * (-this.rotationDirection); // Reversed from phases 1-3
+            rotationSpeed = baseSpeed * (-this.rotationDirection);
             isSyncing = true;
+            sizeMultiplier = PHASE_6_START_SIZE + (speedProgress * (PHASE_6_END_SIZE - PHASE_6_START_SIZE));
+            offsetMultiplier = PHASE_6_START_OFFSET + (speedProgress * (PHASE_6_END_OFFSET - PHASE_6_START_OFFSET));
         }
 
-        // Calculate desync using a globally smooth curve
-        // Desync transitions: 0 -> 1 -> 1 -> 1 -> 0.5 -> 0
         if (cycleTime < t1) {
-            // Phase 1: synced
             desyncAmount = 0;
         } else if (cycleTime < t2) {
-            // Phase 2: smoothly desync from 0 to 1
             desyncAmount = this.smootherstep((cycleTime - t1) / DESYNC_SPEEDUP_DURATION);
         } else if (cycleTime < t4) {
-            // Phases 3-4: stay desynced at 1
             desyncAmount = 1;
         } else if (cycleTime < t5) {
-            // Phase 5: smoothly sync halfway from 1 to 0.5
             const progress = this.smootherstep((cycleTime - t4) / SYNC_SPEEDUP_DURATION);
             desyncAmount = 1 - (progress * 0.5);
         } else {
-            // Phase 6: smoothly sync rest of way from 0.5 to 0
             const progress = this.smootherstep((cycleTime - t5) / SYNC_SLOWDOWN_DURATION);
             desyncAmount = 0.5 - (progress * 0.5);
         }
 
-        return { desyncAmount, rotationSpeed, phaseName, phaseProgress, isSyncing };
+        return { desyncAmount, rotationSpeed, phaseName, phaseProgress, isSyncing, sizeMultiplier, offsetMultiplier };
     }
 
     render() {
@@ -778,34 +873,28 @@ void main() {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.useProgram(this.prog);
 
-        // Set line width (Note: many browsers/drivers only support 1.0)
         gl.lineWidth(2.0);
 
         const aspect = Math.max(1e-6, canvas.width / canvas.height);
         const P = this.mat4Perspective(75 * Math.PI / 180, aspect, 0.1, 1000.0);
 
-        const camX = this.spherical.radius * Math.sin(this.spherical.phi) * Math.sin(this.spherical.theta);
-        const camY = this.spherical.radius * Math.cos(this.spherical.phi);
-        const camZ = this.spherical.radius * Math.sin(this.spherical.phi) * Math.cos(this.spherical.theta);
+        const animatedRadius = (BASE_CAMERA_RADIUS / this.currentSizeMultiplier) * this.spherical.radius / INITIAL_RADIUS;
+        const camX = animatedRadius * Math.sin(this.spherical.phi) * Math.sin(this.spherical.theta);
+        const camY = animatedRadius * Math.cos(this.spherical.phi);
+        const camZ = animatedRadius * Math.sin(this.spherical.phi) * Math.cos(this.spherical.theta);
         const camPos = [camX, camY, camZ];
 
         const V = this.mat4LookAt(camPos, [0, 0, 0], [0, 1, 0]);
 
-        this.polytopes.forEach(p => {
-            const rotX = this.mat4RotateX(p.rotationX);
-            const rotY = this.mat4RotateY(p.rotationY);
-            const scale = this.mat4Scale(p.scale, p.scale, p.scale);
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.prog, 'uProjection'), false, P);
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.prog, 'uView'), false, V);
 
-            const M = this.mat4Multiply(this.mat4Multiply(rotY, rotX), scale);
-            const MVP = this.mat4Multiply(this.mat4Multiply(P, V), M);
+        gl.bindVertexArray(this.sharedGeometry.vao);
 
-            gl.uniformMatrix4fv(gl.getUniformLocation(this.prog, 'uMVP'), false, MVP);
-            gl.uniformMatrix4fv(gl.getUniformLocation(this.prog, 'uModel'), false, M);
-            gl.uniform1f(gl.getUniformLocation(this.prog, 'uOpacity'), p.opacity);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.instanceData);
 
-            gl.bindVertexArray(p.vao);
-            gl.drawArrays(gl.LINES, 0, p.vertexCount);
-        });
+        gl.drawArraysInstanced(gl.LINES, 0, this.sharedGeometry.vertexCount, NUM_NESTED_POLYTOPES);
 
         gl.bindVertexArray(null);
     }
@@ -866,42 +955,14 @@ void main() {
         ]);
     }
 
-    mat4RotateX(angle) {
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
-        return new Float32Array([
-            1, 0, 0, 0,
-            0, c, s, 0,
-            0, -s, c, 0,
-            0, 0, 0, 1
-        ]);
-    }
-
-    mat4RotateY(angle) {
-        const c = Math.cos(angle);
-        const s = Math.sin(angle);
-        return new Float32Array([
-            c, 0, -s, 0,
-            0, 1, 0, 0,
-            s, 0, c, 0,
-            0, 0, 0, 1
-        ]);
-    }
-
-    mat4Scale(sx, sy, sz) {
-        return new Float32Array([
-            sx, 0, 0, 0,
-            0, sy, 0, 0,
-            0, 0, sz, 0,
-            0, 0, 0, 1
-        ]);
-    }
-
     cleanup() {
-        if (this.gl && this.polytopes) {
-            this.polytopes.forEach(p => {
-                if (p.vao) this.gl.deleteVertexArray(p.vao);
-            });
+        if (this.gl && this.sharedGeometry) {
+            if (this.sharedGeometry.vao) {
+                this.gl.deleteVertexArray(this.sharedGeometry.vao);
+            }
+        }
+        if (this.gl && this.instanceBuffer) {
+            this.gl.deleteBuffer(this.instanceBuffer);
         }
         if (this.gl && this.prog) {
             this.gl.deleteProgram(this.prog);

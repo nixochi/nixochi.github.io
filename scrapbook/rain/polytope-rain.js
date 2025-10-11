@@ -1,8 +1,6 @@
 /**
- * polytope rain webcomponent (optimized)
- * - removed opacity channel (always 1.0)
- * - precompute sin/cos on cpu (once per polytope instead of per vertex)
- * - reduced instance buffer from 11 to 13 floats per polytope
+ * polytope rain webcomponent
+ * 
  */
 
 // ============================================
@@ -31,6 +29,8 @@ class PolytopeRain extends HTMLElement {
         this.prog = null;
         this.polytopeGeometry = null;
         this.instanceBuffer = null;
+        this.instanceBufferB = null;  // Second buffer for double buffering
+        this.currentBuffer = 0;  // Track which buffer to use (0 or 1)
         this.instanceData = null;
 
         this.particlePool = [];
@@ -414,7 +414,6 @@ class PolytopeRain extends HTMLElement {
         }
 
         this.gl.enable(this.gl.DEPTH_TEST);
-        this.gl.disable(this.gl.BLEND);  // Critical: explicitly disable blending
         this.gl.clearColor(0.0, 0.0, 0.0, 1.0);
     }
 
@@ -607,11 +606,20 @@ void main() {
         // Instance data layout (13 floats per instance):
         // pos(3) + sinCosX(2) + sinCosY(2) + sinCosZ(2) + scale(1) + color(3) = 13 floats
         this.instanceData = new Float32Array(MAX_POLYTOPES * 13);
+        
+        // Create TWO instance buffers for double buffering
         this.instanceBuffer = gl.createBuffer();
+        this.instanceBufferB = gl.createBuffer();
 
+        // Set up both buffers identically
+        [this.instanceBuffer, this.instanceBufferB].forEach(buffer => {
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, this.instanceData.byteLength, gl.DYNAMIC_DRAW);
+        });
+
+        // Set up VAO with instance buffer A (we'll swap during render)
         gl.bindVertexArray(this.polytopeGeometry.vao);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, this.instanceData.byteLength, gl.DYNAMIC_DRAW);
 
         const stride = 13 * 4; // 13 floats * 4 bytes = 52 bytes per instance
 
@@ -837,10 +845,28 @@ void main() {
 
         gl.uniformMatrix4fv(gl.getUniformLocation(this.prog, 'uProjection'), false, P);
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuffer);
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.instanceData, 0, this.activeParticleCount * 13);
+        // Double buffering: alternate between two buffers
+        // This prevents updating a buffer the GPU is still reading from
+        const currentBuffer = this.currentBuffer === 0 ? this.instanceBuffer : this.instanceBufferB;
+        this.currentBuffer = 1 - this.currentBuffer;  // Swap for next frame
 
         gl.bindVertexArray(this.polytopeGeometry.vao);
+        
+        // Rebind attributes to current buffer
+        gl.bindBuffer(gl.ARRAY_BUFFER, currentBuffer);
+        
+        const stride = 13 * 4;
+        gl.vertexAttribPointer(1, 3, gl.FLOAT, false, stride, 0);
+        gl.vertexAttribPointer(2, 2, gl.FLOAT, false, stride, 12);
+        gl.vertexAttribPointer(3, 2, gl.FLOAT, false, stride, 20);
+        gl.vertexAttribPointer(4, 2, gl.FLOAT, false, stride, 28);
+        gl.vertexAttribPointer(5, 1, gl.FLOAT, false, stride, 36);
+        gl.vertexAttribPointer(6, 3, gl.FLOAT, false, stride, 40);
+        
+        // Update buffer data
+        const uploadData = this.instanceData.subarray(0, this.activeParticleCount * 13);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, uploadData);
+        
         gl.drawArraysInstanced(gl.LINES, 0, this.polytopeGeometry.vertexCount, this.activeParticleCount);
         gl.bindVertexArray(null);
     }
@@ -868,6 +894,9 @@ void main() {
         }
         if (this.gl && this.instanceBuffer) {
             this.gl.deleteBuffer(this.instanceBuffer);
+        }
+        if (this.gl && this.instanceBufferB) {
+            this.gl.deleteBuffer(this.instanceBufferB);
         }
         if (this.gl && this.prog) {
             this.gl.deleteProgram(this.prog);

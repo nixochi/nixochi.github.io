@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="mobile-web-app-capable" content="yes"/>
-  <title>BCC Permutahedron Voxelized Model (WebGL2)</title>
+  <title>BCC Permutahedron Voxelized Model (WebGL2 Optimized)</title>
   <style>
     /* CSS Variables - Dark mode only */
     :root {
@@ -425,9 +425,10 @@
       <div class="stats">
         <div>Total Voxels: <span id="totalCubes">0</span></div>
         <div>Visible Voxels: <span id="visibleCubes">0</span></div>
+        <div>Memory: <span id="memoryUsage">--</span></div>
         <div>Lattice: BCC (a = 2)</div>
         <div>Voxelization: <span id="voxelTime">--</span></div>
-        <div>Renderer: <span id="glVersion">WebGL2</span></div>
+        <div>Renderer: <span id="glVersion">WebGL2 + UBO</span></div>
       </div>
     </div>
   </div>
@@ -458,7 +459,7 @@
       alert('WebGL2 not supported');
       throw new Error('WebGL2 not supported');
     }
-    console.log("WebGL2 initialized");
+    console.log("WebGL2 initialized with UBO support");
 
     // --- Utility functions ---
     const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
@@ -656,7 +657,8 @@
       console.log(`Voxelization complete: ${vox.length / 3} voxels, ${elapsed} ms`);
       document.getElementById('voxelTime').textContent = `${elapsed} ms`;
       
-      return new Float32Array(vox);
+      // Return as Int16Array (positions are integers, saves memory)
+      return new Int16Array(vox);
     }
 
     // === Geometry (permutahedron) ===
@@ -707,7 +709,7 @@
       )
     );
 
-    // === Shaders (WebGL2 GLSL 300 es) ===
+    // === Shaders (WebGL2 GLSL 300 es with UBO) ===
     function compile(src,type){
       const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
       if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(s));
@@ -716,28 +718,43 @@
     
     const vsh=compile(`#version 300 es
       in vec3 aPosition;
-      in vec3 aInstancePosition;
+      in ivec3 aInstancePosition;  // Integer position (saves memory!)
       in float aDelay;
       in float aType;
-      uniform mat4 uProjection,uView;
-      uniform float uTime;
+      
+      // Uniform Buffer Object for scene data
+      layout(std140) uniform SceneData {
+        mat4 uProjection;
+        mat4 uView;
+        float uTime;
+        float _padding1;
+        float _padding2;
+        float _padding3;
+      };
+      
       out vec3 vColor;
       out float vType;
+      
       vec3 hsv2rgb(vec3 c){
         vec4 K=vec4(1.,2./3.,1./3.,3.);
         vec3 p=abs(fract(c.xxx+K.xyz)*6.-K.www);
         return c.z*mix(K.xxx,clamp(p-K.xxx,0.,1.),c.y);
       }
+      
       void main(){
         float d=uTime-aDelay;
         float f=clamp(d/0.8,0.,1.);
         float eased=1.-pow(1.-f,3.);
-        vec3 pos=aInstancePosition;pos.y+=150.*(1.-eased);
+        
+        // Convert integer position to float
+        vec3 pos = vec3(aInstancePosition);
+        pos.y += 150.*(1.-eased);
+        
         vec3 world=aPosition+pos;
         vec3 normal=normalize(world);
         vec3 light=normalize(vec3(1.,1.,1.));
         float diff=max(dot(normal,light),0.4);
-        float hue=clamp((aInstancePosition.y+15.)/30.,0.,1.)*0.833;
+        float hue=clamp((float(aInstancePosition.y)+15.)/30.,0.,1.)*0.833;
         vColor=hsv2rgb(vec3(hue,1.,1.))*diff;
         vType=aType;
         gl_Position=uProjection*uView*vec4(world,1.);
@@ -762,14 +779,29 @@
     
     gl.useProgram(prog);
 
+    // === Uniform Buffer Object (UBO) Setup ===
+    const sceneDataBlockIndex = gl.getUniformBlockIndex(prog, 'SceneData');
+    gl.uniformBlockBinding(prog, sceneDataBlockIndex, 0);  // Bind to binding point 0
+    
+    // Create UBO buffer
+    const uboBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.UNIFORM_BUFFER, uboBuffer);
+    // Allocate space: 2 mat4s (32 floats) + 4 floats = 36 floats = 144 bytes
+    // But std140 layout requires mat4 to be aligned on 16-byte boundaries
+    // So: mat4 (64 bytes) + mat4 (64 bytes) + float (4) + padding (12) = 144 bytes
+    gl.bufferData(gl.UNIFORM_BUFFER, 144, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.UNIFORM_BUFFER, null);
+    
+    // Bind UBO to binding point 0
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, uboBuffer);
+    
+    console.log("UBO configured for scene data");
+
     // === Attribute/Uniform locations ===
     const aPos=gl.getAttribLocation(prog,'aPosition');
     const aInstPos=gl.getAttribLocation(prog,'aInstancePosition');
     const aDelay=gl.getAttribLocation(prog,'aDelay');
     const aType=gl.getAttribLocation(prog,'aType');
-    const uProj=gl.getUniformLocation(prog,'uProjection');
-    const uView=gl.getUniformLocation(prog,'uView');
-    const uTime=gl.getUniformLocation(prog,'uTime');
 
     // === Buffers ===
     const bufVerts=gl.createBuffer();
@@ -820,11 +852,19 @@
       return new Float32Array(d);
     }
 
-    let instPos=new Float32Array(),instDel=new Float32Array();
+    let instPos=new Int16Array(),instDel=new Float32Array();
     
     function updateInstances(vox){
       instPos=vox;
       instDel=calcDelays(vox);
+      
+      // Calculate memory usage
+      const posBytes = instPos.byteLength;
+      const delayBytes = instDel.byteLength;
+      const totalBytes = posBytes + delayBytes;
+      const totalKB = (totalBytes / 1024).toFixed(1);
+      document.getElementById('memoryUsage').textContent = `${totalKB} KB`;
+      console.log(`Memory usage: Position=${posBytes}B (Int16), Delay=${delayBytes}B (Float32), Total=${totalBytes}B`);
       
       // Create or reuse VAO
       if (!vao) {
@@ -847,11 +887,11 @@
       gl.vertexAttribPointer(aType, 1, gl.FLOAT, false, 0, 0);
       gl.vertexAttribDivisor(aType, 0);  // Not instanced
       
-      // Setup instance position buffer
+      // Setup instance position buffer (INTEGER type for memory efficiency)
       gl.bindBuffer(gl.ARRAY_BUFFER, bufInst);
       gl.bufferData(gl.ARRAY_BUFFER, instPos, gl.STATIC_DRAW);
       gl.enableVertexAttribArray(aInstPos);
-      gl.vertexAttribPointer(aInstPos, 3, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribIPointer(aInstPos, 3, gl.SHORT, 0, 0);  // IPointer for integers!
       gl.vertexAttribDivisor(aInstPos, 1);  // Instanced
       
       // Setup delay buffer
@@ -868,7 +908,7 @@
       gl.bindVertexArray(null);
       
       document.getElementById('totalCubes').textContent=vox.length/3;
-      console.log("VAO configured with",vox.length/3,"instances");
+      console.log("VAO configured with",vox.length/3,"instances using Int16Array for positions");
     }
 
     // === Default model data ===
@@ -1106,15 +1146,21 @@ l 17 21`;
       const camX=Math.cos(time*0.3)*camDist,camZ=Math.sin(time*0.3)*camDist;
       const view=lookAt([camX,10,camZ],[0,0,0],[0,1,0]);
       
-      // Update uniforms only (VAO holds all attribute state)
-      gl.uniformMatrix4fv(uProj,false,proj);
-      gl.uniformMatrix4fv(uView,false,view);
-      gl.uniform1f(uTime,time);
+      // Update UBO (Uniform Buffer Object) - all scene data in one upload
+      gl.bindBuffer(gl.UNIFORM_BUFFER, uboBuffer);
+      // Layout: mat4 projection (64 bytes) + mat4 view (64 bytes) + float time (4 bytes) + padding (12 bytes)
+      const uboData = new Float32Array(36);
+      uboData.set(proj, 0);          // offset 0: projection matrix
+      uboData.set(view, 16);         // offset 16: view matrix
+      uboData[32] = time;            // offset 32: time
+      // Indices 33-35 are padding for std140 alignment
+      gl.bufferSubData(gl.UNIFORM_BUFFER, 0, uboData);
+      gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 
       const count=instPos.length/3;
       document.getElementById('visibleCubes').textContent=count;
 
-      // Bind VAO (all attributes configured) and draw
+      // Bind VAO and draw (all uniforms set via UBO, all attributes set via VAO)
       if (vao && count > 0) {
         gl.bindVertexArray(vao);
         

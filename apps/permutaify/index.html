@@ -827,16 +827,37 @@
     }
 
     let instPos=new Float32Array(),instDel=new Float32Array();
+    
+    // Setup instance attribute pointers once (not in render loop)
+    function setupInstanceAttributes() {
+      // Bind and configure instance position buffer
+      gl.bindBuffer(gl.ARRAY_BUFFER, bufInst);
+      gl.enableVertexAttribArray(aInstPos);
+      gl.vertexAttribPointer(aInstPos, 3, gl.FLOAT, false, 0, 0);
+      ext.vertexAttribDivisorANGLE(aInstPos, 1);
+      
+      // Bind and configure delay buffer
+      gl.bindBuffer(gl.ARRAY_BUFFER, bufDelay);
+      gl.enableVertexAttribArray(aDelay);
+      gl.vertexAttribPointer(aDelay, 1, gl.FLOAT, false, 0, 0);
+      ext.vertexAttribDivisorANGLE(aDelay, 1);
+      
+      console.log("Instance attributes configured");
+    }
+    
     function updateInstances(vox){
       instPos=vox;
       instDel=calcDelays(vox);
       
-      // Upload once with STATIC_DRAW since data doesn't change after voxelization
+      // Upload data to buffers with STATIC_DRAW (data doesn't change after voxelization)
       gl.bindBuffer(gl.ARRAY_BUFFER, bufInst);
       gl.bufferData(gl.ARRAY_BUFFER, instPos, gl.STATIC_DRAW);
       
       gl.bindBuffer(gl.ARRAY_BUFFER, bufDelay);
       gl.bufferData(gl.ARRAY_BUFFER, instDel, gl.STATIC_DRAW);
+      
+      // Setup attribute pointers once after uploading new data
+      setupInstanceAttributes();
       
       document.getElementById('totalCubes').textContent=vox.length/3;
       console.log("Updated instance buffers:",vox.length/3);
@@ -1076,20 +1097,11 @@ l 17 21`;
 
       const camX=Math.cos(time*0.3)*camDist,camZ=Math.sin(time*0.3)*camDist;
       const view=lookAt([camX,10,camZ],[0,0,0],[0,1,0]);
+      
+      // Only update uniforms each frame (attribute setup is done once in setupInstanceAttributes)
       gl.uniformMatrix4fv(uProj,false,proj);
       gl.uniformMatrix4fv(uView,false,view);
       gl.uniform1f(uTime,time);
-
-      // Bind buffers (already uploaded in updateInstances)
-      gl.bindBuffer(gl.ARRAY_BUFFER,bufInst);
-      gl.enableVertexAttribArray(aInstPos);
-      gl.vertexAttribPointer(aInstPos,3,gl.FLOAT,false,0,0);
-      ext.vertexAttribDivisorANGLE(aInstPos,1);
-
-      gl.bindBuffer(gl.ARRAY_BUFFER,bufDelay);
-      gl.enableVertexAttribArray(aDelay);
-      gl.vertexAttribPointer(aDelay,1,gl.FLOAT,false,0,0);
-      ext.vertexAttribDivisorANGLE(aDelay,1);
 
       const count=instPos.length/3;
       document.getElementById('visibleCubes').textContent=count;

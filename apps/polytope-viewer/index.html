@@ -193,6 +193,7 @@
         <div class="control-group">
             <label class="control-label">Actions</label>
             <button class="action-btn" id="exportBtn">Export Image</button>
+            <button class="action-btn" id="exportObjBtn">Export OBJ</button>
             <button class="action-btn" id="exportPolytopeBtn">Export Polytope</button>
         </div>
     </div>
@@ -340,6 +341,44 @@
                         console.error('Export failed:', e);
                         alert('Failed to export image. Please try again.');
                     }
+                }
+            });
+
+            // Export OBJ button functionality
+            const exportObjBtn = document.getElementById('exportObjBtn');
+            exportObjBtn.addEventListener('click', () => {
+                try {
+                    // Get OBJ data from viewer
+                    const objData = viewer.exportOBJ();
+
+                    if (!objData) {
+                        alert('No polytope data to export.');
+                        return;
+                    }
+
+                    // Create a blob and download link
+                    const blob = new Blob([objData], { type: 'application/octet-stream' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+
+                    // Generate filename with polytope name
+                    const safeName = viewer.currentPolytopeName.toLowerCase().replace(/\s+/g, '_');
+                    link.download = `${safeName}.obj`;
+                    link.href = url;
+                    link.click();
+
+                    // Clean up
+                    URL.revokeObjectURL(url);
+
+                    // Show success feedback (change button text temporarily)
+                    const originalText = exportObjBtn.textContent;
+                    exportObjBtn.textContent = 'Downloaded!';
+                    setTimeout(() => {
+                        exportObjBtn.textContent = originalText;
+                    }, 2000);
+                } catch (e) {
+                    console.error('Export OBJ failed:', e);
+                    alert('Failed to export OBJ file. Please try again.');
                 }
             });
 

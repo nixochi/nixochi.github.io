@@ -426,6 +426,7 @@
         <div>Total Voxels: <span id="totalCubes">0</span></div>
         <div>Visible Voxels: <span id="visibleCubes">0</span></div>
         <div>Lattice: BCC (a = 2)</div>
+        <div>Voxelization: <span id="voxelTime">--</span></div>
       </div>
     </div>
   </div>
@@ -481,7 +482,7 @@
       return {vertices,faces};
     }
 
-    // === Ray-triangle intersection & point-in-mesh ===
+    // === Ray-triangle intersection ===
     function rayTriangleIntersect(orig,dir,v0,v1,v2){
       const EPS=1e-6;
       const e1=sub(v1,v0), e2=sub(v2,v0);
@@ -496,41 +497,173 @@
       const t=f*dot(e2,q);
       return t>EPS?t:null;
     }
-    function pointInMesh(p,model){
-      // Use perturbed ray direction to avoid edge/vertex numerical issues
-      const dir=normalize([1,0.123456789,0.987654321]);
-      let count=0;
-      for(const f of model.faces){
-        const t=rayTriangleIntersect(p,dir,model.vertices[f[0]],model.vertices[f[1]],model.vertices[f[2]]);
-        if(t!==null) count++;
-      }
-      return (count%2)===1;
-    }
 
-    // === Voxelization (BCC lattice) ===
-    const CELL_R=Math.sqrt(1.25);
-    function voxelizeModel(model){
-      const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
-      for(const v of model.vertices)
-        for(let i=0;i<3;i++){min[i]=Math.min(min[i],v[i]);max[i]=Math.max(max[i],v[i]);}
-      const vox=[],set=new Set();
-      console.log("Voxelizing within",min,max);
-      const start=performance.now();
-      for(let xo=0;xo<2;xo++)
-      for(let yo=0;yo<2;yo++)
-      for(let zo=0;zo<2;zo++){
-        if((xo+yo+zo)%2!==0)continue;
-        for(let x=min[0]-1+xo;x<=max[0]+1;x+=2)
-        for(let y=min[1]-1+yo;y<=max[1]+1;y+=2)
-        for(let z=min[2]-1+zo;z<=max[2]+1;z+=2){
-          const key=`${x},${y},${z}`;
-          if(!set.has(key) && pointInMesh([x,y,z],model)){
-            set.add(key);
-            vox.push(x,y,z);
+    // === Spatial Grid for acceleration ===
+    function buildSpatialGrid(model, cellSize) {
+      const grid = new Map();
+      const min = [Infinity, Infinity, Infinity];
+      const max = [-Infinity, -Infinity, -Infinity];
+      
+      // Calculate bounds
+      for (const v of model.vertices) {
+        for (let i = 0; i < 3; i++) {
+          min[i] = Math.min(min[i], v[i]);
+          max[i] = Math.max(max[i], v[i]);
+        }
+      }
+      
+      // Hash function for grid cells
+      const hash = (x, y, z) => `${x}|${y}|${z}`;
+      const toCell = (x, y, z) => [
+        Math.floor(x / cellSize),
+        Math.floor(y / cellSize),
+        Math.floor(z / cellSize)
+      ];
+      
+      // Insert each triangle into grid cells it touches
+      for (let faceIdx = 0; faceIdx < model.faces.length; faceIdx++) {
+        const face = model.faces[faceIdx];
+        const v0 = model.vertices[face[0]];
+        const v1 = model.vertices[face[1]];
+        const v2 = model.vertices[face[2]];
+        
+        // Find bounding box of triangle
+        const tMin = [
+          Math.min(v0[0], v1[0], v2[0]),
+          Math.min(v0[1], v1[1], v2[1]),
+          Math.min(v0[2], v1[2], v2[2])
+        ];
+        const tMax = [
+          Math.max(v0[0], v1[0], v2[0]),
+          Math.max(v0[1], v1[1], v2[1]),
+          Math.max(v0[2], v1[2], v2[2])
+        ];
+        
+        // Add triangle to all cells it overlaps
+        const cMin = toCell(tMin[0], tMin[1], tMin[2]);
+        const cMax = toCell(tMax[0], tMax[1], tMax[2]);
+        
+        for (let cx = cMin[0]; cx <= cMax[0]; cx++) {
+          for (let cy = cMin[1]; cy <= cMax[1]; cy++) {
+            for (let cz = cMin[2]; cz <= cMax[2]; cz++) {
+              const key = hash(cx, cy, cz);
+              if (!grid.has(key)) {
+                grid.set(key, []);
+              }
+              grid.get(key).push(faceIdx);
+            }
           }
         }
       }
-      console.log(`Voxelization complete: ${vox.length/3} voxels, ${(performance.now()-start).toFixed(1)} ms`);
+      
+      return { grid, cellSize, hash, toCell };
+    }
+
+    // === Point-in-mesh test (with spatial acceleration) ===
+    function pointInMeshAccelerated(p, model, spatialGrid) {
+      const dir = normalize([1, 0.123456789, 0.987654321]);
+      const cell = spatialGrid.toCell(p[0], p[1], p[2]);
+      
+      // Collect all potentially intersecting triangles along ray path
+      const checkedFaces = new Set();
+      let count = 0;
+      
+      // Check cells along ray direction (simplified: check nearby cells)
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dz = -1; dz <= 1; dz++) {
+            const key = spatialGrid.hash(cell[0] + dx, cell[1] + dy, cell[2] + dz);
+            const faceIndices = spatialGrid.grid.get(key);
+            
+            if (faceIndices) {
+              for (const faceIdx of faceIndices) {
+                if (checkedFaces.has(faceIdx)) continue;
+                checkedFaces.add(faceIdx);
+                
+                const face = model.faces[faceIdx];
+                const t = rayTriangleIntersect(
+                  p, dir,
+                  model.vertices[face[0]],
+                  model.vertices[face[1]],
+                  model.vertices[face[2]]
+                );
+                if (t !== null) count++;
+              }
+            }
+          }
+        }
+      }
+      
+      // Need to check farther cells if ray extends beyond local neighborhood
+      // For now, also do a full scan but only on faces not yet checked
+      for (let faceIdx = 0; faceIdx < model.faces.length; faceIdx++) {
+        if (checkedFaces.has(faceIdx)) continue;
+        
+        const face = model.faces[faceIdx];
+        const t = rayTriangleIntersect(
+          p, dir,
+          model.vertices[face[0]],
+          model.vertices[face[1]],
+          model.vertices[face[2]]
+        );
+        if (t !== null) count++;
+      }
+      
+      return (count % 2) === 1;
+    }
+
+    // === Voxelization (BCC lattice with spatial acceleration) ===
+    const CELL_R = Math.sqrt(1.25);
+    
+    function voxelizeModel(model) {
+      const min = [Infinity, Infinity, Infinity];
+      const max = [-Infinity, -Infinity, -Infinity];
+      
+      for (const v of model.vertices) {
+        for (let i = 0; i < 3; i++) {
+          min[i] = Math.min(min[i], v[i]);
+          max[i] = Math.max(max[i], v[i]);
+        }
+      }
+      
+      console.log("Building spatial grid...");
+      const gridStart = performance.now();
+      // Cell size = average edge length of model / 4 (heuristic)
+      const extent = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+      const cellSize = extent / 8;
+      const spatialGrid = buildSpatialGrid(model, cellSize);
+      console.log(`Grid built: ${spatialGrid.grid.size} cells, ${(performance.now() - gridStart).toFixed(1)} ms`);
+      
+      const vox = [];
+      const set = new Set();
+      
+      console.log("Voxelizing within", min, max);
+      const start = performance.now();
+      
+      for (let xo = 0; xo < 2; xo++) {
+        for (let yo = 0; yo < 2; yo++) {
+          for (let zo = 0; zo < 2; zo++) {
+            if ((xo + yo + zo) % 2 !== 0) continue;
+            
+            for (let x = min[0] - 1 + xo; x <= max[0] + 1; x += 2) {
+              for (let y = min[1] - 1 + yo; y <= max[1] + 1; y += 2) {
+                for (let z = min[2] - 1 + zo; z <= max[2] + 1; z += 2) {
+                  const key = `${x},${y},${z}`;
+                  if (!set.has(key) && pointInMeshAccelerated([x, y, z], model, spatialGrid)) {
+                    set.add(key);
+                    vox.push(x, y, z);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      const elapsed = (performance.now() - start).toFixed(1);
+      console.log(`Voxelization complete: ${vox.length / 3} voxels, ${elapsed} ms`);
+      document.getElementById('voxelTime').textContent = `${elapsed} ms`;
+      
       return new Float32Array(vox);
     }
 
@@ -676,7 +809,6 @@
     let proj;resize();
 
     function calcDelays(pos){
-      // Find min/max Y to normalize delays
       let minY=Infinity,maxY=-Infinity;
       for(let i=1;i<pos.length;i+=3){
         minY=Math.min(minY,pos[i]);
@@ -687,7 +819,6 @@
       const yRange=maxY-minY||1;
       for(let i=0;i<pos.length;i+=3){
         const x=pos[i],y=pos[i+1],z=pos[i+2];
-        // Normalize y to 0-1 range, then scale to delay range
         const normalizedY=(y-minY)/yRange;
         let delay=normalizedY*2.5+Math.sin(x*12.3+z*45.6)*0.3+Math.cos(x*23.4+y*34.5)*0.2;
         d.push(delay);
@@ -699,6 +830,14 @@
     function updateInstances(vox){
       instPos=vox;
       instDel=calcDelays(vox);
+      
+      // Upload once with STATIC_DRAW since data doesn't change after voxelization
+      gl.bindBuffer(gl.ARRAY_BUFFER, bufInst);
+      gl.bufferData(gl.ARRAY_BUFFER, instPos, gl.STATIC_DRAW);
+      
+      gl.bindBuffer(gl.ARRAY_BUFFER, bufDelay);
+      gl.bufferData(gl.ARRAY_BUFFER, instDel, gl.STATIC_DRAW);
+      
       document.getElementById('totalCubes').textContent=vox.length/3;
       console.log("Updated instance buffers:",vox.length/3);
     }
@@ -786,7 +925,6 @@ l 17 21`;
     let modelScale=1.0;
 
     function centerModel(model){
-      // Calculate bounding box
       const min=[Infinity,Infinity,Infinity];
       const max=[-Infinity,-Infinity,-Infinity];
       model.vertices.forEach(v=>{
@@ -796,7 +934,6 @@ l 17 21`;
         }
       });
 
-      // Calculate center
       const center=[
         (min[0]+max[0])/2,
         (min[1]+max[1])/2,
@@ -805,7 +942,6 @@ l 17 21`;
 
       console.log(`Model bounds: min=${min}, max=${max}, center=${center}`);
 
-      // Center vertices at origin
       const centeredModel={vertices:[],faces:model.faces};
       model.vertices.forEach(v=>{
         centeredModel.vertices.push([
@@ -844,136 +980,133 @@ l 17 21`;
     uploadBtn.addEventListener('click',()=>fileInput.click());
     fileInput.addEventListener('change',e=>{if(e.target.files[0])loadOBJ(e.target.files[0]);});
     drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('dragover');});
-drop.addEventListener('dragleave',()=>drop.classList.remove('dragover'));
-drop.addEventListener('drop',e=>{
-e.preventDefault();drop.classList.remove('dragover');
-if(e.dataTransfer.files[0])loadOBJ(e.dataTransfer.files[0]);
-});
+    drop.addEventListener('dragleave',()=>drop.classList.remove('dragover'));
+    drop.addEventListener('drop',e=>{
+      e.preventDefault();drop.classList.remove('dragover');
+      if(e.dataTransfer.files[0])loadOBJ(e.dataTransfer.files[0]);
+    });
 
-function applyScaleChange(){
-  const val=parseFloat(scaleInput.value);
-  if(val>0){
-    modelScale=val;
+    function applyScaleChange(){
+      const val=parseFloat(scaleInput.value);
+      if(val>0){
+        modelScale=val;
+        processModel();
+      }
+    }
+
+    computeBtn.addEventListener('click',applyScaleChange);
+    scaleInput.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){
+        applyScaleChange();
+      }
+    });
+
+    function loadOBJ(file){
+      console.log("Loading file:",file.name);
+      const r=new FileReader();
+      r.onload=()=>{
+        currentModel=parseOBJ(r.result);
+        processModel();
+      };
+      r.readAsText(file);
+    }
+
+    // === Options panel toggle ===
+    const optionsBtn=document.getElementById('optionsBtn');
+    const controlsPanel=document.getElementById('controlsPanel');
+    let panelVisible=false;
+
+    optionsBtn.addEventListener('click',()=>{
+      panelVisible=!panelVisible;
+      if(panelVisible){
+        controlsPanel.classList.add('expanded');
+        optionsBtn.textContent='Close';
+      }else{
+        controlsPanel.classList.remove('expanded');
+        optionsBtn.textContent='Options';
+      }
+    });
+
+    // === Camera controls ===
+    let camDist=54;
+    const minDist=10,maxDist=200;
+
+    canvas.addEventListener('wheel',e=>{
+      e.preventDefault();
+      camDist+=e.deltaY*0.05;
+      camDist=Math.max(minDist,Math.min(maxDist,camDist));
+    },{passive:false});
+
+    let touchDist=null;
+    canvas.addEventListener('touchstart',e=>{
+      if(e.touches.length===2){
+        const dx=e.touches[0].clientX-e.touches[1].clientX;
+        const dy=e.touches[0].clientY-e.touches[1].clientY;
+        touchDist=Math.hypot(dx,dy);
+      }
+    },{passive:true});
+
+    canvas.addEventListener('touchmove',e=>{
+      if(e.touches.length===2&&touchDist!==null){
+        e.preventDefault();
+        const dx=e.touches[0].clientX-e.touches[1].clientX;
+        const dy=e.touches[0].clientY-e.touches[1].clientY;
+        const newDist=Math.hypot(dx,dy);
+        const delta=(touchDist-newDist)*0.5;
+        camDist+=delta;
+        camDist=Math.max(minDist,Math.min(maxDist,camDist));
+        touchDist=newDist;
+      }
+    },{passive:false});
+
+    canvas.addEventListener('touchend',e=>{
+      if(e.touches.length<2)touchDist=null;
+    },{passive:true});
+
+    // === Animation loop ===
+    let time=0;
+    document.getElementById('restart').onclick=()=>time=0;
+
+    function render(){
+      time+=0.016;
+      gl.clearColor(0.086,0.086,0.09,1);
+      gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST);
+      gl.enable(gl.CULL_FACE);
+
+      const camX=Math.cos(time*0.3)*camDist,camZ=Math.sin(time*0.3)*camDist;
+      const view=lookAt([camX,10,camZ],[0,0,0],[0,1,0]);
+      gl.uniformMatrix4fv(uProj,false,proj);
+      gl.uniformMatrix4fv(uView,false,view);
+      gl.uniform1f(uTime,time);
+
+      // Bind buffers (already uploaded in updateInstances)
+      gl.bindBuffer(gl.ARRAY_BUFFER,bufInst);
+      gl.enableVertexAttribArray(aInstPos);
+      gl.vertexAttribPointer(aInstPos,3,gl.FLOAT,false,0,0);
+      ext.vertexAttribDivisorANGLE(aInstPos,1);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER,bufDelay);
+      gl.enableVertexAttribArray(aDelay);
+      gl.vertexAttribPointer(aDelay,1,gl.FLOAT,false,0,0);
+      ext.vertexAttribDivisorANGLE(aDelay,1);
+
+      const count=instPos.length/3;
+      document.getElementById('visibleCubes').textContent=count;
+
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,bufIdx);
+      ext.drawElementsInstancedANGLE(gl.TRIANGLES,permutahedronIndices.length,gl.UNSIGNED_SHORT,0,count);
+      const edgeOff=permutahedronVertices.length/3;
+      ext.drawArraysInstancedANGLE(gl.LINES,edgeOff,permutahedronEdges.length/3,count);
+      requestAnimationFrame(render);
+    }
+    render();
+
+    // Load default model on startup
+    console.log("Loading default permutahedron model...");
+    currentModel = parseOBJ(defaultOBJ);
     processModel();
-  }
-}
-
-computeBtn.addEventListener('click',applyScaleChange);
-scaleInput.addEventListener('keydown',e=>{
-  if(e.key==='Enter'){
-    applyScaleChange();
-  }
-});
-
-function loadOBJ(file){
-  console.log("Loading file:",file.name);
-  const r=new FileReader();
-  r.onload=()=>{
-    currentModel=parseOBJ(r.result);
-    processModel();
-  };
-  r.readAsText(file);
-}
-
-// === Options panel toggle ===
-const optionsBtn=document.getElementById('optionsBtn');
-const controlsPanel=document.getElementById('controlsPanel');
-let panelVisible=false;
-
-optionsBtn.addEventListener('click',()=>{
-  panelVisible=!panelVisible;
-  if(panelVisible){
-    controlsPanel.classList.add('expanded');
-    optionsBtn.textContent='Close';
-  }else{
-    controlsPanel.classList.remove('expanded');
-    optionsBtn.textContent='Options';
-  }
-});
-
-// === Camera controls ===
-let camDist=54;
-const minDist=10,maxDist=200;
-
-// Mouse wheel zoom
-canvas.addEventListener('wheel',e=>{
-  e.preventDefault();
-  camDist+=e.deltaY*0.05;
-  camDist=Math.max(minDist,Math.min(maxDist,camDist));
-},{passive:false});
-
-// Touch pinch zoom
-let touchDist=null;
-canvas.addEventListener('touchstart',e=>{
-  if(e.touches.length===2){
-    const dx=e.touches[0].clientX-e.touches[1].clientX;
-    const dy=e.touches[0].clientY-e.touches[1].clientY;
-    touchDist=Math.hypot(dx,dy);
-  }
-},{passive:true});
-
-canvas.addEventListener('touchmove',e=>{
-  if(e.touches.length===2&&touchDist!==null){
-    e.preventDefault();
-    const dx=e.touches[0].clientX-e.touches[1].clientX;
-    const dy=e.touches[0].clientY-e.touches[1].clientY;
-    const newDist=Math.hypot(dx,dy);
-    const delta=(touchDist-newDist)*0.5;
-    camDist+=delta;
-    camDist=Math.max(minDist,Math.min(maxDist,camDist));
-    touchDist=newDist;
-  }
-},{passive:false});
-
-canvas.addEventListener('touchend',e=>{
-  if(e.touches.length<2)touchDist=null;
-},{passive:true});
-
-// === Animation loop ===
-let time=0;
-document.getElementById('restart').onclick=()=>time=0;
-
-function render(){
-  time+=0.016;
-  gl.clearColor(0.086,0.086,0.09,1);
-  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-  gl.enable(gl.DEPTH_TEST);
-  gl.enable(gl.CULL_FACE);
-
-  const camX=Math.cos(time*0.3)*camDist,camZ=Math.sin(time*0.3)*camDist;
-  const view=lookAt([camX,10,camZ],[0,0,0],[0,1,0]);
-  gl.uniformMatrix4fv(uProj,false,proj);
-  gl.uniformMatrix4fv(uView,false,view);
-  gl.uniform1f(uTime,time);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER,bufInst);
-  gl.bufferData(gl.ARRAY_BUFFER,instPos,gl.DYNAMIC_DRAW);
-  gl.enableVertexAttribArray(aInstPos);
-  gl.vertexAttribPointer(aInstPos,3,gl.FLOAT,false,0,0);
-  ext.vertexAttribDivisorANGLE(aInstPos,1);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER,bufDelay);
-  gl.bufferData(gl.ARRAY_BUFFER,instDel,gl.DYNAMIC_DRAW);
-  gl.enableVertexAttribArray(aDelay);
-  gl.vertexAttribPointer(aDelay,1,gl.FLOAT,false,0,0);
-  ext.vertexAttribDivisorANGLE(aDelay,1);
-
-  const count=instPos.length/3;
-  document.getElementById('visibleCubes').textContent=count;
-
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,bufIdx);
-  ext.drawElementsInstancedANGLE(gl.TRIANGLES,permutahedronIndices.length,gl.UNSIGNED_SHORT,0,count);
-  const edgeOff=permutahedronVertices.length/3;
-  ext.drawArraysInstancedANGLE(gl.LINES,edgeOff,permutahedronEdges.length/3,count);
-  requestAnimationFrame(render);
-}
-render();
-
-// Load default model on startup
-console.log("Loading default permutahedron model...");
-currentModel = parseOBJ(defaultOBJ);
-processModel();
-console.log("Default model loaded. Ready for OBJ upload.");
+    console.log("Default model loaded. Ready for OBJ upload.");
   </script>
 </body>
 </html>

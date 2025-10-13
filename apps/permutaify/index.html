@@ -63,8 +63,7 @@
     /* Floating Panel */
     .controls {
       position: absolute;
-      top: 20px;
-      top: max(20px, env(safe-area-inset-top));
+      top: 68px;
       left: 20px;
       left: max(20px, env(safe-area-inset-left));
       background: var(--backdrop-blur);
@@ -83,6 +82,16 @@
       max-height: 80svh;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px);
+      transition: all 0.3s ease;
+    }
+
+    .controls.expanded {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
     }
 
     .controls > * {
@@ -293,10 +302,53 @@
       background: var(--fg-secondary);
     }
 
+    /* Top buttons */
+    .top-left-buttons {
+      position: absolute;
+      top: 20px;
+      top: max(20px, env(safe-area-inset-top));
+      left: 20px;
+      left: max(20px, env(safe-area-inset-left));
+      display: flex;
+      gap: 8px;
+      z-index: 1001;
+    }
+
+    .options-button {
+      background: var(--backdrop-blur);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--fg-primary);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s ease;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .options-button:hover {
+      background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+      border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+    }
+
+    .options-button:active {
+      opacity: 0.8;
+    }
+
     /* Responsive */
     @media (max-width: 768px) {
-      .controls {
+      .top-left-buttons {
         top: 15px;
+        left: 15px;
+      }
+
+      .controls {
+        top: 60px;
         left: 15px;
         padding: 12px;
         min-width: 180px;
@@ -306,14 +358,16 @@
       }
 
       #debugConsole {
-        bottom: 5px;
-        right: 5px;
-        font-size: 10px;
-        height: 140px;
+        display: none;
       }
 
       .compute-btn {
         padding: 8px 12px;
+        font-size: 12px;
+      }
+
+      .options-button {
+        padding: 6px 10px;
         font-size: 12px;
       }
     }
@@ -321,7 +375,13 @@
 </head>
 <body>
   <canvas id="canvas"></canvas>
-  <div class="controls">
+
+  <!-- Top Left Buttons -->
+  <div class="top-left-buttons">
+    <button class="options-button" id="optionsBtn">Options</button>
+  </div>
+
+  <div class="controls" id="controlsPanel">
     <span class="panel-title">BCC Permutahedron Voxelization</span>
 
     <div class="control-group">
@@ -798,6 +858,22 @@ function loadOBJ(file){
   };
   r.readAsText(file);
 }
+
+// === Options panel toggle ===
+const optionsBtn=document.getElementById('optionsBtn');
+const controlsPanel=document.getElementById('controlsPanel');
+let panelVisible=false;
+
+optionsBtn.addEventListener('click',()=>{
+  panelVisible=!panelVisible;
+  if(panelVisible){
+    controlsPanel.classList.add('expanded');
+    optionsBtn.textContent='Close';
+  }else{
+    controlsPanel.classList.remove('expanded');
+    optionsBtn.textContent='Options';
+  }
+});
 
 // === Camera controls ===
 let camDist=54;

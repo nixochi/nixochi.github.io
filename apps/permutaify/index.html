@@ -314,6 +314,17 @@
       z-index: 1001;
     }
 
+    .top-right-buttons {
+      position: absolute;
+      top: 20px;
+      top: max(20px, env(safe-area-inset-top));
+      right: 20px;
+      right: max(20px, env(safe-area-inset-right));
+      display: flex;
+      gap: 8px;
+      z-index: 1001;
+    }
+
     .options-button {
       background: var(--backdrop-blur);
       -webkit-backdrop-filter: blur(16px);
@@ -345,6 +356,11 @@
       .top-left-buttons {
         top: 15px;
         left: 15px;
+      }
+
+      .top-right-buttons {
+        top: 15px;
+        right: 15px;
       }
 
       .controls {
@@ -381,13 +397,13 @@
     <button class="options-button" id="optionsBtn">Options</button>
   </div>
 
+  <!-- Top Right Buttons -->
+  <div class="top-right-buttons">
+    <button class="options-button" id="restart">Restart Animation</button>
+  </div>
+
   <div class="controls" id="controlsPanel">
     <span class="panel-title">BCC Permutahedron Voxelization</span>
-
-    <div class="control-group">
-      <label class="control-label">Animation</label>
-      <button class="action-btn" id="restart">Restart Animation</button>
-    </div>
 
     <div class="control-group">
       <label class="control-label">Model</label>

@@ -43,8 +43,8 @@
         const CONFIG = {
             textureWidth: 2048/4,
             textureHeight: 1024/4,
-            brushRadius: 3.0,  // radius in pixels for drawing cells (hover)
-            explosionRadius: 15.0  // radius in pixels for explosion effect (click)
+            brushRadius: 3.0,
+            explosionRadius: 15.0
         };
 
         const canvas = document.getElementById('canvas');
@@ -171,25 +171,21 @@
         uniform float uMouseDown;
         
         out vec4 fragColor;
-        
-        // Pseudo-random function
+
         float random(vec2 st) {
             return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
         }
-        
-        // Distance function that handles wraparound at u=0/u=1
+
         float torusDistance(vec2 p1, vec2 p2, vec2 resolution) {
             vec2 delta = p1 - p2;
-            
-            // Handle horizontal wraparound (longitude)
+
             float dx = delta.x * resolution.x;
             if (abs(dx) > resolution.x * 0.5) {
                 dx = resolution.x - abs(dx);
             } else {
                 dx = abs(dx);
             }
-            
-            // Vertical distance (no wraparound at poles in this implementation)
+
             float dy = abs(delta.y * resolution.y);
             
             return sqrt(dx * dx + dy * dy);
@@ -205,8 +201,7 @@
                     
                     vec2 offset = vec2(float(x), float(y)) * pixelSize;
                     vec2 samplePos = vUV + offset;
-                    
-                    // sphere topology
+
                     samplePos.x = fract(samplePos.x);
                     
                     if (samplePos.y < 0.0) {
@@ -234,21 +229,17 @@
                     next = 1.0;
                 }
             }
-            
-            // Check distance with proper wraparound handling
+
             if (uHasHover > 0.5) {
                 float dist = torusDistance(vUV, uMouseUV, uResolution);
-                
-                // Explosion effect when mouse is down
+
                 if (uMouseDown > 0.5) {
                     if (dist < uExplosionRadius) {
-                        // 50% chance to turn on
                         if (random(vUV + uMouseUV) > 0.5) {
                             next = 1.0;
                         }
                     }
                 } else {
-                    // Normal drawing when just hovering
                     if (dist < uMouseRadius) {
                         next = 1.0;
                     }
@@ -286,15 +277,12 @@
         
         in vec3 vObjectPos;
         out vec4 fragColor;
-        
+
         void main() {
-            // Use object space position (not rotated) for UV calculation
             vec3 dir = normalize(vObjectPos);
             float u = atan(dir.z, dir.x) / (2.0 * 3.14159265359) + 0.5;
             float v = acos(dir.y) / 3.14159265359;
-            
-            // Store UV coordinates directly as color
-            // R = U, G = V, B = 1.0 (marker that we hit the polytope)
+
             fragColor = vec4(u, v, 1.0, 1.0);
         }
         `;
@@ -335,25 +323,20 @@
         uniform sampler2D uTexture;
         
         out vec4 fragColor;
-        
+
         void main() {
-            // Use object space position (not rotated) for UV calculation
-            // This makes the texture rotate with the geometry
             vec3 dir = normalize(vObjectPos);
-            
-            // Convert to spherical coordinates
+
             float u = atan(dir.z, dir.x) / (2.0 * 3.14159265359) + 0.5;
             float v = acos(dir.y) / 3.14159265359;
-            
-            // Sample the Game of Life texture
+
             float val = texture(uTexture, vec2(u, v)).r;
             
             vec3 color = vec3(0.05, 0.05, 0.08);
             if (val > 0.5) {
                 color = vec3(0.0, 1.0, 0.5);
             }
-            
-            // simple lighting
+
             vec3 normal = normalize(vNormal);
             vec3 lightDir = normalize(vec3(1.0, 1.0, 2.0));
             float diff = max(dot(normal, lightDir), 0.0);
@@ -439,18 +422,15 @@
         function createPermutahedron() {
             const positions = [];
             const indices = [];
-            
-            // Triangulate each face
+
             PERMUTAHEDRON.faces.forEach(face => {
                 const baseIndex = positions.length / 3;
-                
-                // Add all vertices of the face
+
                 face.forEach(vertexIndex => {
                     const vertex = PERMUTAHEDRON.vertices[vertexIndex];
                     positions.push(vertex[0], vertex[1], vertex[2]);
                 });
-                
-                // Triangulate the face (fan triangulation)
+
                 for (let i = 1; i < face.length - 1; i++) {
                     indices.push(baseIndex, baseIndex + i, baseIndex + i + 1);
                 }
@@ -597,14 +577,12 @@
         let mouseUVY = -1;
         let hasHover = 0.0;
 
-        // Mobile detection
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
                          (window.innerWidth <= 768);
-        const mobileZoomFactor = 1.3; // 30% zoom out for mobile
+        const mobileZoomFactor = 1.3;
 
-        // Double tap detection
         let lastTapTime = 0;
-        const DOUBLE_TAP_DELAY = 300; // milliseconds
+        const DOUBLE_TAP_DELAY = 300;
         
         function updatePickingTexture() {
             gl.bindTexture(gl.TEXTURE_2D, pickingTexture);
@@ -619,11 +597,10 @@
                 hasHover = 0.0;
                 return;
             }
-            
+
             const rect = canvas.getBoundingClientRect();
             const mouseRelX = mouseScreenX - rect.left;
-            
-            // Render to picking buffer
+
             gl.bindFramebuffer(gl.FRAMEBUFFER, pickingFBO);
             gl.viewport(0, 0, canvas.width, canvas.height);
             
@@ -640,15 +617,13 @@
             gl.bindVertexArray(permutahedronVAO);
             gl.drawElements(gl.TRIANGLES, permutahedronGeometry.indices.length, gl.UNSIGNED_SHORT, 0);
             gl.bindVertexArray(null);
-            
-            // Read pixel at mouse position
-            const mouseY = rect.height - (mouseScreenY - rect.top); // Flip Y
+
+            const mouseY = rect.height - (mouseScreenY - rect.top);
             const pixel = new Uint8Array(4);
             gl.readPixels(mouseRelX, mouseY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-            
+
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            
-            // Check if we hit the polytope (B channel should be 255)
+
             if (pixel[2] > 128) {
                 mouseUVX = pixel[0] / 255.0;
                 mouseUVY = pixel[1] / 255.0;
@@ -657,8 +632,7 @@
                 hasHover = 0.0;
             }
         }
-        
-        // Mouse events
+
         canvas.addEventListener('mousemove', (e) => {
             mouseScreenX = e.clientX;
             mouseScreenY = e.clientY;
@@ -677,22 +651,19 @@
         canvas.addEventListener('mouseup', () => {
             mouseDown = false;
         });
-        
-        // Touch events
+
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            
+
             const touch = e.touches[0];
             mouseScreenX = touch.clientX;
             mouseScreenY = touch.clientY;
             mouseActive = true;
-            
-            // Double tap detection
+
             const currentTime = Date.now();
             const tapInterval = currentTime - lastTapTime;
-            
+
             if (tapInterval < DOUBLE_TAP_DELAY && tapInterval > 0) {
-                // Double tap detected
                 mouseDown = true;
             }
             
@@ -814,20 +785,16 @@
 
         function render(time) {
             resizeCanvas();
-            
-            // update rotation
+
             rotationY = time * 0.0002;
-            
-            // Set up matrices
+
             const adjustedCameraDistance = isMobile ? cameraDistance * mobileZoomFactor : cameraDistance;
             const projection = mat4Perspective(45 * Math.PI / 180, canvas.width / canvas.height, 0.1, 100);
             const view = mat4LookAt([0, 0, adjustedCameraDistance], [0, 0, 0], [0, 1, 0]);
             const model = mat4RotateY(rotationY);
-            
-            // Update picking texture size if needed
+
             updatePickingTexture();
-            
-            // Read UV at mouse position
+
             readUVAtMouse(projection, view, model);
             
             // ========================================
@@ -868,8 +835,7 @@
             
             gl.viewport(0, 0, canvas.width, canvas.height);
             gl.enable(gl.DEPTH_TEST);
-            
-            // Draw permutahedron faces
+
             gl.useProgram(displayProgram);
             
             gl.uniformMatrix4fv(gl.getUniformLocation(displayProgram, 'uProjection'), false, projection);
@@ -883,8 +849,7 @@
             gl.bindVertexArray(permutahedronVAO);
             gl.drawElements(gl.TRIANGLES, permutahedronGeometry.indices.length, gl.UNSIGNED_SHORT, 0);
             gl.bindVertexArray(null);
-            
-            // Draw white edges
+
             gl.useProgram(edgeProgram);
             
             gl.uniformMatrix4fv(gl.getUniformLocation(edgeProgram, 'uProjection'), false, projection);

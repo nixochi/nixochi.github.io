@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Game of Life on Permutahedron</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            background: #1a1a1a;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+            touch-action: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        // ========================================
+        // CONFIGURATION
+        // ========================================
+        const CONFIG = {
+            textureWidth: 2048/4,
+            textureHeight: 1024/4,
+            brushRadius: 3.0,  // radius in pixels for drawing cells (hover)
+            explosionRadius: 15.0  // radius in pixels for explosion effect (click)
+        };
+
+        const canvas = document.getElementById('canvas');
+        const gl = canvas.getContext('webgl2');
+        
+        if (!gl) {
+            console.error('WebGL2 not supported');
+        }
+
+        // ========================================
+        // PERMUTAHEDRON DATA
+        // ========================================
+        
+        const PERMUTAHEDRON = {
+            vertices: [
+                [-2.121320343559642,-0.408248290463863,0.577350269189626],
+                [-2.121320343559642,0.408248290463863,-0.577350269189626],
+                [-1.414213562373095,-1.632993161855452,0.577350269189626],
+                [-1.414213562373095,0,-1.732050807568877],
+                [-1.414213562373095,0,1.732050807568877],
+                [-1.414213562373095,1.632993161855452,-0.577350269189626],
+                [-0.707106781186548,-2.041241452319315,-0.577350269189626],
+                [-0.707106781186548,-1.224744871391589,-1.732050807568877],
+                [-0.707106781186548,-1.224744871391589,1.732050807568877],
+                [-0.707106781186548,1.224744871391589,-1.732050807568877],
+                [-0.707106781186548,1.224744871391589,1.732050807568877],
+                [-0.707106781186548,2.041241452319315,0.577350269189626],
+                [0.707106781186548,-2.041241452319315,-0.577350269189626],
+                [0.707106781186548,-1.224744871391589,-1.732050807568877],
+                [0.707106781186548,-1.224744871391589,1.732050807568877],
+                [0.707106781186548,1.224744871391589,-1.732050807568877],
+                [0.707106781186548,1.224744871391589,1.732050807568877],
+                [0.707106781186548,2.041241452319315,0.577350269189626],
+                [1.414213562373095,-1.632993161855452,0.577350269189626],
+                [1.414213562373095,0,-1.732050807568877],
+                [1.414213562373095,0,1.732050807568877],
+                [1.414213562373095,1.632993161855452,-0.577350269189626],
+                [2.121320343559642,-0.408248290463863,0.577350269189626],
+                [2.121320343559642,0.408248290463863,-0.577350269189626]
+            ],
+            faces: [
+                [7,13,12,6],
+                [2,0,1,3,7,6],
+                [18,14,8,2,6,12],
+                [19,13,7,3,9,15],
+                [20,14,18,22],
+                [23,22,18,12,13,19],
+                [5,9,3,1],
+                [4,0,2,8],
+                [21,17,16,20,22,23],
+                [21,23,19,15],
+                [21,15,9,5,11,17],
+                [10,11,5,1,0,4],
+                [10,4,8,14,20,16],
+                [10,16,17,11]
+            ],
+            edges: [
+                [7,13],
+                [12,13],
+                [6,12],
+                [6,7],
+                [0,2],
+                [0,1],
+                [1,3],
+                [3,7],
+                [2,6],
+                [14,18],
+                [8,14],
+                [2,8],
+                [12,18],
+                [13,19],
+                [3,9],
+                [9,15],
+                [15,19],
+                [14,20],
+                [18,22],
+                [20,22],
+                [22,23],
+                [19,23],
+                [5,9],
+                [1,5],
+                [0,4],
+                [4,8],
+                [17,21],
+                [16,17],
+                [16,20],
+                [21,23],
+                [15,21],
+                [5,11],
+                [11,17],
+                [10,11],
+                [4,10],
+                [10,16]
+            ]
+        };
+
+        // ========================================
+        // SIMULATION SHADER (Game of Life rules)
+        // ========================================
+        
+        const simVertexShader = `#version 300 es
+        precision highp float;
+        
+        in vec2 aPosition;
+        out vec2 vUV;
+        
+        void main() {
+            gl_Position = vec4(aPosition, 0.0, 1.0);
+            vUV = aPosition * 0.5 + 0.5;
+        }
+        `;
+        
+        const simFragmentShader = `#version 300 es
+        precision highp float;
+        
+        in vec2 vUV;
+        
+        uniform sampler2D uPrevState;
+        uniform vec2 uResolution;
+        uniform vec2 uMouseUV;
+        uniform float uMouseRadius;
+        uniform float uExplosionRadius;
+        uniform float uHasHover;
+        uniform float uMouseDown;
+        
+        out vec4 fragColor;
+        
+        // Pseudo-random function
+        float random(vec2 st) {
+            return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+        }
+        
+        // Distance function that handles wraparound at u=0/u=1
+        float torusDistance(vec2 p1, vec2 p2, vec2 resolution) {
+            vec2 delta = p1 - p2;
+            
+            // Handle horizontal wraparound (longitude)
+            float dx = delta.x * resolution.x;
+            if (abs(dx) > resolution.x * 0.5) {
+                dx = resolution.x - abs(dx);
+            } else {
+                dx = abs(dx);
+            }
+            
+            // Vertical distance (no wraparound at poles in this implementation)
+            float dy = abs(delta.y * resolution.y);
+            
+            return sqrt(dx * dx + dy * dy);
+        }
+        
+        void main() {
+            vec2 pixelSize = 1.0 / uResolution;
+            
+            float count = 0.0;
+            for (int y = -1; y <= 1; y++) {
+                for (int x = -1; x <= 1; x++) {
+                    if (x == 0 && y == 0) continue;
+                    
+                    vec2 offset = vec2(float(x), float(y)) * pixelSize;
+                    vec2 samplePos = vUV + offset;
+                    
+                    // sphere topology
+                    samplePos.x = fract(samplePos.x);
+                    
+                    if (samplePos.y < 0.0) {
+                        samplePos.y = -samplePos.y;
+                        samplePos.x = fract(samplePos.x + 0.5);
+                    } else if (samplePos.y > 1.0) {
+                        samplePos.y = 2.0 - samplePos.y;
+                        samplePos.x = fract(samplePos.x + 0.5);
+                    }
+                    
+                    float cell = texture(uPrevState, samplePos).r;
+                    count += cell;
+                }
+            }
+            
+            float current = texture(uPrevState, vUV).r;
+            
+            float next = 0.0;
+            if (current > 0.5) {
+                if (count >= 2.0 && count <= 3.0) {
+                    next = 1.0;
+                }
+            } else {
+                if (count >= 2.9 && count <= 3.1) {
+                    next = 1.0;
+                }
+            }
+            
+            // Check distance with proper wraparound handling
+            if (uHasHover > 0.5) {
+                float dist = torusDistance(vUV, uMouseUV, uResolution);
+                
+                // Explosion effect when mouse is down
+                if (uMouseDown > 0.5) {
+                    if (dist < uExplosionRadius) {
+                        // 50% chance to turn on
+                        if (random(vUV + uMouseUV) > 0.5) {
+                            next = 1.0;
+                        }
+                    }
+                } else {
+                    // Normal drawing when just hovering
+                    if (dist < uMouseRadius) {
+                        next = 1.0;
+                    }
+                }
+            }
+            
+            fragColor = vec4(next, next, next, 1.0);
+        }
+        `;
+
+        // ========================================
+        // UV PICKING SHADER (renders UV coords as colors)
+        // ========================================
+        
+        const pickingVertexShader = `#version 300 es
+        precision highp float;
+        
+        in vec3 aPosition;
+        
+        uniform mat4 uModel;
+        uniform mat4 uView;
+        uniform mat4 uProjection;
+        
+        out vec3 vObjectPos;
+        
+        void main() {
+            vObjectPos = aPosition;
+            vec4 worldPos = uModel * vec4(aPosition, 1.0);
+            gl_Position = uProjection * uView * worldPos;
+        }
+        `;
+        
+        const pickingFragmentShader = `#version 300 es
+        precision highp float;
+        
+        in vec3 vObjectPos;
+        out vec4 fragColor;
+        
+        void main() {
+            // Use object space position (not rotated) for UV calculation
+            vec3 dir = normalize(vObjectPos);
+            float u = atan(dir.z, dir.x) / (2.0 * 3.14159265359) + 0.5;
+            float v = acos(dir.y) / 3.14159265359;
+            
+            // Store UV coordinates directly as color
+            // R = U, G = V, B = 1.0 (marker that we hit the polytope)
+            fragColor = vec4(u, v, 1.0, 1.0);
+        }
+        `;
+
+        // ========================================
+        // DISPLAY SHADER (3D permutahedron with per-pixel UV calculation)
+        // ========================================
+        
+        const displayVertexShader = `#version 300 es
+        precision highp float;
+        
+        in vec3 aPosition;
+        
+        uniform mat4 uModel;
+        uniform mat4 uView;
+        uniform mat4 uProjection;
+        
+        out vec3 vObjectPos;
+        out vec3 vWorldPos;
+        out vec3 vNormal;
+        
+        void main() {
+            vObjectPos = aPosition;
+            vec4 worldPos = uModel * vec4(aPosition, 1.0);
+            vWorldPos = worldPos.xyz;
+            vNormal = mat3(uModel) * aPosition;
+            gl_Position = uProjection * uView * worldPos;
+        }
+        `;
+        
+        const displayFragmentShader = `#version 300 es
+        precision highp float;
+        
+        in vec3 vObjectPos;
+        in vec3 vWorldPos;
+        in vec3 vNormal;
+        
+        uniform sampler2D uTexture;
+        
+        out vec4 fragColor;
+        
+        void main() {
+            // Use object space position (not rotated) for UV calculation
+            // This makes the texture rotate with the geometry
+            vec3 dir = normalize(vObjectPos);
+            
+            // Convert to spherical coordinates
+            float u = atan(dir.z, dir.x) / (2.0 * 3.14159265359) + 0.5;
+            float v = acos(dir.y) / 3.14159265359;
+            
+            // Sample the Game of Life texture
+            float val = texture(uTexture, vec2(u, v)).r;
+            
+            vec3 color = vec3(0.05, 0.05, 0.08);
+            if (val > 0.5) {
+                color = vec3(0.0, 1.0, 0.5);
+            }
+            
+            // simple lighting
+            vec3 normal = normalize(vNormal);
+            vec3 lightDir = normalize(vec3(1.0, 1.0, 2.0));
+            float diff = max(dot(normal, lightDir), 0.0);
+            color *= (0.5 + 0.5 * diff);
+            
+            fragColor = vec4(color, 1.0);
+        }
+        `;
+
+        // ========================================
+        // EDGE SHADER (simple white lines)
+        // ========================================
+        
+        const edgeVertexShader = `#version 300 es
+        precision highp float;
+        
+        in vec3 aPosition;
+        
+        uniform mat4 uModel;
+        uniform mat4 uView;
+        uniform mat4 uProjection;
+        
+        void main() {
+            vec4 worldPos = uModel * vec4(aPosition, 1.0);
+            gl_Position = uProjection * uView * worldPos;
+        }
+        `;
+        
+        const edgeFragmentShader = `#version 300 es
+        precision highp float;
+        
+        out vec4 fragColor;
+        
+        void main() {
+            fragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        }
+        `;
+
+        // ========================================
+        // COMPILE AND LINK PROGRAMS
+        // ========================================
+        
+        function compileShader(source, type) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            
+            return shader;
+        }
+        
+        function createProgram(vsSource, fsSource) {
+            const vs = compileShader(vsSource, gl.VERTEX_SHADER);
+            const fs = compileShader(fsSource, gl.FRAGMENT_SHADER);
+            
+            const program = gl.createProgram();
+            gl.attachShader(program, vs);
+            gl.attachShader(program, fs);
+            gl.linkProgram(program);
+            
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('Program link error:', gl.getProgramInfoLog(program));
+                return null;
+            }
+            
+            return program;
+        }
+        
+        const simProgram = createProgram(simVertexShader, simFragmentShader);
+        const displayProgram = createProgram(displayVertexShader, displayFragmentShader);
+        const pickingProgram = createProgram(pickingVertexShader, pickingFragmentShader);
+        const edgeProgram = createProgram(edgeVertexShader, edgeFragmentShader);
+
+        // ========================================
+        // CREATE PERMUTAHEDRON GEOMETRY
+        // ========================================
+        
+        function createPermutahedron() {
+            const positions = [];
+            const indices = [];
+            
+            // Triangulate each face
+            PERMUTAHEDRON.faces.forEach(face => {
+                const baseIndex = positions.length / 3;
+                
+                // Add all vertices of the face
+                face.forEach(vertexIndex => {
+                    const vertex = PERMUTAHEDRON.vertices[vertexIndex];
+                    positions.push(vertex[0], vertex[1], vertex[2]);
+                });
+                
+                // Triangulate the face (fan triangulation)
+                for (let i = 1; i < face.length - 1; i++) {
+                    indices.push(baseIndex, baseIndex + i, baseIndex + i + 1);
+                }
+            });
+            
+            return { 
+                positions: new Float32Array(positions), 
+                indices: new Uint16Array(indices) 
+            };
+        }
+        
+        const permutahedronGeometry = createPermutahedron();
+        
+        const permutahedronVAO = gl.createVertexArray();
+        gl.bindVertexArray(permutahedronVAO);
+        
+        const posBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, permutahedronGeometry.positions, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+        
+        const indexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, permutahedronGeometry.indices, gl.STATIC_DRAW);
+        
+        gl.bindVertexArray(null);
+
+        // ========================================
+        // CREATE EDGE GEOMETRY
+        // ========================================
+        
+        function createEdges() {
+            const positions = [];
+            
+            PERMUTAHEDRON.edges.forEach(([i1, i2]) => {
+                const v1 = PERMUTAHEDRON.vertices[i1];
+                const v2 = PERMUTAHEDRON.vertices[i2];
+                positions.push(v1[0], v1[1], v1[2]);
+                positions.push(v2[0], v2[1], v2[2]);
+            });
+            
+            return {
+                positions: new Float32Array(positions),
+                count: PERMUTAHEDRON.edges.length * 2
+            };
+        }
+        
+        const edgeGeometry = createEdges();
+        
+        const edgeVAO = gl.createVertexArray();
+        gl.bindVertexArray(edgeVAO);
+        
+        const edgePosBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, edgePosBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, edgeGeometry.positions, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+        
+        gl.bindVertexArray(null);
+
+        // ========================================
+        // CREATE PING-PONG TEXTURES
+        // ========================================
+        
+        function createTexture(width, height) {
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            
+            const data = new Uint8Array(width * height * 4);
+            for (let i = 0; i < data.length; i += 4) {
+                data[i] = 0;
+                data[i + 1] = 0;
+                data[i + 2] = 0;
+                data[i + 3] = 255;
+            }
+            
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+            
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            
+            return texture;
+        }
+        
+        let textureA = createTexture(CONFIG.textureWidth, CONFIG.textureHeight);
+        let textureB = createTexture(CONFIG.textureWidth, CONFIG.textureHeight);
+        
+        function createFramebuffer(texture) {
+            const fbo = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+            
+            const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+            if (status !== gl.FRAMEBUFFER_COMPLETE) {
+                console.error('Framebuffer not complete:', status);
+            }
+            
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            return fbo;
+        }
+        
+        let fboA = createFramebuffer(textureA);
+        let fboB = createFramebuffer(textureB);
+        
+        let current = { texture: textureA, fbo: fboA };
+        let next = { texture: textureB, fbo: fboB };
+
+        // ========================================
+        // UV PICKING FRAMEBUFFER
+        // ========================================
+        
+        const pickingTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, pickingTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        
+        const pickingDepth = gl.createRenderbuffer();
+        gl.bindRenderbuffer(gl.RENDERBUFFER, pickingDepth);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, 1, 1);
+        
+        const pickingFBO = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, pickingFBO);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, pickingTexture, 0);
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, pickingDepth);
+        
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+        // ========================================
+        // MOUSE/TOUCH TRACKING
+        // ========================================
+        
+        let mouseScreenX = -1;
+        let mouseScreenY = -1;
+        let mouseActive = false;
+        let mouseDown = false;
+        let rotationY = 0;
+        const cameraDistance = 8.0;
+        
+        let mouseUVX = -1;
+        let mouseUVY = -1;
+        let hasHover = 0.0;
+        
+        // Double tap detection
+        let lastTapTime = 0;
+        const DOUBLE_TAP_DELAY = 300; // milliseconds
+        
+        function updatePickingTexture() {
+            gl.bindTexture(gl.TEXTURE_2D, pickingTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            
+            gl.bindRenderbuffer(gl.RENDERBUFFER, pickingDepth);
+            gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, canvas.width, canvas.height);
+        }
+        
+        function readUVAtMouse(projection, view, model) {
+            if (!mouseActive) {
+                hasHover = 0.0;
+                return;
+            }
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseRelX = mouseScreenX - rect.left;
+            
+            // Render to picking buffer
+            gl.bindFramebuffer(gl.FRAMEBUFFER, pickingFBO);
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            
+            gl.clearColor(0, 0, 0, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.enable(gl.DEPTH_TEST);
+            
+            gl.useProgram(pickingProgram);
+            
+            gl.uniformMatrix4fv(gl.getUniformLocation(pickingProgram, 'uProjection'), false, projection);
+            gl.uniformMatrix4fv(gl.getUniformLocation(pickingProgram, 'uView'), false, view);
+            gl.uniformMatrix4fv(gl.getUniformLocation(pickingProgram, 'uModel'), false, model);
+            
+            gl.bindVertexArray(permutahedronVAO);
+            gl.drawElements(gl.TRIANGLES, permutahedronGeometry.indices.length, gl.UNSIGNED_SHORT, 0);
+            gl.bindVertexArray(null);
+            
+            // Read pixel at mouse position
+            const mouseY = rect.height - (mouseScreenY - rect.top); // Flip Y
+            const pixel = new Uint8Array(4);
+            gl.readPixels(mouseRelX, mouseY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+            
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            
+            // Check if we hit the polytope (B channel should be 255)
+            if (pixel[2] > 128) {
+                mouseUVX = pixel[0] / 255.0;
+                mouseUVY = pixel[1] / 255.0;
+                hasHover = 1.0;
+            } else {
+                hasHover = 0.0;
+            }
+        }
+        
+        // Mouse events
+        canvas.addEventListener('mousemove', (e) => {
+            mouseScreenX = e.clientX;
+            mouseScreenY = e.clientY;
+            mouseActive = true;
+        });
+        
+        canvas.addEventListener('mouseleave', () => {
+            mouseActive = false;
+            hasHover = 0.0;
+        });
+        
+        canvas.addEventListener('mousedown', () => {
+            mouseDown = true;
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            mouseDown = false;
+        });
+        
+        // Touch events
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            mouseScreenX = touch.clientX;
+            mouseScreenY = touch.clientY;
+            mouseActive = true;
+            
+            // Double tap detection
+            const currentTime = Date.now();
+            const tapInterval = currentTime - lastTapTime;
+            
+            if (tapInterval < DOUBLE_TAP_DELAY && tapInterval > 0) {
+                // Double tap detected
+                mouseDown = true;
+            }
+            
+            lastTapTime = currentTime;
+        }, { passive: false });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            mouseScreenX = touch.clientX;
+            mouseScreenY = touch.clientY;
+            mouseActive = true;
+        }, { passive: false });
+        
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            
+            if (e.touches.length === 0) {
+                mouseActive = false;
+                mouseDown = false;
+                hasHover = 0.0;
+            }
+        }, { passive: false });
+        
+        canvas.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            mouseActive = false;
+            mouseDown = false;
+            hasHover = 0.0;
+        }, { passive: false });
+
+        // ========================================
+        // FULLSCREEN QUAD FOR SIMULATION
+        // ========================================
+        
+        const quadVertices = new Float32Array([
+            -1.0, -1.0,
+             1.0, -1.0,
+            -1.0,  1.0,
+            -1.0,  1.0,
+             1.0, -1.0,
+             1.0,  1.0
+        ]);
+
+        const quadBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, quadVertices, gl.STATIC_DRAW);
+
+        // ========================================
+        // MATRIX MATH
+        // ========================================
+        
+        function mat4Perspective(fovy, aspect, near, far) {
+            const f = 1 / Math.tan(fovy / 2);
+            const nf = 1 / (near - far);
+            return new Float32Array([
+                f / aspect, 0, 0, 0,
+                0, f, 0, 0,
+                0, 0, (far + near) * nf, -1,
+                0, 0, 2 * far * near * nf, 0
+            ]);
+        }
+        
+        function mat4LookAt(eye, target, up) {
+            const zAxis = [eye[0] - target[0], eye[1] - target[1], eye[2] - target[2]];
+            let len = Math.sqrt(zAxis[0] * zAxis[0] + zAxis[1] * zAxis[1] + zAxis[2] * zAxis[2]);
+            zAxis[0] /= len; zAxis[1] /= len; zAxis[2] /= len;
+            
+            const xAxis = [
+                up[1] * zAxis[2] - up[2] * zAxis[1],
+                up[2] * zAxis[0] - up[0] * zAxis[2],
+                up[0] * zAxis[1] - up[1] * zAxis[0]
+            ];
+            len = Math.sqrt(xAxis[0] * xAxis[0] + xAxis[1] * xAxis[1] + xAxis[2] * xAxis[2]);
+            xAxis[0] /= len; xAxis[1] /= len; xAxis[2] /= len;
+            
+            const yAxis = [
+                zAxis[1] * xAxis[2] - zAxis[2] * xAxis[1],
+                zAxis[2] * xAxis[0] - zAxis[0] * xAxis[2],
+                zAxis[0] * xAxis[1] - zAxis[1] * xAxis[0]
+            ];
+            
+            return new Float32Array([
+                xAxis[0], yAxis[0], zAxis[0], 0,
+                xAxis[1], yAxis[1], zAxis[1], 0,
+                xAxis[2], yAxis[2], zAxis[2], 0,
+                -(xAxis[0] * eye[0] + xAxis[1] * eye[1] + xAxis[2] * eye[2]),
+                -(yAxis[0] * eye[0] + yAxis[1] * eye[1] + yAxis[2] * eye[2]),
+                -(zAxis[0] * eye[0] + zAxis[1] * eye[1] + zAxis[2] * eye[2]),
+                1
+            ]);
+        }
+        
+        function mat4RotateY(angle) {
+            const c = Math.cos(angle);
+            const s = Math.sin(angle);
+            return new Float32Array([
+                c, 0, -s, 0,
+                0, 1, 0, 0,
+                s, 0, c, 0,
+                0, 0, 0, 1
+            ]);
+        }
+
+        // ========================================
+        // RENDER LOOP
+        // ========================================
+        
+        function resizeCanvas() {
+            const displayWidth = canvas.clientWidth;
+            const displayHeight = canvas.clientHeight;
+            
+            if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+                canvas.width = displayWidth;
+                canvas.height = displayHeight;
+            }
+        }
+
+        function render(time) {
+            resizeCanvas();
+            
+            // update rotation
+            rotationY = time * 0.0002;
+            
+            // Set up matrices
+            const projection = mat4Perspective(45 * Math.PI / 180, canvas.width / canvas.height, 0.1, 100);
+            const view = mat4LookAt([0, 0, cameraDistance], [0, 0, 0], [0, 1, 0]);
+            const model = mat4RotateY(rotationY);
+            
+            // Update picking texture size if needed
+            updatePickingTexture();
+            
+            // Read UV at mouse position
+            readUVAtMouse(projection, view, model);
+            
+            // ========================================
+            // SIMULATION PASS
+            // ========================================
+            
+            gl.bindFramebuffer(gl.FRAMEBUFFER, next.fbo);
+            gl.viewport(0, 0, CONFIG.textureWidth, CONFIG.textureHeight);
+            
+            gl.useProgram(simProgram);
+            
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, current.texture);
+            gl.uniform1i(gl.getUniformLocation(simProgram, 'uPrevState'), 0);
+            
+            gl.uniform2f(gl.getUniformLocation(simProgram, 'uResolution'), CONFIG.textureWidth, CONFIG.textureHeight);
+            gl.uniform2f(gl.getUniformLocation(simProgram, 'uMouseUV'), mouseUVX, mouseUVY);
+            gl.uniform1f(gl.getUniformLocation(simProgram, 'uMouseRadius'), CONFIG.brushRadius);
+            gl.uniform1f(gl.getUniformLocation(simProgram, 'uExplosionRadius'), CONFIG.explosionRadius);
+            gl.uniform1f(gl.getUniformLocation(simProgram, 'uHasHover'), hasHover);
+            gl.uniform1f(gl.getUniformLocation(simProgram, 'uMouseDown'), mouseDown ? 1.0 : 0.0);
+            
+            const simPosLoc = gl.getAttribLocation(simProgram, 'aPosition');
+            gl.enableVertexAttribArray(simPosLoc);
+            gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+            gl.vertexAttribPointer(simPosLoc, 2, gl.FLOAT, false, 0, 0);
+            
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            
+            // ========================================
+            // DISPLAY PASS
+            // ========================================
+            
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            
+            gl.clearColor(0.1, 0.1, 0.1, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            gl.enable(gl.DEPTH_TEST);
+            
+            // Draw permutahedron faces
+            gl.useProgram(displayProgram);
+            
+            gl.uniformMatrix4fv(gl.getUniformLocation(displayProgram, 'uProjection'), false, projection);
+            gl.uniformMatrix4fv(gl.getUniformLocation(displayProgram, 'uView'), false, view);
+            gl.uniformMatrix4fv(gl.getUniformLocation(displayProgram, 'uModel'), false, model);
+            
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, next.texture);
+            gl.uniform1i(gl.getUniformLocation(displayProgram, 'uTexture'), 0);
+            
+            gl.bindVertexArray(permutahedronVAO);
+            gl.drawElements(gl.TRIANGLES, permutahedronGeometry.indices.length, gl.UNSIGNED_SHORT, 0);
+            gl.bindVertexArray(null);
+            
+            // Draw white edges
+            gl.useProgram(edgeProgram);
+            
+            gl.uniformMatrix4fv(gl.getUniformLocation(edgeProgram, 'uProjection'), false, projection);
+            gl.uniformMatrix4fv(gl.getUniformLocation(edgeProgram, 'uView'), false, view);
+            gl.uniformMatrix4fv(gl.getUniformLocation(edgeProgram, 'uModel'), false, model);
+            
+            gl.bindVertexArray(edgeVAO);
+            gl.drawArrays(gl.LINES, 0, edgeGeometry.count);
+            gl.bindVertexArray(null);
+            
+            // ========================================
+            // SWAP BUFFERS
+            // ========================================
+            
+            const temp = current;
+            current = next;
+            next = temp;
+            
+            requestAnimationFrame(render);
+        }
+
+        requestAnimationFrame(render);
+    </script>
+</body>
+</html>

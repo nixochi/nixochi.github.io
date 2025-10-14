@@ -329,11 +329,18 @@ export function voxelizeModel(model) {
 
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 1;
-  const gl = canvas.getContext('webgl2');
+
+  // Use same context attributes as Renderer
+  const gl = canvas.getContext('webgl2', {
+    failIfMajorPerformanceCaveat: false,
+    powerPreference: 'high-performance'
+  });
 
   if (!gl) {
     throw new Error("WebGL2 required for GPU voxelization");
   }
+
+  console.log("Voxelizer WebGL2 context created, lost?", gl.isContextLost());
 
   const gpuVoxelizer = new GPUVoxelizer(gl);
   const voxels = gpuVoxelizer.voxelize(model);
@@ -402,11 +409,26 @@ const combinedTypes = new Float32Array(
 
 // === Shader compilation ===
 function compile(gl, src, type) {
+  console.log("compile() called with type:", type);
+  console.log("gl object:", gl);
+  console.log("typeof gl:", typeof gl);
+
   const s = gl.createShader(type);
+  console.log("createShader returned:", s);
+  console.log("GL error after createShader:", gl.getError());
+
+  if (!s) {
+    console.error('Failed to create shader. Type:', type);
+    console.error('GL context lost?', gl.isContextLost());
+    return null;
+  }
   gl.shaderSource(s, src);
   gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
     console.error(gl.getShaderInfoLog(s));
+    gl.deleteShader(s);
+    return null;
+  }
   return s;
 }
 
@@ -460,13 +482,31 @@ function calcDelays(pos) {
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
-    this.gl = canvas.getContext('webgl2');
+
+    // Add context loss handlers BEFORE getting context
+    canvas.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      console.error('WebGL context lost!', event);
+    }, false);
+
+    canvas.addEventListener('webglcontextrestored', () => {
+      console.log('WebGL context restored');
+    }, false);
+
+    // Try to get context with explicit attributes
+    this.gl = canvas.getContext('webgl2', {
+      failIfMajorPerformanceCaveat: false,
+      powerPreference: 'high-performance'
+    });
 
     if (!this.gl) {
       throw new Error('WebGL2 not supported');
     }
 
-    console.log("WebGL2 initialized with transform feedback voxelization");
+    console.log("WebGL2 context obtained");
+    console.log("Context lost immediately?", this.gl.isContextLost());
+    console.log("GL.VERTEX_SHADER:", this.gl.VERTEX_SHADER);
+    console.log("GL.FRAGMENT_SHADER:", this.gl.FRAGMENT_SHADER);
 
     this.setupShaders();
     this.setupBuffers();
@@ -485,6 +525,11 @@ export class Renderer {
 
   setupShaders() {
     const gl = this.gl;
+
+    console.log("setupShaders called");
+    console.log("gl in setupShaders:", gl);
+    console.log("gl.isContextLost():", gl.isContextLost());
+    console.log("Checking GL error before shader creation:", gl.getError());
 
     const vsh = compile(gl, `#version 300 es
       in vec3 aPosition;
@@ -537,6 +582,10 @@ export class Renderer {
         fragColor=(vType>0.5)?vec4(0,0,0,1):vec4(vColor,1);
       }
     `, gl.FRAGMENT_SHADER);
+
+    if (!vsh || !fsh) {
+      throw new Error('Shader compilation failed');
+    }
 
     this.prog = gl.createProgram();
     gl.attachShader(this.prog, vsh);

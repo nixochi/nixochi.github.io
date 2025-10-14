@@ -504,6 +504,30 @@
       window.addEventListener('unhandledrejection', e => add('Promise: ' + e.reason, 'error'));
     })();
 
+    // === Copy log button (set up early) ===
+    const copyLogBtn = document.getElementById('copyLogBtn');
+    copyLogBtn.addEventListener('click', async () => {
+      const debugConsole = document.getElementById('debugConsole');
+      const logText = debugConsole.innerText;
+
+      try {
+        await navigator.clipboard.writeText(logText);
+        copyLogBtn.textContent = 'Copied!';
+        copyLogBtn.classList.add('copied');
+
+        setTimeout(() => {
+          copyLogBtn.textContent = 'Copy Log';
+          copyLogBtn.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy log:', err);
+        copyLogBtn.textContent = 'Failed';
+        setTimeout(() => {
+          copyLogBtn.textContent = 'Copy Log';
+        }, 2000);
+      }
+    });
+
     // === Initialize renderer ===
     const canvas = document.getElementById('canvas');
     let renderer;
@@ -511,7 +535,8 @@
     try {
       renderer = new Renderer(canvas);
     } catch (error) {
-      alert('WebGL2 not supported');
+      console.error('Failed to initialize renderer:', error);
+      alert(`Failed to initialize renderer: ${error.message}`);
       throw error;
     }
 
@@ -522,16 +547,25 @@
     function processModel() {
       if (!currentModel) return;
 
-      const centered = centerModel(currentModel);
-      const scaled = applyScale(centered, modelScale);
-      const result = voxelizeModel(scaled);
+      try {
+        const centered = centerModel(currentModel);
+        const scaled = applyScale(centered, modelScale);
+        console.log("Calling voxelizeModel...");
+        const result = voxelizeModel(scaled);
+        console.log("voxelizeModel completed");
 
-      const stats = renderer.updateInstances(result.voxels);
+        const stats = renderer.updateInstances(result.voxels);
 
-      // Update UI
-      document.getElementById('totalCubes').textContent = stats.count;
-      document.getElementById('memoryUsage').textContent = `${stats.totalKB} KB`;
-      document.getElementById('voxelTime').textContent = `${result.time} ms`;
+        // Update UI
+        document.getElementById('totalCubes').textContent = stats.count;
+        document.getElementById('memoryUsage').textContent = `${stats.totalKB} KB`;
+        document.getElementById('voxelTime').textContent = `${result.time} ms`;
+      } catch (error) {
+        console.error('Error in processModel:', error);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        throw error;
+      }
     }
 
     // === File upload ===
@@ -611,40 +645,19 @@
     // === Restart animation ===
     document.getElementById('restart').onclick = () => renderer.restartAnimation();
 
-    // === Copy log button ===
-    const copyLogBtn = document.getElementById('copyLogBtn');
-    copyLogBtn.addEventListener('click', async () => {
-      const debugConsole = document.getElementById('debugConsole');
-      const logText = debugConsole.innerText;
-
-      try {
-        await navigator.clipboard.writeText(logText);
-        copyLogBtn.textContent = 'Copied!';
-        copyLogBtn.classList.add('copied');
-
-        setTimeout(() => {
-          copyLogBtn.textContent = 'Copy Log';
-          copyLogBtn.classList.remove('copied');
-        }, 2000);
-      } catch (err) {
-        console.error('Failed to copy log:', err);
-        copyLogBtn.textContent = 'Failed';
-        setTimeout(() => {
-          copyLogBtn.textContent = 'Copy Log';
-        }, 2000);
-      }
-    });
-
     // === Load default model on startup ===
     console.log("Loading default permutahedron model...");
     loadOBJFromURL('./examples/permutahedron.obj')
       .then(model => {
         currentModel = model;
+        console.log("Model loaded, starting voxelization...");
         processModel();
         console.log("Default model loaded. Ready for OBJ upload.");
       })
       .catch(error => {
         console.error('Failed to load default model:', error);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
       });
   </script>
 </body>

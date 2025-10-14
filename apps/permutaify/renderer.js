@@ -1,6 +1,12 @@
 /**
- * Renderer Module
- * Handles WebGL2 rendering, voxelization computation, and drawing
+ * Renderer Module - Transform Feedback GPU Voxelization (Texture-backed)
+ * WebGL2-only. Uses a triangle RGBA32F texture + texelFetch in the vertex shader.
+ * Transform Feedback captures (insideFlag, position) for each candidate voxel.
+ *
+ * Fixes:
+ *  1) Deterministic edge rule to avoid double-counts on shared edges/vertices
+ *  2) Ray origin nudge along ray to avoid "on-surface" self-intersections
+ *  4) Adaptive EPS tied to model scale
  */
 
 // --- Utility functions ---
@@ -9,184 +15,333 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const normalize = v => {
   const L = Math.hypot(v[0], v[1], v[2]);
-  return [v[0] / L, v[1] / L, v[2] / L];
+  return L > 0 ? [v[0] / L, v[1] / L, v[2] / L] : [0, 0, 0];
 };
 
-// === Ray-triangle intersection ===
-function rayTriangleIntersect(orig, dir, v0, v1, v2) {
-  const EPS = 1e-6;
-  const e1 = sub(v1, v0), e2 = sub(v2, v0);
-  const h = cross(dir, e2);
-  const a = dot(e1, h);
-  if (a > -EPS && a < EPS) return null;
-  const f = 1 / a;
-  const s = sub(orig, v0);
-  const u = f * dot(s, h);
-  if (u < 0 || u > 1) return null;
-  const q = cross(s, e1);
-  const v = f * dot(dir, q);
-  if (v < 0 || u + v > 1) return null;
-  const t = f * dot(e2, q);
-  return t > EPS ? t : null;
-}
-
-// === Spatial Grid for acceleration ===
-function buildSpatialGrid(model, cellSize) {
-  const grid = new Map();
-  const min = [Infinity, Infinity, Infinity];
-  const max = [-Infinity, -Infinity, -Infinity];
-
-  for (const v of model.vertices) {
-    for (let i = 0; i < 3; i++) {
-      min[i] = Math.min(min[i], v[i]);
-      max[i] = Math.max(max[i], v[i]);
-    }
+// === GPU Transform Feedback Voxelizer ===
+class GPUVoxelizer {
+  constructor(gl) {
+    this.gl = gl;
+    this.maxTriangles = 2048; // guidance; texture path supports far more
   }
 
-  const hash = (x, y, z) => `${x}|${y}|${z}`;
-  const toCell = (x, y, z) => [
-    Math.floor(x / cellSize),
-    Math.floor(y / cellSize),
-    Math.floor(z / cellSize)
-  ];
+  // Build RGBA32F 2D texture with layout: width=3 (v0,v1,v2), height=numTriangles, xyz in RGB
+  _createTriangleTexture(tris) {
+    const gl = this.gl;
+    const numTris = tris.length;
+    const width = 3, height = numTris;
 
-  for (let faceIdx = 0; faceIdx < model.faces.length; faceIdx++) {
-    const face = model.faces[faceIdx];
-    const v0 = model.vertices[face[0]];
-    const v1 = model.vertices[face[1]];
-    const v2 = model.vertices[face[2]];
+    const data = new Float32Array(width * height * 4);
+    for (let i = 0; i < numTris; i++) {
+      const [v0, v1, v2] = tris[i];
+      const base = i * (width * 4);
+      // texel (0,i) = v0
+      data[base + 0] = v0[0]; data[base + 1] = v0[1]; data[base + 2] = v0[2]; data[base + 3] = 0;
+      // texel (1,i) = v1
+      data[base + 4] = v1[0]; data[base + 5] = v1[1]; data[base + 6] = v1[2]; data[base + 7] = 0;
+      // texel (2,i) = v2
+      data[base + 8] = v2[0]; data[base + 9] = v2[1]; data[base +10] = v2[2]; data[base +11] = 0;
+    }
 
-    const tMin = [
-      Math.min(v0[0], v1[0], v2[0]),
-      Math.min(v0[1], v1[1], v2[1]),
-      Math.min(v0[2], v1[2], v2[2])
-    ];
-    const tMax = [
-      Math.max(v0[0], v1[0], v2[0]),
-      Math.max(v0[1], v1[1], v2[1]),
-      Math.max(v0[2], v1[2], v2[2])
-    ];
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, data);
+    gl.bindTexture(gl.TEXTURE_2D, null);
 
-    const cMin = toCell(tMin[0], tMin[1], tMin[2]);
-    const cMax = toCell(tMax[0], tMax[1], tMax[2]);
+    return { tex, width, height };
+  }
 
-    for (let cx = cMin[0]; cx <= cMax[0]; cx++) {
-      for (let cy = cMin[1]; cy <= cMax[1]; cy++) {
-        for (let cz = cMin[2]; cz <= cMax[2]; cz++) {
-          const key = hash(cx, cy, cz);
-          if (!grid.has(key)) {
-            grid.set(key, []);
-          }
-          grid.get(key).push(faceIdx);
-        }
+  voxelize(model) {
+    const gl = this.gl;
+    console.log("Starting GPU transform feedback voxelization (texture-backed + edge fixes)...");
+    const start = performance.now();
+
+    // Calculate bounds
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (const v of model.vertices) {
+      for (let i = 0; i < 3; i++) {
+        min[i] = Math.min(min[i], v[i]);
+        max[i] = Math.max(max[i], v[i]);
       }
     }
-  }
+    const size = [max[0]-min[0], max[1]-min[1], max[2]-min[2]];
+    const maxDim = Math.max(size[0], size[1], size[2]) || 1;
 
-  return { grid, cellSize, hash, toCell };
-}
+    // Adaptive tolerances (tuned conservatively)
+    const eps = 1e-6 * maxDim;           // numerical epsilon for intersection math
+    const originNudge = 1e-5 * maxDim;   // small ray-origin shift along ray
 
-// === Point-in-mesh test (with spatial acceleration) ===
-function pointInMeshAccelerated(p, model, spatialGrid) {
-  const dir = normalize([1, 0.123456789, 0.987654321]);
-  const cell = spatialGrid.toCell(p[0], p[1], p[2]);
+    // Generate BCC lattice candidate positions (voxel spacing ~2 units in your setup)
+    const candidates = [];
+    for (let xo = 0; xo < 2; xo++) {
+      for (let yo = 0; yo < 2; yo++) {
+        for (let zo = 0; zo < 2; zo++) {
+          if ((xo + yo + zo) % 2 !== 0) continue;
 
-  const checkedFaces = new Set();
-  let count = 0;
-
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dz = -1; dz <= 1; dz++) {
-        const key = spatialGrid.hash(cell[0] + dx, cell[1] + dy, cell[2] + dz);
-        const faceIndices = spatialGrid.grid.get(key);
-
-        if (faceIndices) {
-          for (const faceIdx of faceIndices) {
-            if (checkedFaces.has(faceIdx)) continue;
-            checkedFaces.add(faceIdx);
-
-            const face = model.faces[faceIdx];
-            const t = rayTriangleIntersect(
-              p, dir,
-              model.vertices[face[0]],
-              model.vertices[face[1]],
-              model.vertices[face[2]]
-            );
-            if (t !== null) count++;
-          }
-        }
-      }
-    }
-  }
-
-  for (let faceIdx = 0; faceIdx < model.faces.length; faceIdx++) {
-    if (checkedFaces.has(faceIdx)) continue;
-
-    const face = model.faces[faceIdx];
-    const t = rayTriangleIntersect(
-      p, dir,
-      model.vertices[face[0]],
-      model.vertices[face[1]],
-      model.vertices[face[2]]
-    );
-    if (t !== null) count++;
-  }
-
-  return (count % 2) === 1;
-}
-
-// === Voxelization (BCC lattice with spatial acceleration) ===
-const CELL_R = Math.sqrt(1.25);
-
-export function voxelizeModel(model) {
-  const min = [Infinity, Infinity, Infinity];
-  const max = [-Infinity, -Infinity, -Infinity];
-
-  for (const v of model.vertices) {
-    for (let i = 0; i < 3; i++) {
-      min[i] = Math.min(min[i], v[i]);
-      max[i] = Math.max(max[i], v[i]);
-    }
-  }
-
-  console.log("Building spatial grid...");
-  const gridStart = performance.now();
-  const extent = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
-  const cellSize = extent / 8;
-  const spatialGrid = buildSpatialGrid(model, cellSize);
-  console.log(`Grid built: ${spatialGrid.grid.size} cells, ${(performance.now() - gridStart).toFixed(1)} ms`);
-
-  const vox = [];
-  const set = new Set();
-
-  console.log("Voxelizing within", min, max);
-  const start = performance.now();
-
-  for (let xo = 0; xo < 2; xo++) {
-    for (let yo = 0; yo < 2; yo++) {
-      for (let zo = 0; zo < 2; zo++) {
-        if ((xo + yo + zo) % 2 !== 0) continue;
-
-        for (let x = min[0] - 1 + xo; x <= max[0] + 1; x += 2) {
-          for (let y = min[1] - 1 + yo; y <= max[1] + 1; y += 2) {
-            for (let z = min[2] - 1 + zo; z <= max[2] + 1; z += 2) {
-              const key = `${x},${y},${z}`;
-              if (!set.has(key) && pointInMeshAccelerated([x, y, z], model, spatialGrid)) {
-                set.add(key);
-                vox.push(x, y, z);
+          for (let x = Math.floor(min[0]) - 2 + xo; x <= Math.ceil(max[0]) + 2; x += 2) {
+            for (let y = Math.floor(min[1]) - 2 + yo; y <= Math.ceil(max[1]) + 2; y += 2) {
+              for (let z = Math.floor(min[2]) - 2 + zo; z <= Math.ceil(max[2]) + 2; z += 2) {
+                candidates.push(x, y, z);
               }
             }
           }
         }
       }
     }
+
+    console.log(`Testing ${candidates.length / 3} candidate voxels, ${model.faces.length} triangles`);
+
+    // Build triangle array for texture upload
+    const tris = new Array(model.faces.length);
+    for (let i = 0; i < model.faces.length; i++) {
+      const f = model.faces[i];
+      tris[i] = [
+        model.vertices[f[0]],
+        model.vertices[f[1]],
+        model.vertices[f[2]],
+      ];
+    }
+    const triTexInfo = this._createTriangleTexture(tris);
+
+    // ====== Shaders ======
+    const vs = `#version 300 es
+      in vec3 aPosition;
+
+      uniform sampler2D uTriTex;   // width=3, height=uNumTriangles
+      uniform int   uNumTriangles;
+      uniform float uEps;          // adaptive epsilon (scaled by model extents)
+      uniform float uOriginNudge;  // small shift along ray to avoid self-hits
+
+      // Use float for TF portability across drivers
+      flat out float vInside;
+      out vec3 vPosition;
+
+      // Fetch one triangle from row i
+      void getTriangle(int i, out vec3 v0, out vec3 v1, out vec3 v2) {
+        vec4 t0 = texelFetch(uTriTex, ivec2(0, i), 0);
+        vec4 t1 = texelFetch(uTriTex, ivec2(1, i), 0);
+        vec4 t2 = texelFetch(uTriTex, ivec2(2, i), 0);
+        v0 = t0.xyz; v1 = t1.xyz; v2 = t2.xyz;
+      }
+
+      // Möller–Trumbore with deterministic edge rule + adaptive eps
+      // Deterministic rule: count hits only if
+      //   u >   uEps (OPEN), v >= -uEps (CLOSED), and u+v < 1.0 - uEps (OPEN)
+      // plus t > uEps to avoid the origin seeing itself.
+      bool rayTriIntersectDet(vec3 orig, vec3 dir, vec3 v0, vec3 v1, vec3 v2) {
+        vec3 e1 = v1 - v0;
+        vec3 e2 = v2 - v0;
+        vec3 p  = cross(dir, e2);
+        float a = dot(e1, p);
+        if (abs(a) < uEps) return false;           // nearly parallel
+
+        float invA = 1.0 / a;
+        vec3 s = orig - v0;
+        float u = dot(s, p) * invA;
+        if (!(u > uEps)) return false;             // OPEN edge
+
+        vec3 q = cross(s, e1);
+        float v = dot(dir, q) * invA;
+        if (!(v >= -uEps)) return false;           // CLOSED edge (with tolerance)
+        if (!((u + v) < 1.0 - uEps)) return false; // OPEN top edge
+
+        float t = dot(e2, q) * invA;
+        return t > uEps;                            // must be in front by > eps
+      }
+
+      void main() {
+        // Non-axis-aligned to avoid edge-cancellation pathologies
+        vec3 rayDir = normalize(vec3(1.0, 0.123456789, 0.987654321));
+        // Nudge origin along ray direction to avoid counting the surface we start on
+        vec3 rayOrig = aPosition + rayDir * uOriginNudge;
+
+        int count = 0;
+        for (int i = 0; i < uNumTriangles; ++i) {
+          vec3 v0, v1, v2;
+          getTriangle(i, v0, v1, v2);
+          if (rayTriIntersectDet(rayOrig, rayDir, v0, v1, v2)) {
+            count++;
+          }
+        }
+
+        vInside = float(count & 1);
+        vPosition = aPosition;
+        gl_Position = vec4(0.0);  // rasterizer discarded anyway
+      }
+    `;
+
+    const fs = `#version 300 es
+      precision mediump float;
+      out vec4 fragColor;
+      void main() { fragColor = vec4(1.0); }
+    `;
+
+    const program = this.compileProgram(vs, fs, ['vInside', 'vPosition']);
+    if (!program) {
+      throw new Error("Failed to compile transform feedback shader");
+    }
+
+    // ====== Setup input buffer (candidate positions) ======
+    const inputBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, inputBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(candidates), gl.STATIC_DRAW);
+
+    // ====== Setup output buffers (TF captures) ======
+    // insideBuffer: 1 float per candidate
+    const insideBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER, insideBuffer);
+    gl.bufferData(gl.TRANSFORM_FEEDBACK_BUFFER, (candidates.length / 3) * 4, gl.STREAM_READ);
+
+    // positionBuffer: 3 floats per candidate
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER, positionBuffer);
+    gl.bufferData(gl.TRANSFORM_FEEDBACK_BUFFER, candidates.length * 4, gl.STREAM_READ);
+
+    // ====== VAO for input attribute ======
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, inputBuffer);
+    const posLoc = gl.getAttribLocation(program, 'aPosition');
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
+
+    gl.bindVertexArray(null);
+
+    // ====== Transform Feedback bindings ======
+    const tf = gl.createTransformFeedback();
+    gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, tf);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, insideBuffer);   // matches varyings[0] = 'vInside'
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 1, positionBuffer); // matches varyings[1] = 'vPosition'
+
+    // ====== Run transform feedback pass ======
+    gl.useProgram(program);
+
+    // Set triangle texture + uniforms
+    gl.uniform1i(gl.getUniformLocation(program, 'uNumTriangles'), model.faces.length);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, triTexInfo.tex);
+    gl.uniform1i(gl.getUniformLocation(program, 'uTriTex'), 0);
+
+    // Adaptive tolerances
+    gl.uniform1f(gl.getUniformLocation(program, 'uEps'), eps);
+    gl.uniform1f(gl.getUniformLocation(program, 'uOriginNudge'), originNudge);
+
+    gl.bindVertexArray(vao);
+    gl.enable(gl.RASTERIZER_DISCARD);
+    gl.beginTransformFeedback(gl.POINTS);
+    gl.drawArrays(gl.POINTS, 0, candidates.length / 3);
+    gl.endTransformFeedback();
+    gl.disable(gl.RASTERIZER_DISCARD);
+    gl.bindVertexArray(null);
+
+    gl.flush();
+
+    // ====== Read back results ======
+    gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER, insideBuffer);
+    const insideData = new Float32Array(candidates.length / 3);
+    gl.getBufferSubData(gl.TRANSFORM_FEEDBACK_BUFFER, 0, insideData);
+
+    gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER, positionBuffer);
+    const posData = new Float32Array(candidates.length);
+    gl.getBufferSubData(gl.TRANSFORM_FEEDBACK_BUFFER, 0, posData);
+
+    // Extract voxels that are inside
+    const voxels = [];
+    let insideCount = 0;
+    for (let i = 0; i < insideData.length; i++) {
+      if (insideData[i] > 0.5) {
+        insideCount++;
+        voxels.push(
+          Math.round(posData[i * 3]),
+          Math.round(posData[i * 3 + 1]),
+          Math.round(posData[i * 3 + 2])
+        );
+      }
+    }
+
+    console.log(`Found ${insideCount} voxels inside mesh`);
+
+    // ====== Cleanup ======
+    gl.deleteBuffer(inputBuffer);
+    gl.deleteBuffer(insideBuffer);
+    gl.deleteBuffer(positionBuffer);
+    gl.deleteVertexArray(vao);
+    gl.deleteTransformFeedback(tf);
+    gl.deleteProgram(program);
+    gl.deleteTexture(triTexInfo.tex);
+
+    const elapsed = (performance.now() - start).toFixed(1);
+    console.log(`GPU voxelization: ${voxels.length / 3} voxels in ${elapsed}ms`);
+
+    return new Int16Array(voxels);
   }
 
-  const elapsed = (performance.now() - start).toFixed(1);
-  console.log(`Voxelization complete: ${vox.length / 3} voxels, ${elapsed} ms`);
+  compileProgram(vsSource, fsSource, varyings) {
+    const gl = this.gl;
+    const vs = this.compileShader(vsSource, gl.VERTEX_SHADER);
+    const fs = this.compileShader(fsSource, gl.FRAGMENT_SHADER);
+    if (!vs || !fs) return null;
 
-  // Return as Int16Array (positions are integers, saves memory)
-  return { voxels: new Int16Array(vox), time: elapsed };
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+
+    // Specify transform feedback varyings before linking
+    gl.transformFeedbackVaryings(program, varyings, gl.SEPARATE_ATTRIBS);
+    gl.linkProgram(program);
+
+    gl.deleteShader(vs);
+    gl.deleteShader(fs);
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error('Program link error:', gl.getProgramInfoLog(program));
+      return null;
+    }
+    return program;
+  }
+
+  compileShader(source, type) {
+    const gl = this.gl;
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+      console.error(source);
+      gl.deleteShader(shader);
+      return null;
+    }
+    return shader;
+  }
+}
+
+// === GPU Voxelization Entry Point ===
+export function voxelizeModel(model) {
+  console.log("Starting GPU voxelization with transform feedback...");
+  const totalStart = performance.now();
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  const gl = canvas.getContext('webgl2');
+
+  if (!gl) {
+    throw new Error("WebGL2 required for GPU voxelization");
+  }
+
+  const gpuVoxelizer = new GPUVoxelizer(gl);
+  const voxels = gpuVoxelizer.voxelize(model);
+
+  const totalTime = (performance.now() - totalStart).toFixed(1);
+  console.log(`Total: ${voxels.length / 3} voxels in ${totalTime}ms`);
+
+  return { voxels, time: totalTime };
 }
 
 // === Geometry (permutahedron) ===
@@ -263,6 +418,14 @@ function perspective(fov, asp, n, f) {
 }
 
 function lookAt(e, c, u) {
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const normalize = v => {
+    const L = Math.hypot(v[0], v[1], v[2]);
+    return L > 0 ? [v[0] / L, v[1] / L, v[2] / L] : [0, 0, 0];
+  };
+
   const z = normalize(sub(e, c)), x = normalize(cross(u, z)), y = cross(z, x);
   return new Float32Array([
     x[0], y[0], z[0], 0,
@@ -303,7 +466,7 @@ export class Renderer {
       throw new Error('WebGL2 not supported');
     }
 
-    console.log("WebGL2 initialized with UBO support");
+    console.log("WebGL2 initialized with transform feedback voxelization");
 
     this.setupShaders();
     this.setupBuffers();
@@ -314,11 +477,9 @@ export class Renderer {
     this.time = 0;
     this.vao = null;
 
-    // Bind resize event
     window.addEventListener('resize', () => this.resize());
     this.resize();
 
-    // Start render loop
     this.render();
   }
 
@@ -327,11 +488,10 @@ export class Renderer {
 
     const vsh = compile(gl, `#version 300 es
       in vec3 aPosition;
-      in ivec3 aInstancePosition;  // Integer position (saves memory!)
+      in ivec3 aInstancePosition;
       in float aDelay;
       in float aType;
 
-      // Uniform Buffer Object for scene data
       layout(std140) uniform SceneData {
         mat4 uProjection;
         mat4 uView;
@@ -355,7 +515,6 @@ export class Renderer {
         float f=clamp(d/0.8,0.,1.);
         float eased=1.-pow(1.-f,3.);
 
-        // Convert integer position to float
         vec3 pos = vec3(aInstancePosition);
         pos.y += 150.*(1.-eased);
 
@@ -390,7 +549,6 @@ export class Renderer {
 
     gl.useProgram(this.prog);
 
-    // Setup UBO
     const sceneDataBlockIndex = gl.getUniformBlockIndex(this.prog, 'SceneData');
     gl.uniformBlockBinding(this.prog, sceneDataBlockIndex, 0);
 
@@ -400,9 +558,6 @@ export class Renderer {
     gl.bindBuffer(gl.UNIFORM_BUFFER, null);
     gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, this.uboBuffer);
 
-    console.log("UBO configured for scene data");
-
-    // Get attribute locations
     this.aPos = gl.getAttribLocation(this.prog, 'aPosition');
     this.aInstPos = gl.getAttribLocation(this.prog, 'aInstancePosition');
     this.aDelay = gl.getAttribLocation(this.prog, 'aDelay');
@@ -423,7 +578,6 @@ export class Renderer {
     this.minDist = 10;
     this.maxDist = 200;
 
-    // Setup camera controls
     this.canvas.addEventListener('wheel', e => {
       e.preventDefault();
       this.camDist += e.deltaY * 0.05;
@@ -470,55 +624,45 @@ export class Renderer {
     this.instPos = vox;
     this.instDel = calcDelays(vox);
 
-    // Calculate memory usage
     const posBytes = this.instPos.byteLength;
     const delayBytes = this.instDel.byteLength;
     const totalBytes = posBytes + delayBytes;
     const totalKB = (totalBytes / 1024).toFixed(1);
-    console.log(`Memory usage: Position=${posBytes}B (Int16), Delay=${delayBytes}B (Float32), Total=${totalBytes}B`);
 
-    // Create or reuse VAO
     if (!this.vao) {
       this.vao = gl.createVertexArray();
     }
 
     gl.bindVertexArray(this.vao);
 
-    // Setup geometry vertices (shared across all instances)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufVerts);
     gl.bufferData(gl.ARRAY_BUFFER, combinedVerts, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(this.aPos);
     gl.vertexAttribPointer(this.aPos, 3, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(this.aPos, 0);
 
-    // Setup type buffer (0=face, 1=edge)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufType);
     gl.bufferData(gl.ARRAY_BUFFER, combinedTypes, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(this.aType);
     gl.vertexAttribPointer(this.aType, 1, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(this.aType, 0);
 
-    // Setup instance position buffer (INTEGER type for memory efficiency)
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufInst);
     gl.bufferData(gl.ARRAY_BUFFER, this.instPos, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(this.aInstPos);
     gl.vertexAttribIPointer(this.aInstPos, 3, gl.SHORT, 0, 0);
     gl.vertexAttribDivisor(this.aInstPos, 1);
 
-    // Setup delay buffer
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufDelay);
     gl.bufferData(gl.ARRAY_BUFFER, this.instDel, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(this.aDelay);
     gl.vertexAttribPointer(this.aDelay, 1, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(this.aDelay, 1);
 
-    // Setup index buffer
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bufIdx);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, permutahedronIndices, gl.STATIC_DRAW);
 
     gl.bindVertexArray(null);
-
-    console.log("VAO configured with", vox.length / 3, "instances using Int16Array for positions");
 
     return { totalKB, count: vox.length / 3 };
   }
@@ -540,7 +684,6 @@ export class Renderer {
     const camZ = Math.sin(this.time * 0.3) * this.camDist;
     const view = lookAt([camX, 10, camZ], [0, 0, 0], [0, 1, 0]);
 
-    // Update UBO
     gl.bindBuffer(gl.UNIFORM_BUFFER, this.uboBuffer);
     const uboData = new Float32Array(36);
     uboData.set(this.proj, 0);
@@ -551,17 +694,11 @@ export class Renderer {
 
     const count = this.instPos.length / 3;
 
-    // Bind VAO and draw
     if (this.vao && count > 0) {
       gl.bindVertexArray(this.vao);
-
-      // Draw faces
       gl.drawElementsInstanced(gl.TRIANGLES, permutahedronIndices.length, gl.UNSIGNED_SHORT, 0, count);
-
-      // Draw edges
       const edgeOff = permutahedronVertices.length / 3;
       gl.drawArraysInstanced(gl.LINES, edgeOff, permutahedronEdges.length / 3, count);
-
       gl.bindVertexArray(null);
     }
 
@@ -585,8 +722,6 @@ export function centerModel(model) {
     (min[1] + max[1]) / 2,
     (min[2] + max[2]) / 2
   ];
-
-  console.log(`Model bounds: min=${min}, max=${max}, center=${center}`);
 
   const centeredModel = { vertices: [], faces: model.faces };
   model.vertices.forEach(v => {

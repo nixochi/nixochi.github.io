@@ -1,3 +1,4 @@
+// renderer.js - COMPLETE FILE WITH CHANGES
 /**
  * Renderer Module - Transform Feedback GPU Voxelization (Texture-backed)
  * WebGL2-only. Uses a triangle RGBA32F texture + texelFetch in the vertex shader.
@@ -7,6 +8,8 @@
  *  1) Deterministic edge rule to avoid double-counts on shared edges/vertices
  *  2) Ray origin nudge along ray to avoid "on-surface" self-intersections
  *  4) Adaptive EPS tied to model scale
+ *  5) Context reuse to prevent context exhaustion
+ *  6) Proper resource cleanup and disposal
  */
 
 // --- Utility functions ---
@@ -22,7 +25,9 @@ const normalize = v => {
 class GPUVoxelizer {
   constructor(gl) {
     this.gl = gl;
-    this.maxTriangles = 2048; // guidance; texture path supports far more
+    this.maxTriangles = 2048;
+    this.loseContextExt = gl.getExtension('WEBGL_lose_context');
+    console.log('GPUVoxelizer initialized with reusable context');
   }
 
   // Build RGBA32F 2D texture with layout: width=3 (v0,v1,v2), height=numTriangles, xyz in RGB
@@ -267,7 +272,14 @@ class GPUVoxelizer {
 
     console.log(`Found ${insideCount} voxels inside mesh`);
 
-    // ====== Cleanup ======
+    // ====== Cleanup per-voxelization resources ======
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER, null);
+    gl.bindVertexArray(null);
+    gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.useProgram(null);
+
     gl.deleteBuffer(inputBuffer);
     gl.deleteBuffer(insideBuffer);
     gl.deleteBuffer(positionBuffer);
@@ -320,35 +332,73 @@ class GPUVoxelizer {
     }
     return shader;
   }
+
+  dispose() {
+    const gl = this.gl;
+    if (!gl) return;
+
+    console.log('Disposing GPUVoxelizer context');
+    
+    // Unbind everything first
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER, null);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    gl.bindVertexArray(null);
+    gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.useProgram(null);
+
+    // Force context loss if extension available
+    if (this.loseContextExt) {
+      this.loseContextExt.loseContext();
+    }
+
+    // Null out references
+    this.gl = null;
+    this.loseContextExt = null;
+  }
 }
 
 // === GPU Voxelization Entry Point ===
+let sharedVoxelizer = null;
+
 export function voxelizeModel(model) {
   console.log("Starting GPU voxelization with transform feedback...");
   const totalStart = performance.now();
 
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 1;
+  // Reuse existing voxelizer or create new one
+  if (!sharedVoxelizer) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
 
-  // Use same context attributes as Renderer
-  const gl = canvas.getContext('webgl2', {
-    failIfMajorPerformanceCaveat: false,
-    powerPreference: 'high-performance'
-  });
+    const gl = canvas.getContext('webgl2', {
+      failIfMajorPerformanceCaveat: false,
+      powerPreference: 'high-performance'
+    });
 
-  if (!gl) {
-    throw new Error("WebGL2 required for GPU voxelization");
+    if (!gl) {
+      throw new Error("WebGL2 required for GPU voxelization");
+    }
+
+    console.log("Created new voxelizer WebGL2 context");
+    sharedVoxelizer = new GPUVoxelizer(gl);
   }
 
-  console.log("Voxelizer WebGL2 context created, lost?", gl.isContextLost());
-
-  const gpuVoxelizer = new GPUVoxelizer(gl);
-  const voxels = gpuVoxelizer.voxelize(model);
+  const voxels = sharedVoxelizer.voxelize(model);
 
   const totalTime = (performance.now() - totalStart).toFixed(1);
   console.log(`Total: ${voxels.length / 3} voxels in ${totalTime}ms`);
 
   return { voxels, time: totalTime };
+}
+
+// Cleanup function to be called on page unload
+export function cleanupVoxelizer() {
+  if (sharedVoxelizer) {
+    sharedVoxelizer.dispose();
+    sharedVoxelizer = null;
+    console.log('Voxelizer cleaned up');
+  }
 }
 
 // === Geometry (permutahedron) ===
@@ -409,14 +459,7 @@ const combinedTypes = new Float32Array(
 
 // === Shader compilation ===
 function compile(gl, src, type) {
-  console.log("compile() called with type:", type);
-  console.log("gl object:", gl);
-  console.log("typeof gl:", typeof gl);
-
   const s = gl.createShader(type);
-  console.log("createShader returned:", s);
-  console.log("GL error after createShader:", gl.getError());
-
   if (!s) {
     console.error('Failed to create shader. Type:', type);
     console.error('GL context lost?', gl.isContextLost());
@@ -503,10 +546,9 @@ export class Renderer {
       throw new Error('WebGL2 not supported');
     }
 
+    this.loseContextExt = this.gl.getExtension('WEBGL_lose_context');
+
     console.log("WebGL2 context obtained");
-    console.log("Context lost immediately?", this.gl.isContextLost());
-    console.log("GL.VERTEX_SHADER:", this.gl.VERTEX_SHADER);
-    console.log("GL.FRAGMENT_SHADER:", this.gl.FRAGMENT_SHADER);
 
     this.setupShaders();
     this.setupBuffers();
@@ -525,11 +567,6 @@ export class Renderer {
 
   setupShaders() {
     const gl = this.gl;
-
-    console.log("setupShaders called");
-    console.log("gl in setupShaders:", gl);
-    console.log("gl.isContextLost():", gl.isContextLost());
-    console.log("Checking GL error before shader creation:", gl.getError());
 
     const vsh = compile(gl, `#version 300 es
       in vec3 aPosition;
@@ -752,6 +789,52 @@ export class Renderer {
     }
 
     requestAnimationFrame(this.render);
+  }
+
+  dispose() {
+    const gl = this.gl;
+    if (!gl) return;
+
+    console.log('Disposing Renderer');
+
+    // Stop render loop
+    if (this.render) {
+      // Render is an arrow function, can't easily stop, but context cleanup will handle it
+    }
+
+    // Unbind everything
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+    gl.bindBuffer(gl.UNIFORM_BUFFER, null);
+    gl.bindVertexArray(null);
+    gl.useProgram(null);
+
+    // Delete resources
+    if (this.bufVerts) gl.deleteBuffer(this.bufVerts);
+    if (this.bufType) gl.deleteBuffer(this.bufType);
+    if (this.bufIdx) gl.deleteBuffer(this.bufIdx);
+    if (this.bufInst) gl.deleteBuffer(this.bufInst);
+    if (this.bufDelay) gl.deleteBuffer(this.bufDelay);
+    if (this.uboBuffer) gl.deleteBuffer(this.uboBuffer);
+    if (this.vao) gl.deleteVertexArray(this.vao);
+    if (this.prog) gl.deleteProgram(this.prog);
+
+    // Force context loss if extension available
+    if (this.loseContextExt) {
+      this.loseContextExt.loseContext();
+    }
+
+    // Null out references
+    this.gl = null;
+    this.loseContextExt = null;
+    this.bufVerts = null;
+    this.bufType = null;
+    this.bufIdx = null;
+    this.bufInst = null;
+    this.bufDelay = null;
+    this.uboBuffer = null;
+    this.vao = null;
+    this.prog = null;
   }
 }
 

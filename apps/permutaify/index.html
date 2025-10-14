@@ -1,3 +1,4 @@
+<!-- index.html - COMPLETE FILE WITH CHANGES -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -482,7 +483,7 @@
 
   <script type="module">
     import { loadOBJFile, loadOBJFromURL } from './loader.js';
-    import { Renderer, voxelizeModel, centerModel, applyScale } from './renderer.js';
+    import { Renderer, voxelizeModel, centerModel, applyScale, cleanupVoxelizer } from './renderer.js';
 
     // --- On-screen debug console ---
     (function(){
@@ -504,7 +505,7 @@
       window.addEventListener('unhandledrejection', e => add('Promise: ' + e.reason, 'error'));
     })();
 
-    // === Copy log button (set up early) ===
+    // === Copy log button ===
     const copyLogBtn = document.getElementById('copyLogBtn');
     copyLogBtn.addEventListener('click', async () => {
       const debugConsole = document.getElementById('debugConsole');
@@ -539,6 +540,15 @@
       alert(`Failed to initialize renderer: ${error.message}`);
       throw error;
     }
+
+    // === Cleanup on page unload ===
+    window.addEventListener('beforeunload', () => {
+      console.log('Page unloading, cleaning up contexts...');
+      cleanupVoxelizer();
+      if (renderer && renderer.dispose) {
+        renderer.dispose();
+      }
+    });
 
     // === Model management ===
     let currentModel = null;

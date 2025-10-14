@@ -234,7 +234,7 @@
     }
 
     /* Debug console */
-    #debugConsole {
+    .debug-container {
       position: absolute;
       bottom: 10px;
       bottom: max(10px, env(safe-area-inset-bottom));
@@ -243,6 +243,51 @@
       width: 360px;
       max-width: calc(100vw - 20px);
       max-width: calc(100svw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right));
+      z-index: 10000;
+    }
+
+    .debug-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      gap: 8px;
+    }
+
+    .copy-log-btn {
+      background: var(--backdrop-blur);
+      -webkit-backdrop-filter: blur(16px);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--fg-primary);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s ease;
+      -webkit-appearance: none;
+      appearance: none;
+      white-space: nowrap;
+    }
+
+    .copy-log-btn:hover {
+      background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+      border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+    }
+
+    .copy-log-btn:active {
+      opacity: 0.8;
+    }
+
+    .copy-log-btn.copied {
+      background: color-mix(in srgb, #4caf50 20%, var(--bg-secondary) 80%);
+      border-color: #4caf50;
+    }
+
+    #debugConsole {
+      width: 100%;
       height: 180px;
       max-height: 30vh;
       max-height: 30svh;
@@ -260,7 +305,6 @@
       -webkit-overflow-scrolling: touch;
       white-space: pre-wrap;
       line-height: 1.4;
-      z-index: 10000;
     }
 
     #debugConsole::-webkit-scrollbar {
@@ -373,7 +417,7 @@
         max-height: 60svh;
       }
 
-      #debugConsole {
+      .debug-container {
         display: none;
       }
 
@@ -429,7 +473,12 @@
       </div>
     </div>
   </div>
-  <div id="debugConsole"></div>
+  <div class="debug-container">
+    <div class="debug-header">
+      <button class="copy-log-btn" id="copyLogBtn">Copy Log</button>
+    </div>
+    <div id="debugConsole"></div>
+  </div>
 
   <script type="module">
     import { loadOBJFile, loadOBJFromURL } from './loader.js';
@@ -561,6 +610,30 @@
 
     // === Restart animation ===
     document.getElementById('restart').onclick = () => renderer.restartAnimation();
+
+    // === Copy log button ===
+    const copyLogBtn = document.getElementById('copyLogBtn');
+    copyLogBtn.addEventListener('click', async () => {
+      const debugConsole = document.getElementById('debugConsole');
+      const logText = debugConsole.innerText;
+
+      try {
+        await navigator.clipboard.writeText(logText);
+        copyLogBtn.textContent = 'Copied!';
+        copyLogBtn.classList.add('copied');
+
+        setTimeout(() => {
+          copyLogBtn.textContent = 'Copy Log';
+          copyLogBtn.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy log:', err);
+        copyLogBtn.textContent = 'Failed';
+        setTimeout(() => {
+          copyLogBtn.textContent = 'Copy Log';
+        }, 2000);
+      }
+    });
 
     // === Load default model on startup ===
     console.log("Loading default permutahedron model...");

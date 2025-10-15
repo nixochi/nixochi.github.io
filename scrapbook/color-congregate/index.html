@@ -304,11 +304,8 @@
         const overlayCtx = overlayCanvas.getContext('2d');
 
         let texture = null;
-        let binCentersTexture = null;
+        let paletteTexture = null;
         let program = null;
-        let binUniformLocation = null;
-        const FIXED_BINS = 8;
-        let currentBins = FIXED_BINS;
         let vertexShaderSource = null;
         let fragmentShaderSource = null;
         let stream = null;
@@ -344,34 +341,18 @@
             return shader;
         }
 
-        function generateBinCenters(bins) {
-            const totalBins = bins * bins * bins;
-            const centers = new Float32Array(totalBins * 3);
+        function createPaletteTexture() {
+            // Create texture with the 15 predefined colors
+            const paletteData = new Uint8Array(15 * 3);
 
-            let idx = 0;
-            for (let b = 0; b < bins; b++) {
-                for (let g = 0; g < bins; g++) {
-                    for (let r = 0; r < bins; r++) {
-                        centers[idx++] = (r + 0.5) / bins;
-                        centers[idx++] = (g + 0.5) / bins;
-                        centers[idx++] = (b + 0.5) / bins;
-                    }
-                }
-            }
-            return centers;
-        }
-
-        function updateBinCentersTexture(bins) {
-            const centers = generateBinCenters(bins);
-            const totalBins = bins * bins * bins;
-
-            const rgbData = new Uint8Array(totalBins * 3);
-            for (let i = 0; i < totalBins * 3; i++) {
-                rgbData[i] = Math.floor(centers[i] * 255);
+            for (let i = 0; i < COLOR_CATEGORIES.length; i++) {
+                paletteData[i * 3] = COLOR_CATEGORIES[i].rgb[0];
+                paletteData[i * 3 + 1] = COLOR_CATEGORIES[i].rgb[1];
+                paletteData[i * 3 + 2] = COLOR_CATEGORIES[i].rgb[2];
             }
 
-            gl.bindTexture(gl.TEXTURE_2D, binCentersTexture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, totalBins, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, rgbData);
+            gl.bindTexture(gl.TEXTURE_2D, paletteTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 15, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, paletteData);
         }
 
         async function initWebGL() {
@@ -434,8 +415,6 @@
             gl.enableVertexAttribArray(texCoordLocation);
             gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
 
-            binUniformLocation = gl.getUniformLocation(program, 'u_bins');
-
             texture = gl.createTexture();
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -445,16 +424,16 @@
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
             gl.uniform1i(gl.getUniformLocation(program, 'u_texture'), 0);
 
-            binCentersTexture = gl.createTexture();
+            paletteTexture = gl.createTexture();
             gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, binCentersTexture);
+            gl.bindTexture(gl.TEXTURE_2D, paletteTexture);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-            gl.uniform1i(gl.getUniformLocation(program, 'u_binCenters'), 1);
+            gl.uniform1i(gl.getUniformLocation(program, 'u_palette'), 1);
 
-            updateBinCentersTexture(currentBins);
+            createPaletteTexture();
 
             return true;
         }
@@ -571,7 +550,7 @@
             }
         }
 
-        function drawHistogram(binCounts, binCenters, bins) {
+        function drawHistogram(paletteCounts) {
             const width = histCanvas.clientWidth;
             const height = histCanvas.clientHeight;
 
@@ -585,37 +564,14 @@
                 }
             }
 
-            if (binCounts.length === 0) return;
+            if (paletteCounts.length === 0) return;
 
-            // Initialize all color categories with 0 count
-            const colorCounts = {};
-            COLOR_CATEGORIES.forEach(cat => {
-                colorCounts[cat.name] = {
-                    count: 0,
-                    rgb: cat.rgb
-                };
-            });
-
-            // Map bins to color categories using predefined colors
-            for (let i = 0; i < binCounts.length; i++) {
-                if (binCounts[i] === 0) continue;
-
-                const rgb = [
-                    Math.floor(binCenters[i * 3] * 255),
-                    Math.floor(binCenters[i * 3 + 1] * 255),
-                    Math.floor(binCenters[i * 3 + 2] * 255)
-                ];
-
-                const category = classifyColor(rgb);
-                if (category && colorCounts[category.name]) {
-                    colorCounts[category.name].count += binCounts[i];
-                }
-            }
-
-            // Convert to array and sort by count (highest first)
-            let sorted = Object.entries(colorCounts)
-                .map(([name, data]) => ({ name, count: data.count, rgb: data.rgb }))
-                .sort((a, b) => b.count - a.count);
+            // Map palette counts to color categories
+            let sorted = COLOR_CATEGORIES.map((cat, i) => ({
+                name: cat.name,
+                count: paletteCounts[i],
+                rgb: cat.rgb
+            })).sort((a, b) => b.count - a.count);
 
             if (sorted.length === 0) return;
 
@@ -699,24 +655,36 @@
             });
         }
 
-        function countBins(bins) {
-            const totalBins = bins * bins * bins;
-            const counts = new Array(totalBins).fill(0);
+        function countPaletteColors() {
+            const counts = new Array(15).fill(0);
 
             const pixels = new Uint8Array(canvas.width * canvas.height * 4);
             gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
 
+            // Count pixels by matching to the closest palette color
             for (let i = 0; i < pixels.length; i += 4) {
-                const r = pixels[i] / 255;
-                const g = pixels[i + 1] / 255;
-                const b = pixels[i + 2] / 255;
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
 
-                const rbin = Math.min(Math.floor(r * bins), bins - 1);
-                const gbin = Math.min(Math.floor(g * bins), bins - 1);
-                const bbin = Math.min(Math.floor(b * bins), bins - 1);
+                // Find closest palette color
+                let minDist = Infinity;
+                let closestIdx = 0;
 
-                const binIndex = rbin + gbin * bins + bbin * bins * bins;
-                counts[binIndex]++;
+                for (let j = 0; j < COLOR_CATEGORIES.length; j++) {
+                    const pr = COLOR_CATEGORIES[j].rgb[0];
+                    const pg = COLOR_CATEGORIES[j].rgb[1];
+                    const pb = COLOR_CATEGORIES[j].rgb[2];
+
+                    const dist = (r - pr) * (r - pr) + (g - pg) * (g - pg) + (b - pb) * (b - pb);
+
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestIdx = j;
+                    }
+                }
+
+                counts[closestIdx]++;
             }
 
             return counts;
@@ -825,14 +793,11 @@
             gl.bindTexture(gl.TEXTURE_2D, texture);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
 
-            gl.uniform1f(binUniformLocation, FIXED_BINS);
-
             gl.clear(gl.COLOR_BUFFER_BIT);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-            const binCounts = countBins(FIXED_BINS);
-            const binCenters = generateBinCenters(FIXED_BINS);
-            drawHistogram(binCounts, binCenters, FIXED_BINS);
+            const paletteCounts = countPaletteColors();
+            drawHistogram(paletteCounts);
 
             // Update color mask for overlay
             updateColorMask(image);
@@ -855,14 +820,11 @@
             gl.bindTexture(gl.TEXTURE_2D, texture);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cameraView);
 
-            gl.uniform1f(binUniformLocation, FIXED_BINS);
-
             gl.clear(gl.COLOR_BUFFER_BIT);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-            const binCounts = countBins(FIXED_BINS);
-            const binCenters = generateBinCenters(FIXED_BINS);
-            drawHistogram(binCounts, binCenters, FIXED_BINS);
+            const paletteCounts = countPaletteColors();
+            drawHistogram(paletteCounts);
 
             // Update color mask every 3 frames or when selection changes for better performance
             maskUpdateCounter++;

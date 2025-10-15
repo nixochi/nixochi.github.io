@@ -121,7 +121,7 @@ function lookAt(e, c, u) {
   ]);
 }
 
-// === Delay calculation for animation ===
+// === Delay calculation for animation (packed to Uint8) ===
 function calcDelays(pos) {
   let minY = Infinity, maxY = -Infinity;
   for (let i = 1; i < pos.length; i += 3) {
@@ -131,16 +131,30 @@ function calcDelays(pos) {
 
   const d = [];
   const yRange = maxY - minY || 1;
+  let minDelay = Infinity, maxDelay = -Infinity;
+
+  // First pass: calculate delays and find range
+  const delays = [];
   for (let i = 0; i < pos.length; i += 3) {
     const x = pos[i], y = pos[i + 1], z = pos[i + 2];
     const normalizedY = (y - minY) / yRange;
     let delay = normalizedY * 2.5 + Math.sin(x * 12.3 + z * 45.6) * 0.3 + Math.cos(x * 23.4 + y * 34.5) * 0.2;
-    d.push(delay);
+    delays.push(delay);
+    minDelay = Math.min(minDelay, delay);
+    maxDelay = Math.max(maxDelay, delay);
   }
-  return new Float32Array(d);
+
+  // Second pass: normalize to 0-255 range
+  const delayRange = maxDelay - minDelay || 1;
+  for (let i = 0; i < delays.length; i++) {
+    const normalized = (delays[i] - minDelay) / delayRange;
+    d.push(Math.round(normalized * 255));
+  }
+
+  return { packed: new Uint8Array(d), min: minDelay, max: maxDelay };
 }
 
-// === Pre-compute RGB colors from hue (CPU-side optimization) ===
+// === Pre-compute RGB colors from hue (packed to RGB888) ===
 function calcColors(pos) {
   const colors = [];
   for (let i = 0; i < pos.length; i += 3) {
@@ -164,9 +178,14 @@ function calcColors(pos) {
       default: r = 0; g = 0; b = 0; break;
     }
 
-    colors.push(r, g, b);
+    // Pack to 0-255 range
+    colors.push(
+      Math.round(r * 255),
+      Math.round(g * 255),
+      Math.round(b * 255)
+    );
   }
-  return new Float32Array(colors);
+  return new Uint8Array(colors);
 }
 
 /**
@@ -205,7 +224,9 @@ export class Renderer {
     this.setupCamera();
 
     this.instPos = new Int16Array();
-    this.instDel = new Float32Array();
+    this.instDel = new Uint8Array();
+    this.delayMin = 0;
+    this.delayMax = 1;
     this.time = 0;
     this.vaoFaces = null;
     this.vaoEdges = null;
@@ -230,8 +251,8 @@ export class Renderer {
         mat4 uProjection;
         mat4 uView;
         float uTime;
-        float _padding1;
-        float _padding2;
+        float uDelayMin;
+        float uDelayMax;
         float _padding3;
       };
 
@@ -239,7 +260,10 @@ export class Renderer {
       out float vType;
 
       void main(){
-        float d=uTime-aDelay;
+        // Unpack delay from 0-1 range back to original range
+        float delay = uDelayMin + aDelay * (uDelayMax - uDelayMin);
+
+        float d=uTime-delay;
         float f=clamp(d/0.8,0.,1.);
         float eased=1.-pow(1.-f,3.);
 
@@ -361,7 +385,12 @@ export class Renderer {
     const gl = this.gl;
 
     this.instPos = vox;
-    this.instDel = calcDelays(vox);
+
+    const delayData = calcDelays(vox);
+    this.instDel = delayData.packed;
+    this.delayMin = delayData.min;
+    this.delayMax = delayData.max;
+
     this.instColors = calcColors(vox);
 
     const posBytes = this.instPos.byteLength;
@@ -408,12 +437,12 @@ export class Renderer {
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufDelay);
     gl.enableVertexAttribArray(this.aDelay);
-    gl.vertexAttribPointer(this.aDelay, 1, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(this.aDelay, 1, gl.UNSIGNED_BYTE, true, 0, 0); // normalized to 0-1
     gl.vertexAttribDivisor(this.aDelay, 1);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufColor);
     gl.enableVertexAttribArray(this.aBaseColor);
-    gl.vertexAttribPointer(this.aBaseColor, 3, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(this.aBaseColor, 3, gl.UNSIGNED_BYTE, true, 0, 0); // normalized to 0-1
     gl.vertexAttribDivisor(this.aBaseColor, 1);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bufIdx);
@@ -444,12 +473,12 @@ export class Renderer {
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufDelay);
     gl.enableVertexAttribArray(this.aDelay);
-    gl.vertexAttribPointer(this.aDelay, 1, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(this.aDelay, 1, gl.UNSIGNED_BYTE, true, 0, 0); // normalized to 0-1
     gl.vertexAttribDivisor(this.aDelay, 1);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufColor);
     gl.enableVertexAttribArray(this.aBaseColor);
-    gl.vertexAttribPointer(this.aBaseColor, 3, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(this.aBaseColor, 3, gl.UNSIGNED_BYTE, true, 0, 0); // normalized to 0-1
     gl.vertexAttribDivisor(this.aBaseColor, 1);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bufEdgeIdx);
@@ -485,6 +514,8 @@ export class Renderer {
     uboData.set(this.proj, 0);
     uboData.set(view, 16);
     uboData[32] = this.time;
+    uboData[33] = this.delayMin;
+    uboData[34] = this.delayMax;
     gl.bufferSubData(gl.UNIFORM_BUFFER, 0, uboData);
     gl.bindBuffer(gl.UNIFORM_BUFFER, null);
 

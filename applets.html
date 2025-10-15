@@ -52,15 +52,19 @@ h3{ font-size: 18px; }
 p{ margin: .6rem 0; }
 .muted{ color: var(--muted); }
 
+.subtitle {
+  color: var(--muted);
+}
+
 @media (max-width: 720px) {
-  h1:has(+ p.muted) {
+  h1:has(+ .subtitle) {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
     margin-bottom: 0;
   }
 
-  h1 + p.muted {
+  h1 + .subtitle {
     margin: 0 0 0 1rem;
     flex-shrink: 0;
   }
@@ -143,7 +147,7 @@ footer small {
   <main id="main">
     <div class="wrapper prose">
       <h1>applets</h1>
-      <p class="muted">small math applets</p>
+      <p class="subtitle">small math applets</p>
 
       <div style="margin-top: 16px;">
         <div class="applet-row">
@@ -219,12 +223,6 @@ footer small {
     }
     .applet-link:hover {
       text-decoration: underline;
-    }
-
-    @media (max-width: 768px) {
-      .muted {
-        text-align: right;
-      }
     }
   </style>
 

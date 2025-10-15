@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Color Congregate</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            height: 100vh;
+            height: 100svh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            min-height: 0;
+        }
+
+        .content-container {
+            flex: 1;
+            display: flex;
+            gap: 0;
+            min-height: 0;
+        }
+
+        .photo-box {
+            display: none;
+            background: #1a1a1a;
+            border: 2px solid #333;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .image-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        #photoDisplay, #cameraView {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+        }
+
+        #overlayCanvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .histogram-box {
+            flex: 1;
+            display: flex;
+            position: relative;
+            min-width: 0;
+            border: 2px solid #333;
+        }
+
+        #histogramCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none;
+            cursor: pointer;
+        }
+
+        @media (min-width: 1024px) {
+            .content-container {
+                gap: 20px;
+                padding: 20px;
+            }
+
+            .photo-box {
+                display: flex;
+                flex: 1;
+            }
+
+            .histogram-box {
+                flex: 1;
+            }
+        }
+
+        .controls {
+            flex-shrink: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: max(20px, env(safe-area-inset-bottom)) 20px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 16px 32px;
+            font-size: 16px;
+            font-weight: 500;
+            border: 2px solid #fff;
+            background: transparent;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-radius: 8px;
+            -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+            touch-action: manipulation;
+            min-width: 140px;
+        }
+
+        button:hover:not(:disabled) {
+            background: #fff;
+            color: #000;
+        }
+
+        button:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 0 10px;
+        }
+
+        label {
+            color: #fff;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            touch-action: pan-x;
+            border-radius: 2px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        input[type="range"]::-webkit-slider-thumb:active {
+            transform: scale(1.4);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+
+        .value-display {
+            font-size: 14px;
+            color: #fff;
+            min-width: 30px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .hidden-canvas {
+            display: none;
+        }
+
+        .error {
+            background: #f00;
+            color: #fff;
+            padding: 15px;
+            display: none;
+            font-size: 14px;
+            text-align: center;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 1000;
+            border-radius: 8px;
+        }
+
+        #cameraView {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: none;
+        }
+
+        @media (max-width: 640px) {
+            button {
+                padding: 14px 24px;
+                font-size: 14px;
+                min-width: 120px;
+            }
+
+            .controls {
+                padding: max(15px, env(safe-area-inset-bottom)) 15px 15px 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-content">
+        <div class="content-container">
+            <div class="histogram-box">
+                <canvas id="histogramCanvas"></canvas>
+            </div>
+            <div class="photo-box" id="photoBox">
+                <div class="image-container">
+                    <video id="cameraView" autoplay playsinline></video>
+                    <img id="photoDisplay" alt="Captured photo">
+                    <canvas id="overlayCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="button-row">
+            <button id="cameraButton">Use Camera</button>
+            <button id="uploadButton">Upload Photo</button>
+        </div>
+    </div>
+
+    <canvas id="glCanvas" class="hidden-canvas" width="640" height="480"></canvas>
+    <input type="file" id="uploadInput" accept="image/*" style="display: none;">
+
+    <div class="error" id="errorMessage"></div>
+
+    <script>
+        const canvas = document.getElementById('glCanvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        const histCanvas = document.getElementById('histogramCanvas');
+        const histCtx = histCanvas.getContext('2d');
+        const cameraButton = document.getElementById('cameraButton');
+        const uploadButton = document.getElementById('uploadButton');
+        const uploadInput = document.getElementById('uploadInput');
+        const errorMessage = document.getElementById('errorMessage');
+        const cameraView = document.getElementById('cameraView');
+        const photoDisplay = document.getElementById('photoDisplay');
+        const photoBox = document.getElementById('photoBox');
+        const overlayCanvas = document.getElementById('overlayCanvas');
+        const overlayCtx = overlayCanvas.getContext('2d');
+
+        let texture = null;
+        let binCentersTexture = null;
+        let program = null;
+        let binUniformLocation = null;
+        const FIXED_BINS = 8;
+        let currentBins = FIXED_BINS;
+        let vertexShaderSource = null;
+        let fragmentShaderSource = null;
+        let stream = null;
+        let cameraActive = false;
+        let animationFrameId = null;
+        let selectedColorName = null;
+        let blinkState = false;
+        let lastDrawnBars = [];
+        let blinkIntervalId = null;
+        let currentImageData = null;
+        let colorMaskData = null;
+        let maskUpdateCounter = 0;
+        let lastSelectedColor = null;
+
+        async function loadShader(url) {
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to load shader: ${url}`);
+            }
+            return await response.text();
+        }
+
+        function compileShader(gl, source, type) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        function generateBinCenters(bins) {
+            const totalBins = bins * bins * bins;
+            const centers = new Float32Array(totalBins * 3);
+
+            let idx = 0;
+            for (let b = 0; b < bins; b++) {
+                for (let g = 0; g < bins; g++) {
+                    for (let r = 0; r < bins; r++) {
+                        centers[idx++] = (r + 0.5) / bins;
+                        centers[idx++] = (g + 0.5) / bins;
+                        centers[idx++] = (b + 0.5) / bins;
+                    }
+                }
+            }
+            return centers;
+        }
+
+        function updateBinCentersTexture(bins) {
+            const centers = generateBinCenters(bins);
+            const totalBins = bins * bins * bins;
+
+            const rgbData = new Uint8Array(totalBins * 3);
+            for (let i = 0; i < totalBins * 3; i++) {
+                rgbData[i] = Math.floor(centers[i] * 255);
+            }
+
+            gl.bindTexture(gl.TEXTURE_2D, binCentersTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, totalBins, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, rgbData);
+        }
+
+        async function initWebGL() {
+            if (!gl) {
+                showError('WebGL not supported in this browser');
+                return false;
+            }
+
+            try {
+                vertexShaderSource = await loadShader('vertex.glsl');
+                fragmentShaderSource = await loadShader('fragment.glsl');
+            } catch (err) {
+                showError('Failed to load shaders: ' + err.message);
+                return false;
+            }
+
+            const vertexShader = compileShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
+            const fragmentShader = compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
+
+            if (!vertexShader || !fragmentShader) {
+                showError('Failed to compile shaders');
+                return false;
+            }
+
+            program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                showError('Failed to link program: ' + gl.getProgramInfoLog(program));
+                return false;
+            }
+
+            gl.useProgram(program);
+
+            const positions = new Float32Array([
+                -1, -1,  1, -1,  -1, 1,
+                -1, 1,   1, -1,   1, 1
+            ]);
+
+            const texCoords = new Float32Array([
+                0, 1,  1, 1,  0, 0,
+                0, 0,  1, 1,  1, 0
+            ]);
+
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+            const positionLocation = gl.getAttribLocation(program, 'a_position');
+            gl.enableVertexAttribArray(positionLocation);
+            gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+            const texCoordBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
+
+            const texCoordLocation = gl.getAttribLocation(program, 'a_texCoord');
+            gl.enableVertexAttribArray(texCoordLocation);
+            gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+            binUniformLocation = gl.getUniformLocation(program, 'u_bins');
+
+            texture = gl.createTexture();
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.uniform1i(gl.getUniformLocation(program, 'u_texture'), 0);
+
+            binCentersTexture = gl.createTexture();
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, binCentersTexture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.uniform1i(gl.getUniformLocation(program, 'u_binCenters'), 1);
+
+            updateBinCentersTexture(currentBins);
+
+            return true;
+        }
+
+        function updateHistogramCanvasSize() {
+            const width = histCanvas.clientWidth;
+            const height = histCanvas.clientHeight;
+            const dpr = window.devicePixelRatio || 1;
+
+            // Set canvas internal resolution
+            histCanvas.width = width * dpr;
+            histCanvas.height = height * dpr;
+
+            // Reset transform and scale for proper text rendering
+            histCtx.setTransform(1, 0, 0, 1, 0, 0);
+            histCtx.scale(dpr, dpr);
+        }
+
+        // Define named color categories
+        const COLOR_CATEGORIES = [
+            { name: 'Red', rgb: [255, 0, 0] },
+            { name: 'Orange', rgb: [255, 128, 0] },
+            { name: 'Yellow', rgb: [255, 255, 0] },
+            { name: 'Lime', rgb: [128, 255, 0] },
+            { name: 'Green', rgb: [0, 255, 0] },
+            { name: 'Cyan', rgb: [0, 255, 255] },
+            { name: 'Blue', rgb: [0, 0, 255] },
+            { name: 'Purple', rgb: [128, 0, 255] },
+            { name: 'Magenta', rgb: [255, 0, 255] },
+            { name: 'Pink', rgb: [255, 128, 192] },
+            { name: 'Brown', rgb: [139, 69, 19] },
+            { name: 'White', rgb: [255, 255, 255] },
+            { name: 'Gray', rgb: [128, 128, 128] },
+            { name: 'Black', rgb: [0, 0, 0] },
+            { name: 'Beige', rgb: [245, 222, 179] }
+        ];
+
+        function rgbToHsv(r, g, b) {
+            r /= 255;
+            g /= 255;
+            b /= 255;
+
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const delta = max - min;
+
+            let h = 0;
+            let s = 0;
+            const v = max;
+
+            if (delta > 0.00001) {
+                s = delta / max;
+
+                if (max === r) {
+                    h = ((g - b) / delta + (g < b ? 6 : 0)) / 6;
+                } else if (max === g) {
+                    h = ((b - r) / delta + 2) / 6;
+                } else {
+                    h = ((r - g) / delta + 4) / 6;
+                }
+            }
+
+            return { h: h * 360, s, v };
+        }
+
+        function classifyColor(rgb) {
+            const hsv = rgbToHsv(rgb[0], rgb[1], rgb[2]);
+
+            // Low saturation = grayscale
+            if (hsv.s < 0.15) {
+                if (hsv.v > 0.8) {
+                    return COLOR_CATEGORIES.find(c => c.name === 'White');
+                } else if (hsv.v > 0.3) {
+                    return COLOR_CATEGORIES.find(c => c.name === 'Gray');
+                } else {
+                    return COLOR_CATEGORIES.find(c => c.name === 'Black');
+                }
+            }
+
+            // Brown check - low value with some saturation
+            if (hsv.v < 0.4 && hsv.s > 0.2) {
+                return COLOR_CATEGORIES.find(c => c.name === 'Brown');
+            }
+
+            // Beige check - low saturation but not quite gray, and high value
+            if (hsv.s < 0.3 && hsv.s >= 0.15 && hsv.v > 0.7) {
+                return COLOR_CATEGORIES.find(c => c.name === 'Beige');
+            }
+
+            // Classify by hue for saturated colors
+            const hue = hsv.h;
+
+            if (hue >= 345 || hue < 15) {
+                return COLOR_CATEGORIES.find(c => c.name === 'Red');
+            } else if (hue >= 15 && hue < 45) {
+                return COLOR_CATEGORIES.find(c => c.name === 'Orange');
+            } else if (hue >= 45 && hue < 75) {
+                return COLOR_CATEGORIES.find(c => c.name === 'Yellow');
+            } else if (hue >= 75 && hue < 105) {
+                return COLOR_CATEGORIES.find(c => c.name === 'Lime');
+            } else if (hue >= 105 && hue < 165) {
+                return COLOR_CATEGORIES.find(c => c.name === 'Green');
+            } else if (hue >= 165 && hue < 195) {
+                return COLOR_CATEGORIES.find(c => c.name === 'Cyan');
+            } else if (hue >= 195 && hue < 255) {
+                return COLOR_CATEGORIES.find(c => c.name === 'Blue');
+            } else if (hue >= 255 && hue < 285) {
+                return COLOR_CATEGORIES.find(c => c.name === 'Purple');
+            } else if (hue >= 285 && hue < 315) {
+                return COLOR_CATEGORIES.find(c => c.name === 'Magenta');
+            } else {
+                // 315-345
+                return COLOR_CATEGORIES.find(c => c.name === 'Pink');
+            }
+        }
+
+        function drawHistogram(binCounts, binCenters, bins) {
+            const width = histCanvas.clientWidth;
+            const height = histCanvas.clientHeight;
+
+            // Draw grid background
+            const gridSize = 40;
+            for (let y = 0; y < height; y += gridSize) {
+                for (let x = 0; x < width; x += gridSize) {
+                    const isEven = (Math.floor(x / gridSize) + Math.floor(y / gridSize)) % 2 === 0;
+                    histCtx.fillStyle = isEven ? '#333' : '#2a2a2a';
+                    histCtx.fillRect(x, y, gridSize, gridSize);
+                }
+            }
+
+            if (binCounts.length === 0) return;
+
+            // Initialize all color categories with 0 count
+            const colorCounts = {};
+            COLOR_CATEGORIES.forEach(cat => {
+                colorCounts[cat.name] = {
+                    count: 0,
+                    rgb: cat.rgb
+                };
+            });
+
+            // Map bins to color categories using predefined colors
+            for (let i = 0; i < binCounts.length; i++) {
+                if (binCounts[i] === 0) continue;
+
+                const rgb = [
+                    Math.floor(binCenters[i * 3] * 255),
+                    Math.floor(binCenters[i * 3 + 1] * 255),
+                    Math.floor(binCenters[i * 3 + 2] * 255)
+                ];
+
+                const category = classifyColor(rgb);
+                if (category && colorCounts[category.name]) {
+                    colorCounts[category.name].count += binCounts[i];
+                }
+            }
+
+            // Convert to array and sort by count (highest first)
+            let sorted = Object.entries(colorCounts)
+                .map(([name, data]) => ({ name, count: data.count, rgb: data.rgb }))
+                .sort((a, b) => b.count - a.count);
+
+            if (sorted.length === 0) return;
+
+            const total = sorted.reduce((sum, item) => sum + item.count, 0);
+
+            // Keep top 10 colors and group the rest into "Other"
+            const TOP_COLORS = 10;
+            if (sorted.length > TOP_COLORS) {
+                const topColors = sorted.slice(0, TOP_COLORS);
+                const otherColors = sorted.slice(TOP_COLORS);
+                const otherCount = otherColors.reduce((sum, item) => sum + item.count, 0);
+
+                sorted = topColors;
+                if (otherCount > 0) {
+                    sorted.push({
+                        name: 'Other',
+                        count: otherCount,
+                        rgb: [128, 128, 128] // Gray for "Other"
+                    });
+                }
+            }
+
+            // Store bars for click detection
+            lastDrawnBars = sorted.map((item, index) => ({
+                ...item,
+                y: index * (height / sorted.length),
+                height: height / sorted.length,
+                width: Math.max((item.count / total) * width, 2)
+            }));
+
+            // Draw horizontal bars from top to bottom
+            const barHeight = height / sorted.length;
+
+            sorted.forEach((item, index) => {
+                const y = index * barHeight;
+                const proportion = item.count / total;
+                const barWidth = Math.max(proportion * width, 2); // At least 2px for visibility
+
+                // Check if this bar is selected (but not "Other")
+                const isSelected = item.name === selectedColorName && item.name !== 'Other';
+                const shouldShowPattern = isSelected && blinkState;
+
+                // Draw histogram bar
+                histCtx.fillStyle = `rgb(${item.rgb[0]}, ${item.rgb[1]}, ${item.rgb[2]})`;
+                histCtx.fillRect(0, y, barWidth, barHeight);
+
+                // Draw stripe pattern if blinking
+                if (shouldShowPattern) {
+                    histCtx.save();
+                    histCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    const stripeWidth = 10;
+                    for (let x = -barHeight; x < barWidth + barHeight; x += stripeWidth * 2) {
+                        histCtx.beginPath();
+                        histCtx.moveTo(x, y);
+                        histCtx.lineTo(x + stripeWidth, y);
+                        histCtx.lineTo(x + stripeWidth + barHeight, y + barHeight);
+                        histCtx.lineTo(x + barHeight, y + barHeight);
+                        histCtx.closePath();
+                        histCtx.fill();
+                    }
+                    histCtx.restore();
+                }
+
+                // Draw white border around bar (thicker if selected)
+                histCtx.strokeStyle = isSelected ? '#ffff00' : '#fff';
+                histCtx.lineWidth = isSelected ? 4 : 2;
+                histCtx.strokeRect(0, y, barWidth, barHeight);
+
+                // Draw label on the bar
+                const luminance = 0.299 * item.rgb[0] + 0.587 * item.rgb[1] + 0.114 * item.rgb[2];
+                histCtx.fillStyle = luminance > 128 ? '#000' : '#fff';
+                histCtx.font = `bold ${Math.min(barHeight * 0.4, 24)}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+                histCtx.textBaseline = 'middle';
+
+                const percentage = (proportion * 100).toFixed(1);
+                const label = `${item.name} (${percentage}%)`;
+                const textX = 20;
+                const textY = y + barHeight / 2;
+
+                histCtx.fillText(label, textX, textY);
+            });
+        }
+
+        function countBins(bins) {
+            const totalBins = bins * bins * bins;
+            const counts = new Array(totalBins).fill(0);
+
+            const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+            gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i] / 255;
+                const g = pixels[i + 1] / 255;
+                const b = pixels[i + 2] / 255;
+
+                const rbin = Math.min(Math.floor(r * bins), bins - 1);
+                const gbin = Math.min(Math.floor(g * bins), bins - 1);
+                const bbin = Math.min(Math.floor(b * bins), bins - 1);
+
+                const binIndex = rbin + gbin * bins + bbin * bins * bins;
+                counts[binIndex]++;
+            }
+
+            return counts;
+        }
+
+        function updateColorMask(image) {
+            // Get image data for color matching
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = image.width || image.videoWidth;
+            tempCanvas.height = image.height || image.videoHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(image, 0, 0);
+            currentImageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+
+            if (!selectedColorName || selectedColorName === 'Other') {
+                colorMaskData = null;
+                return;
+            }
+
+            // Create mask of pixels matching selected color
+            const pixels = currentImageData.data;
+            colorMaskData = new Uint8Array(tempCanvas.width * tempCanvas.height);
+
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
+
+                const category = classifyColor([r, g, b]);
+                if (category && category.name === selectedColorName) {
+                    colorMaskData[i / 4] = 1;
+                }
+            }
+        }
+
+        function drawImageOverlay() {
+            const displayElem = cameraActive ? cameraView : photoDisplay;
+
+            if (!colorMaskData || !currentImageData || !blinkState) {
+                overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                return;
+            }
+
+            // Get the actual displayed size of the image/video element
+            const displayWidth = displayElem.offsetWidth;
+            const displayHeight = displayElem.offsetHeight;
+
+            // Set overlay canvas to match displayed size exactly
+            overlayCanvas.width = displayWidth;
+            overlayCanvas.height = displayHeight;
+            overlayCanvas.style.width = displayWidth + 'px';
+            overlayCanvas.style.height = displayHeight + 'px';
+
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+            // Get source image dimensions
+            const sourceWidth = displayElem.videoWidth || displayElem.naturalWidth;
+            const sourceHeight = displayElem.videoHeight || displayElem.naturalHeight;
+
+            // Calculate scaling factor
+            const scaleX = displayWidth / sourceWidth;
+            const scaleY = displayHeight / sourceHeight;
+
+            // Draw stripe pattern only on matching pixels
+            const stripeWidth = 10;
+            overlayCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+
+            for (let y = 0; y < sourceHeight; y++) {
+                for (let x = 0; x < sourceWidth; x++) {
+                    const idx = y * sourceWidth + x;
+                    if (colorMaskData[idx] === 1) {
+                        // Check if this pixel should have a stripe
+                        const stripePos = (x + y) % (stripeWidth * 2);
+                        if (stripePos < stripeWidth) {
+                            // Scale pixel position to overlay canvas
+                            const drawX = Math.floor(x * scaleX);
+                            const drawY = Math.floor(y * scaleY);
+                            const drawW = Math.ceil(scaleX);
+                            const drawH = Math.ceil(scaleY);
+                            overlayCtx.fillRect(drawX, drawY, drawW, drawH);
+                        }
+                    }
+                }
+            }
+        }
+
+        function processImage(image) {
+            // Display the original photo
+            if (image instanceof HTMLImageElement) {
+                photoDisplay.src = image.src;
+            } else {
+                // Convert video frame to image URL
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = image.videoWidth;
+                tempCanvas.height = image.videoHeight;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(image, 0, 0);
+                photoDisplay.src = tempCanvas.toDataURL();
+            }
+
+            canvas.width = image.width || image.videoWidth;
+            canvas.height = image.height || image.videoHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+
+            gl.uniform1f(binUniformLocation, FIXED_BINS);
+
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            const binCounts = countBins(FIXED_BINS);
+            const binCenters = generateBinCenters(FIXED_BINS);
+            drawHistogram(binCounts, binCenters, FIXED_BINS);
+
+            // Update color mask for overlay
+            updateColorMask(image);
+            drawImageOverlay();
+        }
+
+        function renderLiveHistogram() {
+            if (!cameraActive || !cameraView.readyState === cameraView.HAVE_ENOUGH_DATA) {
+                if (cameraActive) {
+                    animationFrameId = requestAnimationFrame(renderLiveHistogram);
+                }
+                return;
+            }
+
+            canvas.width = cameraView.videoWidth;
+            canvas.height = cameraView.videoHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cameraView);
+
+            gl.uniform1f(binUniformLocation, FIXED_BINS);
+
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            const binCounts = countBins(FIXED_BINS);
+            const binCenters = generateBinCenters(FIXED_BINS);
+            drawHistogram(binCounts, binCenters, FIXED_BINS);
+
+            // Update color mask every 3 frames or when selection changes for better performance
+            maskUpdateCounter++;
+            const shouldUpdateMask = maskUpdateCounter % 3 === 0 || selectedColorName !== lastSelectedColor;
+
+            if (shouldUpdateMask) {
+                updateColorMask(cameraView);
+                lastSelectedColor = selectedColorName;
+            }
+
+            // Always draw overlay (fast operation)
+            drawImageOverlay();
+
+            if (cameraActive) {
+                animationFrameId = requestAnimationFrame(renderLiveHistogram);
+            }
+        }
+
+        async function handleCameraButton() {
+            if (!cameraActive) {
+                // Start camera
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 }
+                        }
+                    });
+
+                    cameraView.srcObject = stream;
+                    cameraView.style.display = 'block';
+                    photoDisplay.style.display = 'none';
+                    cameraActive = true;
+                    cameraButton.textContent = 'Stop Camera';
+
+                    // Wait for video to be ready
+                    cameraView.addEventListener('loadedmetadata', () => {
+                        renderLiveHistogram();
+                    }, { once: true });
+
+                } catch (err) {
+                    showError('Camera access denied: ' + err.message);
+                }
+            } else {
+                // Stop camera
+                stopCamera();
+            }
+        }
+
+        function stopCamera() {
+            cameraActive = false;
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            cameraView.style.display = 'none';
+            cameraButton.textContent = 'Use Camera';
+        }
+
+        function uploadPhoto() {
+            uploadInput.click();
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            stopCamera();
+
+            const img = new Image();
+            img.onload = () => {
+                cameraView.style.display = 'none';
+                photoDisplay.style.display = 'block';
+                processImage(img);
+            };
+            img.src = URL.createObjectURL(file);
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 3000);
+        }
+
+        // Handle histogram clicks
+        histCanvas.addEventListener('click', (event) => {
+            const rect = histCanvas.getBoundingClientRect();
+            const y = event.clientY - rect.top;
+
+            // Find which bar was clicked
+            for (let i = 0; i < lastDrawnBars.length; i++) {
+                const bar = lastDrawnBars[i];
+                if (y >= bar.y && y < bar.y + bar.height) {
+                    if (selectedColorName === bar.name) {
+                        // Deselect if clicking the same bar
+                        selectedColorName = null;
+                        if (blinkIntervalId) {
+                            clearInterval(blinkIntervalId);
+                            blinkIntervalId = null;
+                        }
+                    } else {
+                        // Select new bar (even if it's "Other", store it but won't blink)
+                        selectedColorName = bar.name;
+                        blinkState = false;
+
+                        // Start blinking only if not "Other"
+                        if (blinkIntervalId) {
+                            clearInterval(blinkIntervalId);
+                        }
+                        if (bar.name !== 'Other') {
+                            blinkIntervalId = setInterval(() => {
+                                blinkState = !blinkState;
+                                // Redraw histogram and image overlay to show blink
+                                if (cameraActive) {
+                                    // Will redraw automatically in renderLiveHistogram
+                                } else if (photoDisplay.src && photoDisplay.style.display !== 'none') {
+                                    const img = new Image();
+                                    img.onload = () => processImage(img);
+                                    img.src = photoDisplay.src;
+                                } else {
+                                    drawImageOverlay();
+                                }
+                            }, 300);
+                        } else {
+                            // Clear overlay for "Other"
+                            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                        }
+                    }
+                    break;
+                }
+            }
+        });
+
+        cameraButton.addEventListener('click', handleCameraButton);
+        uploadButton.addEventListener('click', uploadPhoto);
+        uploadInput.addEventListener('change', handleImageUpload);
+
+        (async () => {
+            updateHistogramCanvasSize();
+            if (!await initWebGL()) {
+                cameraButton.disabled = true;
+                uploadButton.disabled = true;
+            }
+        })();
+
+        window.addEventListener('resize', () => {
+            updateHistogramCanvasSize();
+            // Redraw if we have an image
+            if (photoDisplay.src) {
+                const img = new Image();
+                img.onload = () => processImage(img);
+                img.src = photoDisplay.src;
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            stopCamera();
+        });
+    </script>
+</body>
+</html>

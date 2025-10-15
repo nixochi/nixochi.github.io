@@ -240,7 +240,27 @@ export class Renderer {
   setupShaders() {
     const gl = this.gl;
 
+    // Create easing curve texture (cubic ease-out: 1 - (1-x)^3)
+    const easingRes = 256;
+    const easingData = new Uint8Array(easingRes);
+    for (let i = 0; i < easingRes; i++) {
+      const t = i / (easingRes - 1);
+      const eased = 1.0 - Math.pow(1.0 - t, 3.0);
+      easingData[i] = Math.round(eased * 255);
+    }
+
+    this.easingTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.easingTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, easingRes, 1, 0, gl.RED, gl.UNSIGNED_BYTE, easingData);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
     const vsh = compile(gl, `#version 300 es
+      precision mediump float;
+
       in vec3 aPosition;
       in ivec3 aInstancePosition;
       in float aDelay;
@@ -256,6 +276,8 @@ export class Renderer {
         float _padding3;
       };
 
+      uniform sampler2D uEasingCurve;
+
       out vec3 vColor;
       out float vType;
 
@@ -265,7 +287,7 @@ export class Renderer {
 
         float d=uTime-delay;
         float f=clamp(d/0.8,0.,1.);
-        float eased=1.-pow(1.-f,3.);
+        float eased=texture(uEasingCurve, vec2(f, 0.5)).r;
 
         vec3 pos = vec3(aInstancePosition);
         pos.y += 120.*(1.-eased);
@@ -322,6 +344,7 @@ export class Renderer {
     this.aDelay = gl.getAttribLocation(this.prog, 'aDelay');
     this.aType = gl.getAttribLocation(this.prog, 'aType');
     this.aBaseColor = gl.getAttribLocation(this.prog, 'aBaseColor');
+    this.uEasingCurve = gl.getUniformLocation(this.prog, 'uEasingCurve');
   }
 
   setupBuffers() {
@@ -509,6 +532,11 @@ export class Renderer {
     const camZ = Math.sin(this.time * 0.3) * this.camDist;
     const view = lookAt([camX, 10, camZ], [0, 0, 0], [0, 1, 0]);
 
+    // Bind easing curve texture
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.easingTexture);
+    gl.uniform1i(this.uEasingCurve, 0);
+
     gl.bindBuffer(gl.UNIFORM_BUFFER, this.uboBuffer);
     const uboData = new Float32Array(36);
     uboData.set(this.proj, 0);
@@ -561,6 +589,7 @@ export class Renderer {
     if (this.uboBuffer) gl.deleteBuffer(this.uboBuffer);
     if (this.vaoFaces) gl.deleteVertexArray(this.vaoFaces);
     if (this.vaoEdges) gl.deleteVertexArray(this.vaoEdges);
+    if (this.easingTexture) gl.deleteTexture(this.easingTexture);
     if (this.prog) gl.deleteProgram(this.prog);
 
     // Force context loss if extension available
@@ -582,6 +611,7 @@ export class Renderer {
     this.uboBuffer = null;
     this.vaoFaces = null;
     this.vaoEdges = null;
+    this.easingTexture = null;
     this.prog = null;
   }
 }

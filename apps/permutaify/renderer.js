@@ -120,6 +120,35 @@ function calcDelays(pos) {
   return new Float32Array(d);
 }
 
+// === Pre-compute RGB colors from hue (CPU-side optimization) ===
+function calcColors(pos) {
+  const colors = [];
+  for (let i = 0; i < pos.length; i += 3) {
+    const y = pos[i + 1];
+    // Same hue calculation as in shader
+    const hue = Math.max(0, Math.min(1, (y + 15) / 30)) * 0.833;
+
+    // Simple HSV to RGB conversion (H, 1, 1)
+    const h6 = hue * 6;
+    const sector = Math.floor(h6);
+    const frac = h6 - sector;
+
+    let r, g, b;
+    switch (sector % 6) {
+      case 0: r = 1; g = frac; b = 0; break;
+      case 1: r = 1 - frac; g = 1; b = 0; break;
+      case 2: r = 0; g = 1; b = frac; break;
+      case 3: r = 0; g = 1 - frac; b = 1; break;
+      case 4: r = frac; g = 0; b = 1; break;
+      case 5: r = 1; g = 0; b = 1 - frac; break;
+      default: r = 0; g = 0; b = 0; break;
+    }
+
+    colors.push(r, g, b);
+  }
+  return new Float32Array(colors);
+}
+
 /**
  * Renderer class - manages WebGL2 rendering
  */
@@ -174,6 +203,7 @@ export class Renderer {
       in ivec3 aInstancePosition;
       in float aDelay;
       in float aType;
+      in vec3 aBaseColor;
 
       layout(std140) uniform SceneData {
         mat4 uProjection;
@@ -187,12 +217,6 @@ export class Renderer {
       out vec3 vColor;
       out float vType;
 
-      vec3 hsv2rgb(vec3 c){
-        vec4 K=vec4(1.,2./3.,1./3.,3.);
-        vec3 p=abs(fract(c.xxx+K.xyz)*6.-K.www);
-        return c.z*mix(K.xxx,clamp(p-K.xxx,0.,1.),c.y);
-      }
-
       void main(){
         float d=uTime-aDelay;
         float f=clamp(d/0.8,0.,1.);
@@ -202,11 +226,14 @@ export class Renderer {
         pos.y += 120.*(1.-eased);
 
         vec3 world=aPosition+pos;
-        vec3 normal=normalize(world);
-        vec3 light=normalize(vec3(1.,1.,1.));
-        float diff=max(dot(normal,light),0.4);
-        float hue=clamp((float(aInstancePosition.y)+15.)/30.,0.,1.)*0.833;
-        vColor=hsv2rgb(vec3(hue,1.,1.))*diff;
+
+        // Simple ambient + directional lighting
+        vec3 normal=normalize(aPosition); // Use base geometry normal
+        vec3 lightDir=vec3(0.5,0.8,0.3); // Soft top-front lighting
+        float diffuse=max(dot(normal,lightDir),0.0)*0.5;
+        float ambient=0.6;
+
+        vColor=aBaseColor*(ambient+diffuse);
         vType=aType;
         gl_Position=uProjection*uView*vec4(world,1.);
       }`, gl.VERTEX_SHADER);
@@ -249,6 +276,7 @@ export class Renderer {
     this.aInstPos = gl.getAttribLocation(this.prog, 'aInstancePosition');
     this.aDelay = gl.getAttribLocation(this.prog, 'aDelay');
     this.aType = gl.getAttribLocation(this.prog, 'aType');
+    this.aBaseColor = gl.getAttribLocation(this.prog, 'aBaseColor');
   }
 
   setupBuffers() {
@@ -258,6 +286,7 @@ export class Renderer {
     this.bufIdx = gl.createBuffer();
     this.bufInst = gl.createBuffer();
     this.bufDelay = gl.createBuffer();
+    this.bufColor = gl.createBuffer();
   }
 
   setupCamera() {
@@ -310,10 +339,12 @@ export class Renderer {
 
     this.instPos = vox;
     this.instDel = calcDelays(vox);
+    this.instColors = calcColors(vox);
 
     const posBytes = this.instPos.byteLength;
     const delayBytes = this.instDel.byteLength;
-    const totalBytes = posBytes + delayBytes;
+    const colorBytes = this.instColors.byteLength;
+    const totalBytes = posBytes + delayBytes + colorBytes;
     const totalKB = (totalBytes / 1024).toFixed(1);
 
     if (!this.vao) {
@@ -345,6 +376,12 @@ export class Renderer {
     gl.enableVertexAttribArray(this.aDelay);
     gl.vertexAttribPointer(this.aDelay, 1, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(this.aDelay, 1);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.bufColor);
+    gl.bufferData(gl.ARRAY_BUFFER, this.instColors, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(this.aBaseColor);
+    gl.vertexAttribPointer(this.aBaseColor, 3, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(this.aBaseColor, 1);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bufIdx);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, permutahedronIndices, gl.STATIC_DRAW);
@@ -414,6 +451,7 @@ export class Renderer {
     if (this.bufIdx) gl.deleteBuffer(this.bufIdx);
     if (this.bufInst) gl.deleteBuffer(this.bufInst);
     if (this.bufDelay) gl.deleteBuffer(this.bufDelay);
+    if (this.bufColor) gl.deleteBuffer(this.bufColor);
     if (this.uboBuffer) gl.deleteBuffer(this.uboBuffer);
     if (this.vao) gl.deleteVertexArray(this.vao);
     if (this.prog) gl.deleteProgram(this.prog);
@@ -431,6 +469,7 @@ export class Renderer {
     this.bufIdx = null;
     this.bufInst = null;
     this.bufDelay = null;
+    this.bufColor = null;
     this.uboBuffer = null;
     this.vao = null;
     this.prog = null;

@@ -56,18 +56,22 @@ p{ margin: .6rem 0; }
   color: var(--muted);
 }
 
-@media (max-width: 720px) {
-  h1:has(+ .subtitle) {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    margin-bottom: 0;
-  }
+.title-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  gap: 1rem;
+}
 
-  h1 + .subtitle {
-    margin: 0 0 0 1rem;
-    flex-shrink: 0;
-  }
+.title-container h1 {
+  margin: 0;
+}
+
+.title-container .subtitle {
+  margin: 0;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 a{ color: inherit; text-underline-offset: 3px; }
 
@@ -146,8 +150,10 @@ footer small {
 
   <main id="main">
     <div class="wrapper prose">
-      <h1>scrapbook</h1>
-      <p class="subtitle">throwaway ideas</p>
+      <div class="title-container">
+        <h1>scrapbook</h1>
+        <p class="subtitle">throwaway ideas</p>
+      </div>
       <div class="grid cols-3" style="margin-top: 16px;">
         <div class="entry-name"><a href="scrapbook/nested/">nested</a></div>
         <div class="entry-name"><a href="scrapbook/rain/">rain</a></div>

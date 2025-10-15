@@ -64,6 +64,13 @@ p{ margin: .6rem 0; }
   gap: 1rem;
 }
 
+@media (min-width: 720px) {
+  .title-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 .title-container h1 {
   margin: 0;
 }
@@ -106,7 +113,10 @@ main{
   padding: 14px 16px 16px;
 }
 .grid{ display:grid; gap: 16px; }
-@media (min-width: 720px){ .grid.cols-2{ grid-template-columns: 1fr 1fr; } }
+@media (min-width: 720px){
+  .grid.cols-2{ grid-template-columns: 1fr 1fr; }
+  .grid.cols-3{ grid-template-columns: 1fr 1fr 1fr; }
+}
 
 footer { 
   border-top: 1px solid var(--line); 
@@ -154,13 +164,32 @@ footer small {
         <h1>scrapbook</h1>
         <p class="subtitle">throwaway ideas</p>
       </div>
+
+      <hr>
+      <h2>sketches of a permutahedron</h2>
       <div class="grid cols-3" style="margin-top: 16px;">
         <div class="entry-name"><a href="scrapbook/nested/">nested</a></div>
         <div class="entry-name"><a href="scrapbook/rain/">rain</a></div>
         <div class="entry-name"><a href="scrapbook/life/">life</a></div>
       </div>
+
+      <hr>
+      <h2>client-side image processing</h2>
+      <div class="grid cols-3" style="margin-top: 16px;">
+      </div>
     </div>
   </main>
+
+  <style>
+    .prose h2 {
+      color: var(--muted);
+      font-weight: 400;
+      margin-top: 0;
+    }
+    .prose hr {
+      margin: 1rem 0;
+    }
+  </style>
 
   <footer>
     <div class="wrapper">

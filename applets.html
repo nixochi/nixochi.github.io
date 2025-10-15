@@ -38,7 +38,7 @@ body{
   min-height: 100svh;
 }
 
-.wrapper{ max-width: 980px; margin: 0 auto; padding: 0 20px; }
+.wrapper{ max-width: 980px; margin: 0 auto; padding: 0 0px; }
 .prose{ max-width: var(--maxw); }
 
 h1, h2, h3{
@@ -56,30 +56,6 @@ p{ margin: .6rem 0; }
   color: var(--muted);
 }
 
-.title-container {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-  gap: 1rem;
-}
-
-@media (min-width: 720px) {
-  .title-container {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-
-.title-container h1 {
-  margin: 0;
-}
-
-.title-container .subtitle {
-  margin: 0;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
 a{ color: inherit; text-underline-offset: 3px; }
 
 hr{ border:0; border-top: 1px solid var(--line); margin: 2rem 0; }
@@ -90,8 +66,8 @@ hr{ border:0; border-top: 1px solid var(--line); margin: 2rem 0; }
   background: color-mix(in srgb, var(--bg) 92%, transparent);
   border-bottom: 1px solid var(--line);
 }
-.nav{ display:flex; align-items:center; justify-content:space-between; height:64px; }
-.brand{
+.nav{ display:flex; align-items:center; justify-content:space-between; height:60px; }
+.xochi{
   font-family: ui-serif, system-ui;
   font-size: 18px;
   letter-spacing:.2px;
@@ -103,7 +79,7 @@ hr{ border:0; border-top: 1px solid var(--line); margin: 2rem 0; }
 .links a[aria-current="page"]{ opacity:1; text-decoration: underline; }
 
 main{
-  padding: 48px 0;
+  padding: 24px 0;
   flex: 1;
 }
 
@@ -148,7 +124,7 @@ footer small {
 
   <header class="header">
     <div class="wrapper nav" role="navigation" aria-label="primary">
-      <a href="index.html" class="brand" data-nav><span class="xochi-word">xochi</span></a>
+      <a href="index.html" class="xochi" data-nav><span class="xochi-word">xochi</span></a>
       <nav class="links">
         <a href="projects.html" data-nav>projects</a>
         <a href="applets.html" data-nav>applets</a>
@@ -161,7 +137,6 @@ footer small {
   <main id="main">
     <div class="wrapper prose">
       
-      <div style="margin-top: 16px;">
         <div class="applet-row">
           <div class="applet-info">
             <div class="applet-name"><a href="apps/point-configuration">point configurations</a></div>
@@ -199,7 +174,6 @@ footer small {
         </div>
         
       </div>
-    </div>
   </main>
 
   <style>

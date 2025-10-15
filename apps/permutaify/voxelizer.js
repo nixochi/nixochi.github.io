@@ -71,8 +71,7 @@ class GPUVoxelizer {
     const maxDim = Math.max(size[0], size[1], size[2]) || 1;
 
     // Adaptive tolerances
-    const eps = 1e-6 * maxDim;
-    const originNudge = 1e-5 * maxDim;
+    const eps = 1e-4 * maxDim;
 
     // Generate BCC lattice candidate positions
     const candidates = [];
@@ -108,12 +107,13 @@ class GPUVoxelizer {
 
     // ====== Shaders ======
     const vs = `#version 300 es
+      precision highp float;
+
       in vec3 aPosition;
 
       uniform sampler2D uTriTex;
       uniform int   uNumTriangles;
       uniform float uEps;
-      uniform float uOriginNudge;
 
       flat out float vInside;
       out vec3 vPosition;
@@ -135,20 +135,21 @@ class GPUVoxelizer {
         float invA = 1.0 / a;
         vec3 s = orig - v0;
         float u = dot(s, p) * invA;
-        if (!(u > uEps)) return false;
+        if (u < 0.0) return false;
 
         vec3 q = cross(s, e1);
         float v = dot(dir, q) * invA;
-        if (!(v >= -uEps)) return false;
-        if (!((u + v) < 1.0 - uEps)) return false;
+        if (v < 0.0 || u + v > 1.0) return false;
 
         float t = dot(e2, q) * invA;
         return t > uEps;
       }
 
       void main() {
-        vec3 rayDir = normalize(vec3(1.0, 0.123456789, 0.987654321));
-        vec3 rayOrig = aPosition + rayDir * uOriginNudge;
+        // Golden ratio based direction: normalize(1, phi, phi^2)
+        // phi = 1.618033988749895, phi^2 = 2.618033988749895
+        vec3 rayDir = normalize(vec3(1.0, 1.618033988749895, 2.618033988749895));
+        vec3 rayOrig = aPosition;
 
         int count = 0;
         for (int i = 0; i < uNumTriangles; ++i) {
@@ -216,7 +217,6 @@ class GPUVoxelizer {
     gl.uniform1i(gl.getUniformLocation(program, 'uTriTex'), 0);
 
     gl.uniform1f(gl.getUniformLocation(program, 'uEps'), eps);
-    gl.uniform1f(gl.getUniformLocation(program, 'uOriginNudge'), originNudge);
 
     gl.bindVertexArray(vao);
     gl.enable(gl.RASTERIZER_DISCARD);

@@ -95,10 +95,8 @@ main{
   padding: 14px 16px 16px;
 }
 .grid{ display:grid; gap: 16px; }
-@media (min-width: 720px){
-  .grid.cols-2{ grid-template-columns: 1fr 1fr; }
-  .grid.cols-3{ grid-template-columns: 1fr 1fr 1fr; }
-}
+.grid.cols-2{ grid-template-columns: 1fr 1fr; }
+.grid.cols-3{ grid-template-columns: 1fr 1fr 1fr; }
 
 footer { 
   padding: 14px 0;
@@ -150,7 +148,7 @@ footer small {
 
       <hr>
       <h2>client-side image processing</h2>
-      <div class="grid cols-3" style="margin-top: 16px;">
+      <div class="grid cols-2" style="margin-top: 16px;">
           <div class="entry-name"><a href="scrapbook/binning-live/">live color binning</a></div>
       </div>
       <ht></ht>

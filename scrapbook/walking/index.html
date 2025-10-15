@@ -44,6 +44,16 @@
     .action-btn { width: 70px; height: 70px; background: rgba(59, 130, 246, 0.3); border: 3px solid rgba(59, 130, 246, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 14px; user-select: none; touch-action: none; }
     .action-btn:active { background: rgba(59, 130, 246, 0.5); }
 
+    /* Fullscreen Modal */
+    #fullscreen-modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+    #fullscreen-modal.hidden { display: none; }
+    #fullscreen-content { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 40px; border-radius: 16px; border: 2px solid rgba(34, 197, 94, 0.3); text-align: center; max-width: 500px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+    #fullscreen-content h2 { color: #22c55e; margin: 0 0 20px 0; font-size: 28px; font-weight: bold; }
+    #fullscreen-content p { color: #e5e7eb; margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; }
+    #fullscreen-btn { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; border: none; padding: 16px 40px; font-size: 18px; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4); }
+    #fullscreen-btn:hover { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(34, 197, 94, 0.6); }
+    #fullscreen-btn:active { transform: translateY(0); }
+
   </style>
   <!-- Import map for Three.js modules -->
   <script type="importmap">
@@ -58,6 +68,15 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.2/nipplejs.min.js"></script>
 </head>
 <body>
+
+  <!-- Fullscreen Modal -->
+  <div id="fullscreen-modal">
+    <div id="fullscreen-content">
+      <h2>Enter Fullscreen</h2>
+      <p>For the best experience, please enter fullscreen mode before starting the game.</p>
+      <button id="fullscreen-btn">START FULLSCREEN</button>
+    </div>
+  </div>
 
   <div id="crosshair"></div>
 
@@ -93,6 +112,43 @@
       alert('Failed to load Three.js modules. Check console.');
       throw error;
     }
+
+    // --- Fullscreen Modal Handler ---
+    const fullscreenModal = document.getElementById('fullscreen-modal');
+    const fullscreenBtn = document.getElementById('fullscreen-btn');
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    fullscreenBtn.addEventListener('click', async () => {
+      try {
+        // Request fullscreen
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          await elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+          await elem.msRequestFullscreen();
+        }
+
+        // Lock to landscape on mobile
+        if (isMobile && screen.orientation && screen.orientation.lock) {
+          try {
+            await screen.orientation.lock('landscape');
+            console.log('Screen locked to landscape');
+          } catch (err) {
+            console.warn('Could not lock screen orientation:', err);
+          }
+        }
+
+        // Hide modal
+        fullscreenModal.classList.add('hidden');
+        console.log('Fullscreen activated');
+      } catch (err) {
+        console.error('Error entering fullscreen:', err);
+        // Hide modal anyway to let user continue
+        fullscreenModal.classList.add('hidden');
+      }
+    });
 
     // --- Console Logger ---
     const consoleLogsEl = document.getElementById('console-logs');
@@ -193,8 +249,7 @@
       console.log('Pointer unlocked');
     });
 
-    // Check if mobile/tablet
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    // Log device type
     console.log('Device type:', isMobile ? 'Mobile/Tablet' : 'Desktop');
 
     if (!isMobile) {
@@ -220,13 +275,6 @@
 
       // Hide console panel on mobile
       document.getElementById('console').style.display = 'none';
-
-      // Lock screen to landscape orientation
-      if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape').catch(err => {
-          console.log('Could not lock screen orientation:', err);
-        });
-      }
 
       // Camera look controls
       let yaw = 0;

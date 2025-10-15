@@ -56,6 +56,20 @@ h3{ font-size: 18px; }
 
 p{ margin: .6rem 0; }
 .muted{ color: var(--muted); }
+
+/* Make muted paragraph appear inline next to heading on mobile */
+@media (max-width: 720px) {
+  h1 + p.muted {
+    display: inline-block;
+    margin: 0 0 0 1rem;
+    vertical-align: baseline;
+  }
+
+  h1:has(+ p.muted) {
+    display: inline-block;
+    margin-bottom: 0;
+  }
+}
 a{ color: inherit; text-underline-offset: 3px; }
 
 hr{ border:0; border-top: 1px solid var(--line); margin: 2rem 0; }
@@ -134,7 +148,7 @@ footer small {
   <main id="main">
     <div class="wrapper prose">
       <h1>applets</h1>
-      <p class="muted">here are some small math apps.</p>
+      <p class="muted">small math applets</p>
 
       <div style="margin-top: 16px;">
         <div class="applet-row">

@@ -70,8 +70,13 @@ class GPUVoxelizer {
     const size = [max[0]-min[0], max[1]-min[1], max[2]-min[2]];
     const maxDim = Math.max(size[0], size[1], size[2]) || 1;
 
-    // Adaptive tolerances
-    const eps = 1e-4 * maxDim;
+    // Small constant epsilon for ray-triangle intersection tests
+    const eps = 1e-5;
+
+    // Debug output
+    console.log(`Mesh bounds: min=[${min.map(v => v.toFixed(2)).join(', ')}], max=[${max.map(v => v.toFixed(2)).join(', ')}]`);
+    console.log(`Mesh size: [${size.map(v => v.toFixed(2)).join(', ')}], maxDim=${maxDim.toFixed(2)}`);
+    console.log(`Epsilon tolerance: ${eps.toExponential(3)}`);
 
     // Generate BCC lattice candidate positions
     const candidates = [];
@@ -93,6 +98,15 @@ class GPUVoxelizer {
 
     console.log(`Testing ${candidates.length / 3} candidate voxels, ${model.faces.length} triangles`);
 
+    // Debug: Show first few candidates
+    if (candidates.length > 0) {
+      const sampleCount = Math.min(5, candidates.length / 3);
+      console.log(`First ${sampleCount} candidate positions:`);
+      for (let i = 0; i < sampleCount; i++) {
+        console.log(`  [${candidates[i*3]}, ${candidates[i*3+1]}, ${candidates[i*3+2]}]`);
+      }
+    }
+
     // Build triangle array for texture upload
     const tris = new Array(model.faces.length);
     for (let i = 0; i < model.faces.length; i++) {
@@ -103,6 +117,16 @@ class GPUVoxelizer {
         model.vertices[f[2]],
       ];
     }
+
+    // Debug: Show first triangle
+    if (tris.length > 0 && tris[0]) {
+      const t = tris[0];
+      console.log(`First triangle vertices:`);
+      console.log(`  v0=[${t[0][0].toFixed(2)}, ${t[0][1].toFixed(2)}, ${t[0][2].toFixed(2)}]`);
+      console.log(`  v1=[${t[1][0].toFixed(2)}, ${t[1][1].toFixed(2)}, ${t[1][2].toFixed(2)}]`);
+      console.log(`  v2=[${t[2][0].toFixed(2)}, ${t[2][1].toFixed(2)}, ${t[2][2].toFixed(2)}]`);
+    }
+
     const triTexInfo = this._createTriangleTexture(tris);
 
     // ====== Shaders ======

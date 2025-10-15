@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flat Plane Walking Game</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { background: #0f172a; /* slate-900 */ overflow: hidden; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+
+
+    /* Console Panel */
+    #console { position: fixed; bottom: 12px; right: 12px; width: 400px; max-height: 300px; background: rgba(2,6,23,0.8); color: #e5e7eb; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; font-family: 'Courier New', monospace; font-size: 12px; overflow: hidden; display: flex; flex-direction: column; }
+    #console-header { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); font-weight: bold; background: rgba(0,0,0,0.3); }
+    #console-logs { flex: 1; overflow-y: auto; padding: 8px 10px; max-height: 250px; }
+    #console-logs::-webkit-scrollbar { width: 8px; }
+    #console-logs::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+    #console-logs::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+    #console-logs::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+    .console-entry { margin: 2px 0; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .console-log { color: #93c5fd; }
+    .console-warn { color: #fbbf24; }
+    .console-error { color: #fca5a5; }
+
+    /* Crosshair */
+    #crosshair { position: fixed; left: 50%; top: 50%; width: 14px; height: 14px; transform: translate(-50%, -50%); opacity: .8; }
+    #crosshair::before, #crosshair::after { content: ""; position: absolute; background: #e5e7eb; }
+    #crosshair::before { left: 6px; top: 0; width: 2px; height: 14px; border-radius: 1px; }
+    #crosshair::after { top: 6px; left: 0; width: 14px; height: 2px; border-radius: 1px; }
+
+    /* Mobile Controls */
+    #mobile-controls { position: fixed; inset: 0; pointer-events: none; display: none; }
+    #mobile-controls.active { display: block; }
+
+    /* Joystick */
+    #joystick-zone { position: fixed; bottom: 20px; left: 20px; width: 150px; height: 150px; pointer-events: auto; }
+
+    /* Action Buttons */
+    #action-buttons { position: fixed; bottom: 20px; right: 20px; pointer-events: auto; display: flex; flex-direction: column; gap: 15px; }
+    .action-btn { width: 70px; height: 70px; background: rgba(59, 130, 246, 0.3); border: 3px solid rgba(59, 130, 246, 0.6); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 14px; user-select: none; touch-action: none; }
+    .action-btn:active { background: rgba(59, 130, 246, 0.5); }
+
+  </style>
+  <!-- Import map for Three.js modules -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <!-- nipplejs for virtual joystick -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.2/nipplejs.min.js"></script>
+</head>
+<body>
+
+  <div id="crosshair"></div>
+
+  <div id="console">
+    <div id="console-header">Console</div>
+    <div id="console-logs"></div>
+  </div>
+
+  <!-- Mobile Controls -->
+  <div id="mobile-controls">
+    <div id="joystick-zone"></div>
+    <div id="action-buttons">
+      <div class="action-btn jump" id="jump-btn">JUMP</div>
+    </div>
+  </div>
+
+  <script type="module">
+    console.log('=== SCRIPT STARTING ===');
+
+    let THREE, PointerLockControls;
+
+    try {
+      const threeModule = await import('three');
+      THREE = threeModule;
+      console.log('THREE.js loaded successfully');
+
+      const controlsModule = await import('three/addons/controls/PointerLockControls.js');
+      PointerLockControls = controlsModule.PointerLockControls;
+      console.log('PointerLockControls loaded successfully');
+    } catch (error) {
+      console.error('Failed to load modules:', error);
+      alert('Failed to load Three.js modules. Check console.');
+      throw error;
+    }
+
+    // --- Console Logger ---
+    const consoleLogsEl = document.getElementById('console-logs');
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
+
+    function addConsoleEntry(message, type = 'log') {
+      const entry = document.createElement('div');
+      entry.className = `console-entry console-${type}`;
+      entry.textContent = message;
+      consoleLogsEl.appendChild(entry);
+      // Auto-scroll to bottom
+      consoleLogsEl.scrollTop = consoleLogsEl.scrollHeight;
+      // Limit to last 100 entries
+      while (consoleLogsEl.children.length > 100) {
+        consoleLogsEl.removeChild(consoleLogsEl.firstChild);
+      }
+    }
+
+    console.log = function(...args) {
+      originalLog.apply(console, args);
+      addConsoleEntry(args.map(a => String(a)).join(' '), 'log');
+    };
+
+    console.warn = function(...args) {
+      originalWarn.apply(console, args);
+      addConsoleEntry(args.map(a => String(a)).join(' '), 'warn');
+    };
+
+    console.error = function(...args) {
+      originalError.apply(console, args);
+      addConsoleEntry(args.map(a => String(a)).join(' '), 'error');
+    };
+
+    console.log('Console logger initialized');
+
+    // --- Scene ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b1220);
+    scene.fog = new THREE.Fog(0x0b1220, 60, 400);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 1.75, 4);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = false;
+    document.body.appendChild(renderer.domElement);
+
+    // Lighting
+    const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x1b263b, 0.8);
+    scene.add(hemi);
+    const sun = new THREE.DirectionalLight(0xffffff, 0.25);
+    sun.position.set(40, 80, 20);
+    scene.add(sun);
+
+    // Ground plane
+    const planeSize = 2000;
+    const groundGeo = new THREE.PlaneGeometry(planeSize, planeSize, 1, 1);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.0, roughness: 1.0 });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    const grid = new THREE.GridHelper(planeSize, planeSize / 2, 0x2dd4bf, 0x334155);
+    grid.position.y = 0.001;
+    scene.add(grid);
+
+    // Landmarks
+    const landmarkMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.6, metalness: 0.05 });
+    const monolithGeo = new THREE.BoxGeometry(1.5, 8, 1.5);
+    const rng = (min, max) => Math.random() * (max - min) + min;
+    for (let i = 0; i < 24; i++) {
+      const m = new THREE.Mesh(monolithGeo, landmarkMat.clone());
+      const radius = rng(30, 150);
+      const angle = rng(0, Math.PI * 2);
+      m.position.set(Math.cos(angle) * radius, 4, Math.sin(angle) * radius);
+      m.material.color.offsetHSL(rng(-0.02, 0.02), rng(-0.1, 0.1), rng(-0.05, 0.05));
+      scene.add(m);
+    }
+
+    // Controls
+    console.log('Creating PointerLockControls...');
+    const controls = new PointerLockControls(camera, renderer.domElement);
+    scene.add(controls.getObject());
+
+    // Set initial position
+    camera.position.set(0, 1.75, 0);
+
+    // Listen for lock/unlock events
+    controls.addEventListener('lock', () => {
+      console.log('Pointer locked!');
+    });
+
+    controls.addEventListener('unlock', () => {
+      console.log('Pointer unlocked');
+    });
+
+    // Check if mobile/tablet
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    console.log('Device type:', isMobile ? 'Mobile/Tablet' : 'Desktop');
+
+    if (!isMobile) {
+      // Desktop: Use pointer lock
+      console.log('Setting up click listener on canvas...');
+      renderer.domElement.addEventListener('click', () => {
+        console.log('Canvas clicked, attempting to lock pointer...');
+        controls.lock();
+      });
+
+      document.addEventListener('click', () => {
+        if (!controls.isLocked) {
+          console.log('Document clicked, attempting to lock pointer...');
+          controls.lock();
+        }
+      });
+    } else {
+      // Mobile: Use touch controls
+      console.log('Setting up touch controls for mobile...');
+
+      // Show mobile controls
+      document.getElementById('mobile-controls').classList.add('active');
+
+      // Hide console panel on mobile
+      document.getElementById('console').style.display = 'none';
+
+      // Touch look controls
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let yaw = 0;
+      let pitch = 0;
+
+      // Create nipplejs joystick
+      console.log('Creating nipplejs joystick...');
+      const joystickManager = nipplejs.create({
+        zone: document.getElementById('joystick-zone'),
+        mode: 'static',
+        position: { left: '50%', top: '50%' },
+        color: 'rgba(255, 255, 255, 0.5)',
+        size: 150
+      });
+
+      // Listen to joystick events
+      joystickManager.on('move', (evt, data) => {
+        const angle = data.angle.radian;
+        const force = Math.min(data.force, 2) / 2; // Normalize force 0-1
+
+        // Convert polar to cartesian
+        const x = Math.cos(angle) * force;
+        const y = Math.sin(angle) * force;
+
+        // Map to movement keys (y is inverted in screen coordinates)
+        keys.right = x > 0.3;
+        keys.left = x < -0.3;
+        keys.forward = y > 0.3;
+        keys.back = y < -0.3;
+      });
+
+      joystickManager.on('end', () => {
+        keys.forward = false;
+        keys.back = false;
+        keys.left = false;
+        keys.right = false;
+      });
+
+      // Camera look (drag on canvas)
+      renderer.domElement.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 0) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      });
+
+      renderer.domElement.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (e.touches.length > 0) {
+          const deltaX = e.touches[0].clientX - touchStartX;
+          const deltaY = e.touches[0].clientY - touchStartY;
+
+          yaw -= deltaX * 0.005;
+          pitch -= deltaY * 0.005;
+          pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+
+          camera.rotation.order = 'YXZ';
+          camera.rotation.y = yaw;
+          camera.rotation.x = pitch;
+
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      }, { passive: false });
+
+      // Action buttons
+      const jumpBtn = document.getElementById('jump-btn');
+
+      jumpBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        keys.jump = true;
+      });
+
+      jumpBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        keys.jump = false;
+      });
+
+      console.log('Mobile controls ready - nipplejs joystick, drag to look, tap jump button');
+    }
+
+    // Movement
+    const keys = { forward: false, back: false, left: false, right: false, jump: false };
+    const onKey = (e, down) => {
+      switch (e.code) {
+        case 'KeyW': keys.forward = down; break;
+        case 'KeyS': keys.back = down; break;
+        case 'KeyA': keys.left = down; break;
+        case 'KeyD': keys.right = down; break;
+        case 'Space': keys.jump = down; break;
+        case 'KeyR': if (down) resetPosition(); break;
+      }
+    };
+    window.addEventListener('keydown', e => onKey(e, true));
+    window.addEventListener('keyup', e => onKey(e, false));
+
+    const velocity = new THREE.Vector3();
+    const direction = new THREE.Vector3();
+
+    const WALK_SPEED = 6.0;    // m/s
+    const ACCEL = 90.0;        // m/s^2
+    const FRICTION = 14.0;     // damping
+    const GRAVITY = 28.0;      // m/s^2
+    const JUMP_VELOCITY = 10.5;
+    const EYE_HEIGHT = 1.75;   // meters
+
+    let onGround = true;
+
+    function resetPosition() {
+      camera.position.set(0, EYE_HEIGHT, 0);
+      velocity.set(0, 0, 0);
+    }
+
+    // Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Loop
+    const clock = new THREE.Clock();
+    function loop() {
+      requestAnimationFrame(loop);
+
+      const dt = Math.min(clock.getDelta(), 0.033);
+
+      // friction
+      velocity.x -= velocity.x * FRICTION * dt;
+      velocity.z -= velocity.z * FRICTION * dt;
+
+      // direction from keys
+      direction.set(0, 0, 0);
+      if (keys.forward) direction.z -= 1;
+      if (keys.back) direction.z += 1;
+      if (keys.left) direction.x -= 1;
+      if (keys.right) direction.x += 1;
+      if (direction.lengthSq() > 0) direction.normalize();
+
+      // accel relative to view
+      const speed = WALK_SPEED;
+      const accel = ACCEL * dt;
+      const forward = new THREE.Vector3();
+      const right = new THREE.Vector3();
+
+      if (isMobile) {
+        // Mobile: Get direction from camera rotation
+        forward.set(0, 0, -1);
+        forward.applyQuaternion(camera.quaternion);
+        forward.y = 0;
+        forward.normalize();
+        right.crossVectors(forward, new THREE.Vector3(0,1,0));
+      } else {
+        // Desktop: Get direction from controls
+        controls.getDirection(forward).y = 0;
+        forward.normalize();
+        right.crossVectors(forward, new THREE.Vector3(0,1,0));
+      }
+
+      velocity.addScaledVector(forward, direction.z * accel * speed);
+      velocity.addScaledVector(right,   direction.x * accel * speed);
+
+      // gravity & jump
+      if (!onGround) velocity.y -= GRAVITY * dt;
+      if (onGround && keys.jump) {
+        velocity.y = JUMP_VELOCITY;
+        onGround = false;
+      }
+
+      // apply movement
+      if (isMobile) {
+        // Mobile: Move camera directly
+        camera.position.x += velocity.x * dt;
+        camera.position.z += velocity.z * dt;
+        camera.position.y += velocity.y * dt;
+      } else {
+        // Desktop: Use controls movement
+        controls.moveRight(velocity.x * dt);
+        controls.moveForward(velocity.z * dt);
+        camera.position.y += velocity.y * dt;
+      }
+
+      // ground collision (y=0)
+      if (camera.position.y < EYE_HEIGHT) {
+        velocity.y = 0;
+        camera.position.y = EYE_HEIGHT;
+        onGround = true;
+      }
+
+      renderer.render(scene, camera);
+    }
+    loop();
+  </script>
+</body>
+</html>

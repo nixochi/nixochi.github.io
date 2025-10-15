@@ -1,6 +1,12 @@
 /**
  * Voxelizer Module - Transform Feedback GPU Voxelization
  * Uses shared WebGL2 context to avoid context exhaustion
+ * 
+ * IMPROVEMENTS:
+ * - Watertight-inspired ray-triangle intersection
+ * - Optional 3-ray voting for robustness
+ * - Better epsilon handling for edge cases
+ * - Improved degenerate triangle detection
  */
 
 // --- Utility functions ---
@@ -20,7 +26,7 @@ class GPUVoxelizer {
     }
     this.gl = gl;
     this.maxTriangles = 2048;
-    console.log('GPUVoxelizer initialized with shared context');
+    console.log('GPUVoxelizer initialized with shared context (improved robustness)');
   }
 
   // Build RGBA32F 2D texture with layout: width=3 (v0,v1,v2), height=numTriangles, xyz in RGB
@@ -53,9 +59,10 @@ class GPUVoxelizer {
     return { tex, width, height };
   }
 
-  voxelize(model) {
+  voxelize(model, useMultiRay = false) {
     const gl = this.gl;
-    console.log("Starting GPU transform feedback voxelization (texture-backed + edge fixes)...");
+    const rayMode = useMultiRay ? "3-ray voting" : "single ray";
+    console.log(`Starting GPU voxelization (${rayMode}, improved intersection)...`);
     const start = performance.now();
 
     // Calculate bounds
@@ -70,13 +77,12 @@ class GPUVoxelizer {
     const size = [max[0]-min[0], max[1]-min[1], max[2]-min[2]];
     const maxDim = Math.max(size[0], size[1], size[2]) || 1;
 
-    // Small constant epsilon for ray-triangle intersection tests
-    const eps = 1e-5;
+    // Adaptive epsilon based on scene scale
+    const eps = Math.max(1e-6, maxDim * 1e-7);
 
-    // Debug output
     console.log(`Mesh bounds: min=[${min.map(v => v.toFixed(2)).join(', ')}], max=[${max.map(v => v.toFixed(2)).join(', ')}]`);
     console.log(`Mesh size: [${size.map(v => v.toFixed(2)).join(', ')}], maxDim=${maxDim.toFixed(2)}`);
-    console.log(`Epsilon tolerance: ${eps.toExponential(3)}`);
+    console.log(`Adaptive epsilon: ${eps.toExponential(3)}`);
 
     // Generate BCC lattice candidate positions
     const candidates = [];
@@ -98,15 +104,6 @@ class GPUVoxelizer {
 
     console.log(`Testing ${candidates.length / 3} candidate voxels, ${model.faces.length} triangles`);
 
-    // Debug: Show first few candidates
-    if (candidates.length > 0) {
-      const sampleCount = Math.min(5, candidates.length / 3);
-      console.log(`First ${sampleCount} candidate positions:`);
-      for (let i = 0; i < sampleCount; i++) {
-        console.log(`  [${candidates[i*3]}, ${candidates[i*3+1]}, ${candidates[i*3+2]}]`);
-      }
-    }
-
     // Build triangle array for texture upload
     const tris = new Array(model.faces.length);
     for (let i = 0; i < model.faces.length; i++) {
@@ -118,18 +115,9 @@ class GPUVoxelizer {
       ];
     }
 
-    // Debug: Show first triangle
-    if (tris.length > 0 && tris[0]) {
-      const t = tris[0];
-      console.log(`First triangle vertices:`);
-      console.log(`  v0=[${t[0][0].toFixed(2)}, ${t[0][1].toFixed(2)}, ${t[0][2].toFixed(2)}]`);
-      console.log(`  v1=[${t[1][0].toFixed(2)}, ${t[1][1].toFixed(2)}, ${t[1][2].toFixed(2)}]`);
-      console.log(`  v2=[${t[2][0].toFixed(2)}, ${t[2][1].toFixed(2)}, ${t[2][2].toFixed(2)}]`);
-    }
-
     const triTexInfo = this._createTriangleTexture(tris);
 
-    // ====== Shaders ======
+    // ====== Shaders with improved intersection ======
     const vs = `#version 300 es
       precision highp float;
 
@@ -138,6 +126,7 @@ class GPUVoxelizer {
       uniform sampler2D uTriTex;
       uniform int   uNumTriangles;
       uniform float uEps;
+      uniform bool  uUseMultiRay;
 
       flat out float vInside;
       out vec3 vPosition;
@@ -149,42 +138,97 @@ class GPUVoxelizer {
         v0 = t0.xyz; v1 = t1.xyz; v2 = t2.xyz;
       }
 
-      bool rayTriIntersectDet(vec3 orig, vec3 dir, vec3 v0, vec3 v1, vec3 v2) {
+      // Improved ray-triangle intersection with better robustness
+      // Inspired by watertight intersection principles
+      bool rayTriIntersectRobust(vec3 orig, vec3 dir, vec3 v0, vec3 v1, vec3 v2) {
+        // Edge vectors
         vec3 e1 = v1 - v0;
         vec3 e2 = v2 - v0;
-        vec3 p  = cross(dir, e2);
-        float a = dot(e1, p);
-        if (abs(a) < uEps) return false;
-
-        float invA = 1.0 / a;
+        
+        // Check for degenerate triangle (near-zero area)
+        vec3 normal = cross(e1, e2);
+        float area = length(normal);
+        if (area < uEps * uEps) return false; // Degenerate triangle
+        
+        // Begin Möller-Trumbore with improved numerics
+        vec3 p = cross(dir, e2);
+        float det = dot(e1, p);
+        
+        // Use relative epsilon for determinant test (proportional to edge lengths)
+        float edgeScale = max(length(e1), length(e2));
+        float detThreshold = uEps * edgeScale;
+        
+        // Backface culling disabled for solid voxelization
+        // But we need non-degenerate case
+        if (abs(det) < detThreshold) return false;
+        
+        float invDet = 1.0 / det;
         vec3 s = orig - v0;
-        float u = dot(s, p) * invA;
-        if (u < 0.0) return false;
-
+        
+        // Barycentric coordinate u
+        float u = dot(s, p) * invDet;
+        
+        // Use small negative epsilon for boundary cases
+        // This makes the test more inclusive at edges (watertight-inspired)
+        float boundsEps = -uEps * 0.1;
+        if (u < boundsEps || u > 1.0 - boundsEps) return false;
+        
+        // Barycentric coordinate v
         vec3 q = cross(s, e1);
-        float v = dot(dir, q) * invA;
-        if (v < 0.0 || u + v > 1.0) return false;
-
-        float t = dot(e2, q) * invA;
+        float v = dot(dir, q) * invDet;
+        if (v < boundsEps || u + v > 1.0 - boundsEps) return false;
+        
+        // Ray parameter t (distance along ray)
+        float t = dot(e2, q) * invDet;
+        
+        // Accept hits in positive direction with small epsilon
         return t > uEps;
       }
 
-      void main() {
-        // Golden ratio based direction: normalize(1, phi, phi^2)
-        // phi = 1.618033988749895, phi^2 = 2.618033988749895
-        vec3 rayDir = normalize(vec3(1.0, 1.618033988749895, 2.618033988749895));
-        vec3 rayOrig = aPosition;
-
+      // Test single ray direction
+      int testRayDirection(vec3 orig, vec3 dir) {
         int count = 0;
         for (int i = 0; i < uNumTriangles; ++i) {
           vec3 v0, v1, v2;
           getTriangle(i, v0, v1, v2);
-          if (rayTriIntersectDet(rayOrig, rayDir, v0, v1, v2)) {
+          if (rayTriIntersectRobust(orig, dir, v0, v1, v2)) {
             count++;
           }
         }
+        return count;
+      }
 
-        vInside = float(count & 1);
+      void main() {
+        vec3 rayOrig = aPosition;
+        
+        if (uUseMultiRay) {
+          // 3-ray voting for robustness
+          // Use three well-distributed irrational directions based on golden ratio
+          float phi = 1.618033988749895;
+          float phi2 = 2.618033988749895;
+          
+          vec3 dir1 = normalize(vec3(1.0, phi, phi2));
+          vec3 dir2 = normalize(vec3(phi, phi2, 1.0));
+          vec3 dir3 = normalize(vec3(phi2, 1.0, phi));
+          
+          int count1 = testRayDirection(rayOrig, dir1);
+          int count2 = testRayDirection(rayOrig, dir2);
+          int count3 = testRayDirection(rayOrig, dir3);
+          
+          // Majority voting: inside if at least 2 rays agree
+          int vote1 = count1 & 1;
+          int vote2 = count2 & 1;
+          int vote3 = count3 & 1;
+          int votes = vote1 + vote2 + vote3;
+          
+          vInside = float(votes >= 2);
+        } else {
+          // Single ray (faster, still improved)
+          vec3 rayDir = normalize(vec3(1.0, 1.618033988749895, 2.618033988749895));
+          int count = testRayDirection(rayOrig, rayDir);
+          vInside = float(count & 1);
+        }
+        
         vPosition = aPosition;
         gl_Position = vec4(0.0);
       }
@@ -241,6 +285,7 @@ class GPUVoxelizer {
     gl.uniform1i(gl.getUniformLocation(program, 'uTriTex'), 0);
 
     gl.uniform1f(gl.getUniformLocation(program, 'uEps'), eps);
+    gl.uniform1i(gl.getUniformLocation(program, 'uUseMultiRay'), useMultiRay ? 1 : 0);
 
     gl.bindVertexArray(vao);
     gl.enable(gl.RASTERIZER_DISCARD);
@@ -341,12 +386,12 @@ class GPUVoxelizer {
 // === GPU Voxelization Entry Point ===
 let sharedVoxelizer = null;
 
-export function voxelizeModel(model, gl) {
+export function voxelizeModel(model, gl, useMultiRay = false) {
   if (!gl) {
     throw new Error('voxelizeModel requires a WebGL2 context');
   }
 
-  console.log("Starting GPU voxelization with shared context...");
+  console.log(`Starting GPU voxelization (${useMultiRay ? '3-ray voting' : 'single ray'})...`);
   const totalStart = performance.now();
 
   // Create voxelizer with provided context (reuse if same context)
@@ -355,7 +400,7 @@ export function voxelizeModel(model, gl) {
     sharedVoxelizer = new GPUVoxelizer(gl);
   }
 
-  const voxels = sharedVoxelizer.voxelize(model);
+  const voxels = sharedVoxelizer.voxelize(model, useMultiRay);
 
   const totalTime = (performance.now() - totalStart).toFixed(1);
   console.log(`Total: ${voxels.length / 3} voxels in ${totalTime}ms`);

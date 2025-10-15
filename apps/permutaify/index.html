@@ -466,6 +466,13 @@
     </div>
 
     <div class="control-group">
+      <label class="control-label" style="display: flex; align-items: center; cursor: pointer;">
+        <input type="checkbox" id="multiRayToggle" style="margin-right: 8px;">
+        <span>3-ray voting (more robust, 3x slower)</span>
+      </label>
+    </div>
+
+    <div class="control-group">
       <label class="control-label">Statistics</label>
       <div class="stats">
         <div>Total Voxels: <span id="totalCubes">0</span></div>
@@ -564,8 +571,11 @@
         const scaled = applyScale(centered, modelScale);
         console.log("Calling voxelizeModel with shared context...");
 
-        // Pass the renderer's GL context to voxelizer
-        const result = voxelizeModel(scaled, renderer.gl);
+        // Get multi-ray setting from checkbox
+        const useMultiRay = document.getElementById('multiRayToggle')?.checked || false;
+
+        // Pass the renderer's GL context and useMultiRay parameter to voxelizer
+        const result = voxelizeModel(scaled, renderer.gl, useMultiRay);
 
         console.log("voxelizeModel completed");
 

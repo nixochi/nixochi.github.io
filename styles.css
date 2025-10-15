@@ -14,13 +14,8 @@ html, body { height: 100%; }
 body{
   margin:0; background:var(--bg); color:var(--fg);
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-  font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  display: -webkit-box;
-  display: -webkit-flex;
+  font: 16px/1.6 system-ui;
   display: flex;
-  -webkit-box-orient: vertical;
-  -webkit-box-direction: normal;
-  -webkit-flex-direction: column;
   flex-direction: column;
   min-height: 100vh;
   min-height: 100svh;
@@ -30,7 +25,7 @@ body{
 .prose{ max-width: var(--maxw); }
 
 h1, h2, h3{
-  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-family: ui-serif, system-ui;
   letter-spacing: -0.01em; line-height: 1.15; margin: 0 0 .5rem;
 }
 h1{ font-size: clamp(28px, 3.6vw, 40px); }
@@ -40,18 +35,17 @@ h3{ font-size: 18px; }
 p{ margin: .6rem 0; }
 .muted{ color: var(--muted); }
 
-/* Make muted paragraph appear inline next to heading on mobile */
 @media (max-width: 720px) {
-  h1 + p.muted {
-    display: inline-block;
-    margin: 0 0 0 1rem;
-    vertical-align: bottom;
-    float: right;
+  h1:has(+ p.muted) {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 0;
   }
 
-  h1:has(+ p.muted) {
-    display: inline-block;
-    margin-bottom: 0;
+  h1 + p.muted {
+    margin: 0 0 0 1rem;
+    flex-shrink: 0;
   }
 }
 a{ color: inherit; text-underline-offset: 3px; }
@@ -64,14 +58,14 @@ hr{ border:0; border-top: 1px solid var(--line); margin: 2rem 0; }
   background: color-mix(in srgb, var(--bg) 92%, transparent);
   border-bottom: 1px solid var(--line);
 }
-.nav{ display:-webkit-box; display:-webkit-flex; display:flex; -webkit-box-align:center; -webkit-align-items:center; align-items:center; -webkit-box-pack:justify; -webkit-justify-content:space-between; justify-content:space-between; height:64px; }
+.nav{ display:flex; align-items:center; justify-content:space-between; height:64px; }
 .brand{
-  font-family: ui-serif, Georgia, serif;
+  font-family: ui-serif, system-ui;
   font-size: 18px;
   letter-spacing:.2px;
   text-decoration: none;
 }
-.links{ display:-webkit-box; display:-webkit-flex; display:flex; gap: 18px; }
+.links{ display:flex; gap: 18px; }
 .links a{ font-size: 14px; opacity:.85; text-decoration:none; }
 .links a:hover{ opacity:1; text-decoration: underline; }
 .links a[aria-current="page"]{ opacity:1; text-decoration: underline; }
@@ -86,7 +80,7 @@ main{
   border-radius: var(--radius); box-shadow: var(--shadow);
   padding: 14px 16px 16px;
 }
-.grid{ display:-webkit-grid; display:grid; gap: 16px; }
+.grid{ display:grid; gap: 16px; }
 @media (min-width: 720px){ .grid.cols-2{ grid-template-columns: 1fr 1fr; } }
 
 footer { 

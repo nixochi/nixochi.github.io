@@ -1,4 +1,4 @@
-<!-- index.html - COMPLETE FILE WITH CHANGES -->
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -483,7 +483,8 @@
 
   <script type="module">
     import { loadOBJFile, loadOBJFromURL } from './loader.js';
-    import { Renderer, voxelizeModel, centerModel, applyScale, cleanupVoxelizer } from './renderer.js';
+    import { Renderer } from './renderer.js';
+    import { voxelizeModel, centerModel, applyScale, cleanupVoxelizer } from './voxelizer.js';
 
     // --- On-screen debug console ---
     (function(){
@@ -535,6 +536,7 @@
 
     try {
       renderer = new Renderer(canvas);
+      console.log('Renderer initialized - using single shared WebGL2 context');
     } catch (error) {
       console.error('Failed to initialize renderer:', error);
       alert(`Failed to initialize renderer: ${error.message}`);
@@ -543,7 +545,7 @@
 
     // === Cleanup on page unload ===
     window.addEventListener('beforeunload', () => {
-      console.log('Page unloading, cleaning up contexts...');
+      console.log('Page unloading, cleaning up...');
       cleanupVoxelizer();
       if (renderer && renderer.dispose) {
         renderer.dispose();
@@ -560,11 +562,38 @@
       try {
         const centered = centerModel(currentModel);
         const scaled = applyScale(centered, modelScale);
-        console.log("Calling voxelizeModel...");
-        const result = voxelizeModel(scaled);
+        console.log("Calling voxelizeModel with shared context...");
+
+        // Pass the renderer's GL context to voxelizer
+        const result = voxelizeModel(scaled, renderer.gl);
+
         console.log("voxelizeModel completed");
 
+        // Log voxel coordinate ranges for debugging
+        const voxels = result.voxels;
+        if (voxels.length > 0) {
+          let minX = Infinity, maxX = -Infinity;
+          let minY = Infinity, maxY = -Infinity;
+          let minZ = Infinity, maxZ = -Infinity;
+
+          for (let i = 0; i < voxels.length; i += 3) {
+            minX = Math.min(minX, voxels[i]);
+            maxX = Math.max(maxX, voxels[i]);
+            minY = Math.min(minY, voxels[i + 1]);
+            maxY = Math.max(maxY, voxels[i + 1]);
+            minZ = Math.min(minZ, voxels[i + 2]);
+            maxZ = Math.max(maxZ, voxels[i + 2]);
+          }
+
+          console.log(`Voxel bounds: X[${minX}, ${maxX}] Y[${minY}, ${maxY}] Z[${minZ}, ${maxZ}]`);
+          console.log(`Voxel size: ${maxX - minX} x ${maxY - minY} x ${maxZ - minZ}`);
+        }
+
         const stats = renderer.updateInstances(result.voxels);
+
+        // Restart animation when new model is loaded
+        renderer.restartAnimation();
+        console.log("Animation restarted");
 
         // Update UI
         document.getElementById('totalCubes').textContent = stats.count;
@@ -660,7 +689,7 @@
     loadOBJFromURL('./examples/permutahedron.obj')
       .then(model => {
         currentModel = model;
-        console.log("Model loaded, starting voxelization...");
+        console.log("Model loaded, starting voxelization with shared context...");
         processModel();
         console.log("Default model loaded. Ready for OBJ upload.");
       })

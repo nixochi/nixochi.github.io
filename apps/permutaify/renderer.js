@@ -51,12 +51,32 @@ function generateEdges(faces) {
 }
 
 const permutahedronEdges = generateEdges(permutahedronFaces);
-const combinedVerts = new Float32Array([...permutahedronVertices, ...permutahedronEdges]);
-const combinedTypes = new Float32Array(
-  Array(permutahedronVertices.length / 3).fill(0).concat(
-    Array(permutahedronEdges.length / 3).fill(1)
-  )
-);
+
+// Generate edge indices (lines refer to vertices in the shared vertex buffer)
+function generateEdgeIndices(faces) {
+  const edges = new Set();
+  faces.forEach(face => {
+    for (let i = 0; i < face.length; i++) {
+      const a = face[i], b = face[(i + 1) % face.length];
+      const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+      edges.add(key);
+    }
+  });
+
+  const edgeIndices = [];
+  edges.forEach(k => {
+    const [a, b] = k.split('-').map(Number);
+    edgeIndices.push(a, b);
+  });
+
+  return new Uint16Array(edgeIndices);
+}
+
+const permutahedronEdgeIndices = generateEdgeIndices(permutahedronFaces);
+
+// Vertex types: 0 for faces, 1 for edges
+const faceTypes = new Float32Array(permutahedronVertices.length / 3).fill(0);
+const edgeTypes = new Float32Array(permutahedronVertices.length / 3).fill(1);
 
 // === Shader compilation ===
 function compile(gl, src, type) {
@@ -187,7 +207,8 @@ export class Renderer {
     this.instPos = new Int16Array();
     this.instDel = new Float32Array();
     this.time = 0;
-    this.vao = null;
+    this.vaoFaces = null;
+    this.vaoEdges = null;
 
     window.addEventListener('resize', () => this.resize());
     this.resize();
@@ -282,8 +303,10 @@ export class Renderer {
   setupBuffers() {
     const gl = this.gl;
     this.bufVerts = gl.createBuffer();
-    this.bufType = gl.createBuffer();
+    this.bufFaceType = gl.createBuffer();
+    this.bufEdgeType = gl.createBuffer();
     this.bufIdx = gl.createBuffer();
+    this.bufEdgeIdx = gl.createBuffer();
     this.bufInst = gl.createBuffer();
     this.bufDelay = gl.createBuffer();
     this.bufColor = gl.createBuffer();
@@ -347,44 +370,90 @@ export class Renderer {
     const totalBytes = posBytes + delayBytes + colorBytes;
     const totalKB = (totalBytes / 1024).toFixed(1);
 
-    if (!this.vao) {
-      this.vao = gl.createVertexArray();
+    // Upload shared buffers once
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.bufVerts);
+    gl.bufferData(gl.ARRAY_BUFFER, permutahedronVertices, gl.STATIC_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.bufInst);
+    gl.bufferData(gl.ARRAY_BUFFER, this.instPos, gl.STATIC_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.bufDelay);
+    gl.bufferData(gl.ARRAY_BUFFER, this.instDel, gl.STATIC_DRAW);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.bufColor);
+    gl.bufferData(gl.ARRAY_BUFFER, this.instColors, gl.STATIC_DRAW);
+
+    // Setup Face VAO
+    if (!this.vaoFaces) {
+      this.vaoFaces = gl.createVertexArray();
     }
 
-    gl.bindVertexArray(this.vao);
+    gl.bindVertexArray(this.vaoFaces);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufVerts);
-    gl.bufferData(gl.ARRAY_BUFFER, combinedVerts, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(this.aPos);
     gl.vertexAttribPointer(this.aPos, 3, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(this.aPos, 0);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.bufType);
-    gl.bufferData(gl.ARRAY_BUFFER, combinedTypes, gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.bufFaceType);
+    gl.bufferData(gl.ARRAY_BUFFER, faceTypes, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(this.aType);
     gl.vertexAttribPointer(this.aType, 1, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(this.aType, 0);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufInst);
-    gl.bufferData(gl.ARRAY_BUFFER, this.instPos, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(this.aInstPos);
     gl.vertexAttribIPointer(this.aInstPos, 3, gl.SHORT, 0, 0);
     gl.vertexAttribDivisor(this.aInstPos, 1);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufDelay);
-    gl.bufferData(gl.ARRAY_BUFFER, this.instDel, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(this.aDelay);
     gl.vertexAttribPointer(this.aDelay, 1, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(this.aDelay, 1);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.bufColor);
-    gl.bufferData(gl.ARRAY_BUFFER, this.instColors, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(this.aBaseColor);
     gl.vertexAttribPointer(this.aBaseColor, 3, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(this.aBaseColor, 1);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bufIdx);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, permutahedronIndices, gl.STATIC_DRAW);
+
+    // Setup Edge VAO (shares instance buffers, different type and index buffer)
+    if (!this.vaoEdges) {
+      this.vaoEdges = gl.createVertexArray();
+    }
+
+    gl.bindVertexArray(this.vaoEdges);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.bufVerts);
+    gl.enableVertexAttribArray(this.aPos);
+    gl.vertexAttribPointer(this.aPos, 3, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(this.aPos, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.bufEdgeType);
+    gl.bufferData(gl.ARRAY_BUFFER, edgeTypes, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(this.aType);
+    gl.vertexAttribPointer(this.aType, 1, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(this.aType, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.bufInst);
+    gl.enableVertexAttribArray(this.aInstPos);
+    gl.vertexAttribIPointer(this.aInstPos, 3, gl.SHORT, 0, 0);
+    gl.vertexAttribDivisor(this.aInstPos, 1);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.bufDelay);
+    gl.enableVertexAttribArray(this.aDelay);
+    gl.vertexAttribPointer(this.aDelay, 1, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(this.aDelay, 1);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.bufColor);
+    gl.enableVertexAttribArray(this.aBaseColor);
+    gl.vertexAttribPointer(this.aBaseColor, 3, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(this.aBaseColor, 1);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bufEdgeIdx);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, permutahedronEdgeIndices, gl.STATIC_DRAW);
 
     gl.bindVertexArray(null);
 
@@ -421,11 +490,15 @@ export class Renderer {
 
     const count = this.instPos.length / 3;
 
-    if (this.vao && count > 0) {
-      gl.bindVertexArray(this.vao);
+    if (this.vaoFaces && this.vaoEdges && count > 0) {
+      // Draw faces
+      gl.bindVertexArray(this.vaoFaces);
       gl.drawElementsInstanced(gl.TRIANGLES, permutahedronIndices.length, gl.UNSIGNED_SHORT, 0, count);
-      const edgeOff = permutahedronVertices.length / 3;
-      gl.drawArraysInstanced(gl.LINES, edgeOff, permutahedronEdges.length / 3, count);
+
+      // Draw edges (only VAO bind needed, all instance data already set)
+      gl.bindVertexArray(this.vaoEdges);
+      gl.drawElementsInstanced(gl.LINES, permutahedronEdgeIndices.length, gl.UNSIGNED_SHORT, 0, count);
+
       gl.bindVertexArray(null);
     }
 
@@ -447,13 +520,16 @@ export class Renderer {
 
     // Delete resources
     if (this.bufVerts) gl.deleteBuffer(this.bufVerts);
-    if (this.bufType) gl.deleteBuffer(this.bufType);
+    if (this.bufFaceType) gl.deleteBuffer(this.bufFaceType);
+    if (this.bufEdgeType) gl.deleteBuffer(this.bufEdgeType);
     if (this.bufIdx) gl.deleteBuffer(this.bufIdx);
+    if (this.bufEdgeIdx) gl.deleteBuffer(this.bufEdgeIdx);
     if (this.bufInst) gl.deleteBuffer(this.bufInst);
     if (this.bufDelay) gl.deleteBuffer(this.bufDelay);
     if (this.bufColor) gl.deleteBuffer(this.bufColor);
     if (this.uboBuffer) gl.deleteBuffer(this.uboBuffer);
-    if (this.vao) gl.deleteVertexArray(this.vao);
+    if (this.vaoFaces) gl.deleteVertexArray(this.vaoFaces);
+    if (this.vaoEdges) gl.deleteVertexArray(this.vaoEdges);
     if (this.prog) gl.deleteProgram(this.prog);
 
     // Force context loss if extension available
@@ -465,13 +541,16 @@ export class Renderer {
     this.gl = null;
     this.loseContextExt = null;
     this.bufVerts = null;
-    this.bufType = null;
+    this.bufFaceType = null;
+    this.bufEdgeType = null;
     this.bufIdx = null;
+    this.bufEdgeIdx = null;
     this.bufInst = null;
     this.bufDelay = null;
     this.bufColor = null;
     this.uboBuffer = null;
-    this.vao = null;
+    this.vaoFaces = null;
+    this.vaoEdges = null;
     this.prog = null;
   }
 }

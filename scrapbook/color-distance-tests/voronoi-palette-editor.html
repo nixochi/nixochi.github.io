@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Voronoi Palette Editor</title>
+    <style>
+        :root {
+            --bg-primary: #161617;
+            --bg-secondary: #1c1c1e;
+            --fg-primary: #f3f3f3;
+            --fg-secondary: #b9b9b9;
+            --border: #222224;
+            --radius: 12px;
+            --accent: #0a84ff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+        }
+
+        html {
+            height: 100vh;
+            height: -webkit-fill-available;
+            height: 100svh;
+            overflow: hidden;
+            touch-action: pan-x pan-y;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--fg-primary);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            height: 100vh;
+            height: -webkit-fill-available;
+            height: 100svh;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            left: 0;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: -webkit-fill-available;
+            height: 100svh;
+            gap: 10px;
+            padding: 10px;
+            padding: env(safe-area-inset-top, 10px) env(safe-area-inset-right, 10px) env(safe-area-inset-bottom, 10px) env(safe-area-inset-left, 10px);
+        }
+
+        .palette-panel {
+            flex: 0 0 auto;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .section {
+            background: color-mix(in srgb, var(--bg-primary) 80%, transparent 20%);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .color-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: stretch;
+            flex-wrap: wrap;
+        }
+
+        .color-picker-wrapper {
+            display: flex;
+            align-items: stretch;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .color-input-group .btn {
+            flex-shrink: 0;
+        }
+
+        input[type="color"] {
+            width: 50px;
+            height: 44px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            background: transparent;
+            flex-shrink: 0;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            flex: 1;
+            min-width: 0;
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--fg-primary);
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+
+        input[type="text"] {
+            font-family: 'Courier New', monospace;
+        }
+
+        input[type="number"] {
+            text-align: center;
+        }
+
+        /* Prevent iOS zoom on input focus by ensuring 16px minimum font size */
+        input, select, textarea {
+            font-size: 16px;
+        }
+
+        .btn {
+            padding: 8px 12px;
+            background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--fg-primary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-family: inherit;
+        }
+
+        .btn:hover {
+            background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+            border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+        }
+
+        .btn-secondary {
+            background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+            color: var(--fg-primary);
+            width: 100%;
+        }
+
+        .palette-colors {
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 5px;
+        }
+
+        .palette-color-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            min-width: 100px;
+        }
+
+        .palette-color-item:hover {
+            border-color: var(--fg-secondary);
+        }
+
+        .color-preview {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            flex-shrink: 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .color-preview:hover {
+            transform: scale(1.1);
+            border-color: var(--accent);
+        }
+
+        .color-preview input[type="color"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .color-info {
+            font-size: 11px;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            width: 100%;
+        }
+
+        .color-hex {
+            color: var(--fg-primary);
+            font-weight: 600;
+        }
+
+        .color-lab {
+            color: var(--fg-secondary);
+            margin-top: 2px;
+        }
+
+        .btn-delete {
+            padding: 4px 8px;
+            background: rgba(255, 59, 48, 0.1);
+            border: 1px solid rgba(255, 59, 48, 0.3);
+            border-radius: 4px;
+            color: #ff3b30;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            white-space: nowrap;
+            width: 100%;
+            text-align: center;
+        }
+
+        .btn-delete:hover {
+            background: rgba(255, 59, 48, 0.2);
+        }
+
+        .slider-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--fg-secondary);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            outline: none;
+            appearance: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: color-mix(in srgb, var(--fg-secondary) 80%, var(--bg-secondary) 20%);
+            transform: scale(1.1);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .bins-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .bins-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, 400px);
+            grid-auto-flow: column;
+            grid-template-rows: repeat(2, 1fr);
+            gap: 15px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            padding: 10px;
+            height: 100%;
+        }
+
+        .voronoi-cell {
+            background: var(--bg-secondary);
+            border: 3px solid var(--border);
+            border-radius: var(--radius);
+            padding: 8px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            width: 400px;
+            display: flex;
+            flex-direction: column;
+            min-height: 250px;
+        }
+
+        .cell-canvas-container {
+            width: 100%;
+            height: 100%;
+            min-height: 200px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            touch-action: none;
+        }
+
+        .cell-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none;
+        }
+
+        .progress {
+            margin-top: 12px;
+            padding: 12px;
+            background: color-mix(in srgb, var(--accent) 20%, transparent 80%);
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--fg-secondary);
+        }
+
+        /* Debug Modal */
+        .debug-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: #ff9500;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 2000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
+        }
+
+        .debug-button:hover {
+            background: #ff9f1a;
+            transform: translateY(-2px);
+        }
+
+        .debug-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .debug-modal.active {
+            display: flex;
+        }
+
+        .debug-content {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            width: 90%;
+            max-width: 900px;
+            height: 80vh;
+            height: 80svh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .debug-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .debug-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .debug-close {
+            padding: 8px 16px;
+            background: rgba(255, 59, 48, 0.1);
+            border: 1px solid rgba(255, 59, 48, 0.3);
+            border-radius: 6px;
+            color: #ff3b30;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .debug-close:hover {
+            background: rgba(255, 59, 48, 0.2);
+        }
+
+        .debug-controls {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+        }
+
+        .debug-control-btn {
+            padding: 6px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--fg-primary);
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .debug-control-btn:hover {
+            background: var(--border);
+        }
+
+        .debug-logs {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .debug-log-entry {
+            padding: 6px 10px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            border-left: 3px solid transparent;
+        }
+
+        .debug-log-entry.log {
+            background: color-mix(in srgb, var(--bg-primary) 80%, transparent 20%);
+            border-left-color: #0a84ff;
+        }
+
+        .debug-log-entry.warn {
+            background: rgba(255, 149, 0, 0.1);
+            border-left-color: #ff9500;
+            color: #ff9500;
+        }
+
+        .debug-log-entry.error {
+            background: rgba(255, 59, 48, 0.1);
+            border-left-color: #ff3b30;
+            color: #ff3b30;
+        }
+
+        .debug-log-time {
+            color: var(--fg-secondary);
+            margin-right: 10px;
+        }
+
+        /* Enlarged View Modal */
+        .enlarged-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 4000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .enlarged-modal.active {
+            display: flex;
+        }
+
+        .enlarged-content {
+            width: 90vw;
+            height: 90vh;
+            height: 90svh;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .enlarged-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+
+        .enlarged-color-info {
+            font-size: 24px;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        .enlarged-close {
+            padding: 10px 20px;
+            background: rgba(255, 59, 48, 0.1);
+            border: 1px solid rgba(255, 59, 48, 0.3);
+            border-radius: 6px;
+            color: #ff3b30;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .enlarged-close:hover {
+            background: rgba(255, 59, 48, 0.2);
+        }
+
+        .enlarged-canvas-container {
+            flex: 1;
+            border-radius: 0 0 var(--radius) var(--radius);
+            overflow: hidden;
+            background: var(--bg-primary);
+        }
+
+        .enlarged-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none;
+        }
+
+        .voronoi-cell {
+            cursor: pointer;
+        }
+
+        /* Mobile Responsive (small phones only) */
+        @media (max-width: 480px) {
+            .container {
+                padding: 5px;
+                gap: 5px;
+            }
+
+            .palette-panel {
+                padding: 10px;
+            }
+
+            .voronoi-cell {
+                width: 280px;
+            }
+
+            .bins-grid {
+                grid-template-columns: repeat(auto-fill, 280px);
+            }
+
+            .enlarged-modal {
+                padding: 10px;
+            }
+
+            .enlarged-content {
+                width: 98vw;
+                height: 98vh;
+                height: 98svh;
+            }
+
+            .enlarged-header {
+                padding: 10px;
+            }
+
+            .enlarged-color-info {
+                font-size: 16px;
+            }
+
+            .enlarged-close {
+                padding: 6px 10px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Debug Button -->
+    <button class="debug-button" id="debugBtn">Debug Console</button>
+
+    <!-- Enlarged View Modal -->
+    <div class="enlarged-modal" id="enlargedModal">
+        <div class="enlarged-content" id="enlargedContent">
+            <div class="enlarged-header" id="enlargedHeader">
+                <div class="enlarged-color-info" id="enlargedColorInfo"></div>
+                <button class="enlarged-close" id="enlargedCloseBtn">Close</button>
+            </div>
+            <div class="enlarged-canvas-container">
+                <canvas class="enlarged-canvas" id="enlargedCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Debug Modal -->
+    <div class="debug-modal" id="debugModal">
+        <div class="debug-content">
+            <div class="debug-header">
+                <div class="debug-title">Debug Console</div>
+                <button class="debug-close" id="debugCloseBtn">Close</button>
+            </div>
+            <div class="debug-controls">
+                <button class="debug-control-btn" id="debugClearBtn">Clear</button>
+                <button class="debug-control-btn" id="debugCopyBtn">Copy All</button>
+                <span style="color: var(--fg-secondary); font-size: 12px; margin-left: auto;">
+                    <span id="debugLogCount">0</span> logs
+                </span>
+            </div>
+            <div class="debug-logs" id="debugLogs"></div>
+        </div>
+    </div>
+    <div class="container">
+        <!-- Top: Voronoi Visualization -->
+        <div class="bins-panel">
+            <div class="bins-grid" id="voronoiGrid"></div>
+        </div>
+
+        <!-- Bottom: Palette Editor -->
+        <div class="palette-panel">
+            <!-- Controls Row -->
+            <div style="display: flex; gap: 10px; align-items: flex-end;">
+                <div style="flex: 3; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 14px; color: var(--fg-secondary); white-space: nowrap;">Resolution</span>
+                    <input type="range" id="resolutionSlider" min="8" max="64" step="4" value="32" style="flex: 1; height: 6px; background: var(--border); border-radius: 3px; outline: none; appearance: none; cursor: pointer;">
+                    <span id="resolutionValue" style="font-size: 14px; color: var(--fg-secondary); min-width: 30px; text-align: right;">32</span>
+                </div>
+                <button class="btn btn-secondary" id="clearBtn" style="flex: 1;">Clear</button>
+            </div>
+
+            <!-- Palette Colors Section (includes Add card) -->
+            <div class="palette-colors" id="paletteColors">
+                <!-- Add Color Card -->
+                <div class="palette-color-item add-color-card">
+                    <div style="display: flex; flex-direction: column; gap: 8px; align-items: stretch; width: 100%;">
+                        <input type="color" id="colorPicker" value="#ff6b6b" style="width: 100%; height: 40px;">
+                        <input type="text" id="colorHex" value="#ff6b6b" placeholder="#000000" style="width: 100%; padding: 6px; font-size: 12px;">
+                        <button class="btn" id="addColorBtn" style="width: 100%; padding: 6px; font-size: 12px;">Add</button>
+                    </div>
+                </div>
+                <!-- Palette colors will be added dynamically here -->
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // ==========================================
+        // DEBUG CONSOLE SYSTEM
+        // ==========================================
+
+        const debugLogs = [];
+        const debugLogsElement = document.getElementById('debugLogs');
+        const debugLogCount = document.getElementById('debugLogCount');
+        const debugModal = document.getElementById('debugModal');
+        const debugBtn = document.getElementById('debugBtn');
+        const debugCloseBtn = document.getElementById('debugCloseBtn');
+        const debugClearBtn = document.getElementById('debugClearBtn');
+        const debugCopyBtn = document.getElementById('debugCopyBtn');
+
+        function addDebugLog(type, args) {
+            const timestamp = new Date().toLocaleTimeString();
+            const message = args.map(arg => {
+                if (typeof arg === 'object') {
+                    try {
+                        return JSON.stringify(arg, null, 2);
+                    } catch (e) {
+                        return String(arg);
+                    }
+                }
+                return String(arg);
+            }).join(' ');
+
+            debugLogs.push({ type, timestamp, message });
+
+            // Update UI - prepend instead of append
+            const entry = document.createElement('div');
+            entry.className = `debug-log-entry ${type}`;
+            entry.innerHTML = `<span class="debug-log-time">[${timestamp}]</span>${message}`;
+            debugLogsElement.insertBefore(entry, debugLogsElement.firstChild);
+
+            debugLogCount.textContent = debugLogs.length;
+        }
+
+        // Intercept console methods
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addDebugLog('log', args);
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addDebugLog('warn', args);
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addDebugLog('error', args);
+        };
+
+        // Window error handler
+        window.addEventListener('error', (event) => {
+            addDebugLog('error', [`${event.message} at ${event.filename}:${event.lineno}:${event.colno}`]);
+        });
+
+        // Debug modal controls
+        debugBtn.addEventListener('click', () => {
+            debugModal.classList.add('active');
+        });
+
+        debugCloseBtn.addEventListener('click', () => {
+            debugModal.classList.remove('active');
+        });
+
+        debugModal.addEventListener('click', (e) => {
+            if (e.target === debugModal) {
+                debugModal.classList.remove('active');
+            }
+        });
+
+        debugClearBtn.addEventListener('click', () => {
+            debugLogs.length = 0;
+            debugLogsElement.innerHTML = '';
+            debugLogCount.textContent = '0';
+        });
+
+        debugCopyBtn.addEventListener('click', () => {
+            const text = debugLogs.map(log => `[${log.timestamp}] [${log.type.toUpperCase()}] ${log.message}`).join('\n');
+            navigator.clipboard.writeText(text).then(() => {
+                debugCopyBtn.textContent = 'Copied!';
+                setTimeout(() => {
+                    debugCopyBtn.textContent = 'Copy All';
+                }, 2000);
+            });
+        });
+
+        console.log('Debug console initialized');
+
+        // ==========================================
+        // ENLARGED VIEW SYSTEM
+        // ==========================================
+
+        const enlargedModal = document.getElementById('enlargedModal');
+        const enlargedColorInfo = document.getElementById('enlargedColorInfo');
+        const enlargedCloseBtn = document.getElementById('enlargedCloseBtn');
+        const enlargedCanvas = document.getElementById('enlargedCanvas');
+        const enlargedHeader = document.getElementById('enlargedHeader');
+        let enlargedScene = null;
+        let enlargedRenderer = null;
+        let enlargedCamera = null;
+        let enlargedControls = null;
+        let enlargedAnimationId = null;
+
+        function openEnlargedView(cellIdx) {
+            const cell = voronoiCells[cellIdx];
+            if (!cell) return;
+
+            console.log(`Opening enlarged view for cell ${cellIdx} (${cell.seed.hex})`);
+
+            // Set header color and info
+            enlargedHeader.style.background = cell.seed.hex;
+            enlargedColorInfo.textContent = cell.seed.hex;
+            enlargedColorInfo.style.color = getContrastColor(cell.seed.hex);
+            enlargedCloseBtn.style.color = getContrastColor(cell.seed.hex);
+
+            // Show modal
+            enlargedModal.classList.add('active');
+
+            // Create 3D scene for enlarged view
+            createEnlargedScene(cell);
+        }
+
+        function closeEnlargedView() {
+            enlargedModal.classList.remove('active');
+
+            // Stop animation
+            if (enlargedAnimationId) {
+                cancelAnimationFrame(enlargedAnimationId);
+                enlargedAnimationId = null;
+            }
+
+            // Clean up
+            if (enlargedControls) {
+                enlargedControls.dispose();
+            }
+            if (enlargedRenderer) {
+                enlargedRenderer.dispose();
+            }
+            enlargedScene = null;
+            enlargedRenderer = null;
+            enlargedCamera = null;
+            enlargedControls = null;
+        }
+
+        function getContrastColor(hex) {
+            const [r, g, b] = hexToRgb(hex);
+            const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+            return luminance > 0.5 ? '#000000' : '#ffffff';
+        }
+
+        function createEnlargedScene(cell) {
+            const container = enlargedCanvas.parentElement;
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            console.log(`Creating enlarged scene: ${width}x${height}`);
+
+            // Scene setup
+            enlargedScene = new THREE.Scene();
+            enlargedScene.background = new THREE.Color(0x161617);
+
+            enlargedCamera = new THREE.PerspectiveCamera(50, width / height, 1, 1000);
+
+            // Renderer
+            enlargedRenderer = new THREE.WebGLRenderer({
+                canvas: enlargedCanvas,
+                antialias: true
+            });
+            enlargedRenderer.setSize(width, height);
+            enlargedRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // Controls
+            enlargedControls = new OrbitControls(enlargedCamera, enlargedCanvas);
+            enlargedControls.enableDamping = true;
+            enlargedControls.dampingFactor = 0.05;
+            enlargedControls.target.set(0, 0, 0);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            enlargedScene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            directionalLight.position.set(1, 1, 1);
+            enlargedScene.add(directionalLight);
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+            directionalLight2.position.set(-1, -1, -1);
+            enlargedScene.add(directionalLight2);
+
+            // Calculate center of mass and bounds
+            let sumA = 0, sumL = 0, sumB = 0;
+            let minA = Infinity, maxA = -Infinity;
+            let minL = Infinity, maxL = -Infinity;
+            let minB = Infinity, maxB = -Infinity;
+
+            cell.points.forEach(point => {
+                const [L, a, b] = point.lab;
+                sumA += a;
+                sumL += L;
+                sumB += b;
+                minA = Math.min(minA, a);
+                maxA = Math.max(maxA, a);
+                minL = Math.min(minL, L);
+                maxL = Math.max(maxL, L);
+                minB = Math.min(minB, b);
+                maxB = Math.max(maxB, b);
+            });
+            const centerA = sumA / cell.points.length;
+            const centerL = sumL / cell.points.length;
+            const centerB = sumB / cell.points.length;
+
+            // Calculate extent for camera positioning
+            const extentA = maxA - minA;
+            const extentL = maxL - minL;
+            const extentB = maxB - minB;
+            const maxExtent = Math.max(extentA, extentL, extentB, 10);
+
+            // Create point cloud
+            const positions = [];
+            const colors = [];
+
+            cell.points.forEach(point => {
+                const [L, a, b] = point.lab;
+                positions.push(a - centerA, L - centerL, b - centerB);
+                colors.push(...point.rgb);
+            });
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+            const pointSize = Math.max(3, maxExtent / 15);
+
+            const material = new THREE.PointsMaterial({
+                size: pointSize,
+                vertexColors: true,
+                sizeAttenuation: true
+            });
+
+            const pointCloud = new THREE.Points(geometry, material);
+            enlargedScene.add(pointCloud);
+
+            // Position camera
+            const cameraDistance = maxExtent * 2.5;
+            enlargedCamera.position.set(cameraDistance, cameraDistance * 0.8, cameraDistance);
+
+            // Start animation loop
+            function animate() {
+                enlargedAnimationId = requestAnimationFrame(animate);
+                enlargedControls.update();
+                enlargedRenderer.render(enlargedScene, enlargedCamera);
+            }
+            animate();
+        }
+
+        // Event listeners
+        enlargedCloseBtn.addEventListener('click', closeEnlargedView);
+
+        enlargedModal.addEventListener('click', (e) => {
+            if (e.target === enlargedModal) {
+                closeEnlargedView();
+            }
+        });
+
+        // Handle window resize for enlarged view
+        window.addEventListener('resize', () => {
+            if (enlargedModal.classList.contains('active') && enlargedRenderer) {
+                const container = enlargedCanvas.parentElement;
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+
+                enlargedCamera.aspect = width / height;
+                enlargedCamera.updateProjectionMatrix();
+                enlargedRenderer.setSize(width, height);
+            }
+        });
+
+        // ==========================================
+        // VORONOI PALETTE SYSTEM
+        // ==========================================
+
+        // Store Three.js scenes for each cell
+        const cellScenes = new Map();
+
+        // Shared renderer (ONE WebGL context for all cells)
+        let sharedRenderer = null;
+        let sharedCanvas = null;
+
+        // Intersection observer for visibility tracking
+        let intersectionObserver = null;
+        const visibleCells = new Set();
+
+        // ==========================================
+        // COLOR SPACE CONVERSION
+        // ==========================================
+
+        function rgb2lab(r, g, b) {
+            const toLinear = (c) => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+            let lr = toLinear(r), lg = toLinear(g), lb = toLinear(b);
+
+            let x = lr * 0.4124564 + lg * 0.3575761 + lb * 0.1804375;
+            let y = lr * 0.2126729 + lg * 0.7151522 + lb * 0.0721750;
+            let z = lr * 0.0193339 + lg * 0.1191920 + lb * 0.9503041;
+
+            const ref = [0.95047, 1.00000, 1.08883];
+            x /= ref[0]; y /= ref[1]; z /= ref[2];
+            const f = (t) => t > 0.008856 ? Math.pow(t, 1/3) : 7.787 * t + 16/116;
+            const fx = f(x), fy = f(y), fz = f(z);
+            const L = 116 * fy - 16;
+            const a = 500 * (fx - fy);
+            const bv = 200 * (fy - fz);
+
+            return [L, a, bv];
+        }
+
+        function hexToRgb(hex) {
+            hex = hex.replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16) / 255;
+            const g = parseInt(hex.substring(2, 4), 16) / 255;
+            const b = parseInt(hex.substring(4, 6), 16) / 255;
+            return [r, g, b];
+        }
+
+        function rgbToHex(r, g, b) {
+            const toHex = (c) => Math.round(c * 255).toString(16).padStart(2, '0');
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+        }
+
+        function labDistance(lab1, lab2) {
+            const dL = lab1[0] - lab2[0];
+            const da = lab1[1] - lab2[1];
+            const db = lab1[2] - lab2[2];
+            return Math.sqrt(dL * dL + da * da + db * db);
+        }
+
+        // ==========================================
+        // STATE
+        // ==========================================
+
+        let palette = [];
+        let voronoiCells = null;
+        let isComputing = false;
+
+        // ==========================================
+        // DOM ELEMENTS
+        // ==========================================
+
+        const colorPicker = document.getElementById('colorPicker');
+        const colorHex = document.getElementById('colorHex');
+        const addColorBtn = document.getElementById('addColorBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const paletteColors = document.getElementById('paletteColors');
+        const resolutionSlider = document.getElementById('resolutionSlider');
+        const resolutionValue = document.getElementById('resolutionValue');
+        const voronoiGrid = document.getElementById('voronoiGrid');
+
+        // ==========================================
+        // PALETTE MANAGEMENT
+        // ==========================================
+
+        function addColor(hex) {
+            hex = hex.toUpperCase();
+
+            // If color already exists, don't add duplicate
+            if (palette.some(c => c.hex === hex)) {
+                return;
+            }
+
+            const [r, g, b] = hexToRgb(hex);
+            const [L, a, bv] = rgb2lab(r, g, b);
+
+            palette.push({ hex, rgb: [r, g, b], lab: [L, a, bv] });
+            updatePaletteUI();
+            voronoiCells = null; // Clear previous computation
+
+            // Auto-compute Voronoi cells (if enabled)
+            if (autoComputeEnabled && palette.length > 0) {
+                computeVoronoi();
+            }
+        }
+
+        function removeColor(hex) {
+            palette = palette.filter(c => c.hex !== hex);
+            updatePaletteUI();
+            voronoiCells = null;
+
+            // Auto-compute Voronoi cells (if enabled)
+            if (autoComputeEnabled) {
+                if (palette.length > 0) {
+                    computeVoronoi();
+                } else {
+                    updateVoronoiUI();
+                }
+            }
+        }
+
+        function clearPalette() {
+            palette = [];
+            updatePaletteUI();
+            voronoiCells = null;
+            updateVoronoiUI();
+        }
+
+        function updatePaletteUI() {
+            // Remove all palette items except the add-color-card
+            const addCard = paletteColors.querySelector('.add-color-card');
+            paletteColors.innerHTML = '';
+            if (addCard) {
+                paletteColors.appendChild(addCard);
+            }
+
+            // Add palette items
+            palette.forEach((color, idx) => {
+                const item = document.createElement('div');
+                item.className = 'palette-color-item';
+                item.innerHTML = `
+                    <div class="color-preview" style="background: ${color.hex};">
+                        <input type="color" value="${color.hex}" data-color-hex="${color.hex}" />
+                    </div>
+                    <div class="color-info">
+                        <div class="color-hex">${color.hex}</div>
+                    </div>
+                    <button class="btn-delete" onclick="removeColor('${color.hex}')">×</button>
+                `;
+                paletteColors.appendChild(item);
+            });
+
+            // Add change handlers to each color picker
+            document.querySelectorAll('.palette-color-item:not(.add-color-card) .color-preview input[type="color"]').forEach(picker => {
+                picker.addEventListener('input', (e) => {
+                    const oldHex = picker.dataset.colorHex;
+                    const newHex = e.target.value.toUpperCase();
+                    updateColorInPalette(oldHex, newHex);
+                });
+            });
+        }
+
+        // ==========================================
+        // VORONOI COMPUTATION
+        // ==========================================
+
+        async function computeVoronoi() {
+            if (palette.length === 0) {
+                return;
+            }
+
+            if (isComputing) return;
+            isComputing = true;
+
+            // Update Clear button to show progress
+            const originalClearText = clearBtn.textContent;
+            clearBtn.textContent = '0%';
+            clearBtn.disabled = true;
+
+            const resolution = parseInt(resolutionSlider.value);
+
+            // Initialize cells
+            const cells = palette.map(seed => ({
+                seed,
+                points: []  // Store {rgb, lab, hex}
+            }));
+
+            const totalColors = resolution ** 3;
+            let processed = 0;
+
+            // Process in chunks to avoid blocking UI
+            const chunkSize = 1000;
+
+            for (let ri = 0; ri < resolution; ri++) {
+                for (let gi = 0; gi < resolution; gi++) {
+                    for (let bi = 0; bi < resolution; bi++) {
+                        const r = ri / (resolution - 1);
+                        const g = gi / (resolution - 1);
+                        const b = bi / (resolution - 1);
+                        const hex = rgbToHex(r, g, b);
+                        const lab = rgb2lab(r, g, b);
+
+                        // Find nearest seed
+                        let minDist = Infinity;
+                        let nearestIdx = 0;
+
+                        for (let i = 0; i < palette.length; i++) {
+                            const dist = labDistance(lab, palette[i].lab);
+                            if (dist < minDist) {
+                                minDist = dist;
+                                nearestIdx = i;
+                            }
+                        }
+
+                        cells[nearestIdx].points.push({
+                            rgb: [r, g, b],
+                            lab: lab,
+                            hex: hex
+                        });
+                        processed++;
+
+                        // Update progress periodically
+                        if (processed % chunkSize === 0) {
+                            const percent = Math.round((processed / totalColors) * 100);
+                            clearBtn.textContent = `${percent}%`;
+                            await new Promise(resolve => setTimeout(resolve, 0));
+                        }
+                    }
+                }
+            }
+
+            voronoiCells = cells;
+            isComputing = false;
+
+            // Restore Clear button
+            clearBtn.textContent = originalClearText;
+            clearBtn.disabled = false;
+
+            updateVoronoiUI();
+        }
+
+        function updateVoronoiUI() {
+            if (!voronoiCells || voronoiCells.length === 0) {
+                voronoiGrid.innerHTML = '';
+                return;
+            }
+
+            // Clear previous scenes
+            cellScenes.clear();
+            visibleCells.clear();
+
+            // Disconnect old observer
+            if (intersectionObserver) {
+                intersectionObserver.disconnect();
+            }
+
+            // Create shared renderer if needed (ONLY ONCE for all cells)
+            if (!sharedRenderer) {
+                console.log('Creating shared WebGL renderer (ONE context for all cells)');
+                sharedCanvas = document.createElement('canvas');
+                sharedRenderer = new THREE.WebGLRenderer({
+                    canvas: sharedCanvas,
+                    antialias: true,
+                    preserveDrawingBuffer: true
+                });
+                sharedRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            }
+
+            // Create HTML structure
+            voronoiGrid.innerHTML = voronoiCells.map((cell, idx) => {
+                return `
+                    <div class="voronoi-cell" style="border-color: ${cell.seed.hex}; background: ${cell.seed.hex};" data-cell-idx="${idx}">
+                        <div class="cell-canvas-container">
+                            <canvas class="cell-canvas" id="canvas-${idx}"></canvas>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Create 3D scenes for each cell
+            voronoiCells.forEach((cell, idx) => {
+                const canvas = document.getElementById(`canvas-${idx}`);
+                if (canvas) {
+                    create3DVisualization(canvas, cell, idx);
+                }
+            });
+
+
+            // Set up intersection observer to track visibility
+            intersectionObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const idx = parseInt(entry.target.dataset.cellIdx);
+                    if (entry.isIntersecting) {
+                        visibleCells.add(idx);
+                        console.log(`Cell ${idx} is now visible`);
+                    } else {
+                        visibleCells.delete(idx);
+                        console.log(`Cell ${idx} is now hidden`);
+                    }
+                });
+            }, {
+                root: null,
+                rootMargin: '100px',
+                threshold: 0.01
+            });
+
+            // Observe all cell containers and mark initially visible ones
+            document.querySelectorAll('.voronoi-cell').forEach((cell, idx) => {
+                cell.dataset.cellIdx = idx;
+                intersectionObserver.observe(cell);
+
+                // Check if initially visible and add to set
+                const rect = cell.getBoundingClientRect();
+                const isVisible = (
+                    rect.top < window.innerHeight &&
+                    rect.bottom > 0 &&
+                    rect.left < window.innerWidth &&
+                    rect.right > 0
+                );
+                if (isVisible) {
+                    visibleCells.add(idx);
+                    console.log(`Cell ${idx} initially visible`);
+                }
+            });
+
+            // Start shared animation loop
+            startSharedAnimationLoop();
+        }
+
+        // Shared animation loop
+        let animationFrameId = null;
+        let frameCount = 0;
+        function startSharedAnimationLoop() {
+            // Cancel previous loop if exists
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+
+            function animate() {
+                animationFrameId = requestAnimationFrame(animate);
+                frameCount++;
+
+                // Debug log every 60 frames
+                if (frameCount % 60 === 0) {
+                    console.log(`Rendering ${visibleCells.size} visible cells:`, Array.from(visibleCells));
+                }
+
+                // Only render visible cells using the SHARED renderer
+                visibleCells.forEach(idx => {
+                    const cellData = cellScenes.get(idx);
+                    if (cellData) {
+                        const { scene, camera, canvas, controls } = cellData;
+
+                        // Update controls
+                        controls.update();
+
+                        // Get canvas dimensions
+                        const width = canvas.width;
+                        const height = canvas.height;
+
+                        // Update camera aspect if needed
+                        if (camera.aspect !== width / height) {
+                            camera.aspect = width / height;
+                            camera.updateProjectionMatrix();
+                        }
+
+                        // Render to shared renderer canvas
+                        sharedRenderer.setSize(width, height, false);
+                        sharedRenderer.render(scene, camera);
+
+                        // Copy from shared renderer to this cell's canvas
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            ctx.clearRect(0, 0, width, height);
+                            ctx.drawImage(sharedCanvas, 0, 0, width, height);
+                        }
+                    } else {
+                        console.warn(`No cell data for index ${idx}`);
+                    }
+                });
+            }
+
+            animate();
+        }
+
+        function create3DVisualization(canvas, cell, idx) {
+            const container = canvas.parentElement;
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            // Debug: log cell info
+            console.log(`Cell ${idx} (${cell.seed.hex}): ${cell.points.length} points`);
+
+            // Skip if no points
+            if (!cell.points || cell.points.length === 0) {
+                console.warn(`Cell ${idx} has no points, skipping visualization`);
+                return;
+            }
+
+            // Scene setup
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x161617);
+
+            const camera = new THREE.PerspectiveCamera(50, width / height, 1, 1000);
+
+            // Set canvas size (no individual renderer - using shared one)
+            console.log(`Setting up canvas for cell ${idx}: ${width}x${height}`);
+            canvas.width = width;
+            canvas.height = height;
+
+            // Setup controls
+            const controls = new OrbitControls(camera, canvas);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(0, 0, 0);
+
+            // Lighting (better lighting for StandardMaterial)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+            directionalLight2.position.set(-1, -1, -1);
+            scene.add(directionalLight2);
+
+            // Calculate center of mass and bounds
+            let sumA = 0, sumL = 0, sumB = 0;
+            let minA = Infinity, maxA = -Infinity;
+            let minL = Infinity, maxL = -Infinity;
+            let minB = Infinity, maxB = -Infinity;
+
+            cell.points.forEach(point => {
+                const [L, a, b] = point.lab;
+                sumA += a;
+                sumL += L;
+                sumB += b;
+                minA = Math.min(minA, a);
+                maxA = Math.max(maxA, a);
+                minL = Math.min(minL, L);
+                maxL = Math.max(maxL, L);
+                minB = Math.min(minB, b);
+                maxB = Math.max(maxB, b);
+            });
+            const centerA = sumA / cell.points.length;
+            const centerL = sumL / cell.points.length;
+            const centerB = sumB / cell.points.length;
+
+            // Calculate extent for camera positioning
+            const extentA = maxA - minA;
+            const extentL = maxL - minL;
+            const extentB = maxB - minB;
+            const maxExtent = Math.max(extentA, extentL, extentB, 10); // At least 10 units
+
+            // Create point cloud from cell data, centered at origin
+            const positions = [];
+            const colors = [];
+
+            cell.points.forEach(point => {
+                const [L, a, b] = point.lab;
+                // Position: X=a, Y=L, Z=b, centered at origin
+                positions.push(a - centerA, L - centerL, b - centerB);
+                colors.push(...point.rgb);
+            });
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+            // Adjust point size based on extent
+            const pointSize = Math.max(2, maxExtent / 15);
+
+            const material = new THREE.PointsMaterial({
+                size: pointSize,
+                vertexColors: true,
+                sizeAttenuation: true
+            });
+
+            const pointCloud = new THREE.Points(geometry, material);
+            scene.add(pointCloud);
+
+            // Position camera based on actual extent
+            const cameraDistance = maxExtent * 2.5;
+            camera.position.set(cameraDistance, cameraDistance * 0.8, cameraDistance);
+
+            // Store scene data (shared renderer will render to this canvas)
+            cellScenes.set(idx, {
+                scene,
+                camera,
+                canvas,
+                controls
+            });
+        }
+
+        // ==========================================
+        // EVENT LISTENERS
+        // ==========================================
+
+        colorPicker.addEventListener('input', () => {
+            colorHex.value = colorPicker.value.toUpperCase();
+        });
+
+        colorHex.addEventListener('input', () => {
+            const hex = colorHex.value;
+            if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+                colorPicker.value = hex;
+            }
+        });
+
+        function updateColorInPalette(oldHex, newHex) {
+            const colorIndex = palette.findIndex(c => c.hex === oldHex);
+            if (colorIndex !== -1) {
+                // Update the color
+                const [r, g, b] = hexToRgb(newHex);
+                const [L, a, bv] = rgb2lab(r, g, b);
+                palette[colorIndex] = { hex: newHex, rgb: [r, g, b], lab: [L, a, bv] };
+
+                // Update UI and recompute
+                updatePaletteUI();
+                voronoiCells = null;
+
+                // Auto-compute
+                if (autoComputeEnabled && palette.length > 0) {
+                    computeVoronoi();
+                }
+
+                console.log(`Updated color from ${oldHex} to ${newHex}`);
+            }
+        }
+
+        addColorBtn.addEventListener('click', () => {
+            const hex = colorHex.value;
+            if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+                addColor(hex);
+            }
+        });
+
+        colorHex.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addColorBtn.click();
+            }
+        });
+
+        clearBtn.addEventListener('click', clearPalette);
+
+        resolutionSlider.addEventListener('input', () => {
+            const res = parseInt(resolutionSlider.value);
+            resolutionValue.textContent = res;
+        });
+
+        // ==========================================
+        // INITIALIZATION
+        // ==========================================
+
+        // Temporarily disable auto-compute for initial load
+        let autoComputeEnabled = false;
+
+        const defaultColors = [
+            // Earths & Browns
+            '#8B4513', '#A0522D', '#D2691E', '#CD853F',
+            // Greens (plants, moss, forest)
+            '#228B22', '#3CB371', '#556B2F', '#6B8E23',
+            // Blues (sky, water)
+            '#4682B4', '#5F9EA0', '#87CEEB', '#708090',
+            // Grays & Stones
+            '#696969', '#808080', '#A9A9A9', '#D3D3D3',
+            // Warm naturals (clay, sand, ochre)
+            '#DAA520', '#BDB76B', '#BC8F8F', '#F4A460'
+        ];
+
+        // Add all default colors without auto-computing
+        defaultColors.forEach(hex => {
+            const normalized = hex.toUpperCase();
+            if (!palette.some(c => c.hex === normalized)) {
+                const [r, g, b] = hexToRgb(normalized);
+                const [L, a, bv] = rgb2lab(r, g, b);
+                palette.push({ hex: normalized, rgb: [r, g, b], lab: [L, a, bv] });
+            }
+        });
+
+        updatePaletteUI();
+
+        // Enable auto-compute and compute once with all default colors
+        autoComputeEnabled = true;
+        computeVoronoi();
+    </script>
+</body>
+</html>

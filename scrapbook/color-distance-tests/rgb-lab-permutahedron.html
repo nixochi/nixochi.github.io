@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RGB to LAB Permutahedron Transformation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            overflow: hidden;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
+        }
+
+        #container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            height: 100vh;
+            height: 100svh;
+            height: -webkit-fill-available;
+            gap: 0;
+        }
+
+        .viewer {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #222;
+        }
+
+        .viewer:last-child {
+            border-right: none;
+        }
+
+        .viewer-header {
+            background: #111;
+            padding: 16px 24px;
+            border-bottom: 1px solid #222;
+        }
+
+        .viewer-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .viewer-header p {
+            font-size: 13px;
+            color: #888;
+            font-weight: 400;
+        }
+
+        canvas {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #000;
+            touch-action: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 20, 20, 0.9);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .control-group label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #e0e0e0;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #252525;
+            border-color: #444;
+        }
+
+        button:active {
+            background: #0a0a0a;
+        }
+
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a0a0a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        @media (max-width: 768px) {
+            #container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 1fr;
+            }
+
+            .viewer {
+                border-right: none;
+                border-bottom: 1px solid #222;
+            }
+
+            .viewer:last-child {
+                border-bottom: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div style="font-size: 18px; color: #e0e0e0;">Generating point cloud...</div>
+        <div style="font-size: 13px; color: #888;" id="status">Initializing...</div>
+    </div>
+
+    <div id="container" style="opacity: 0; transition: opacity 0.5s;">
+        <div class="viewer">
+            <div class="viewer-header">
+                <h2>RGB Space</h2>
+                <p>Permutahedron in RGB coordinates</p>
+            </div>
+            <canvas id="canvas-rgb"></canvas>
+            <div class="controls">
+                <div class="control-group">
+                    <label>View</label>
+                    <button id="reset-rgb">Reset</button>
+                </div>
+            </div>
+        </div>
+        <div class="viewer">
+            <div class="viewer-header">
+                <h2>LAB Space</h2>
+                <p>Transformed to CIELAB coordinates</p>
+            </div>
+            <canvas id="canvas-lab"></canvas>
+            <div class="controls">
+                <div class="control-group">
+                    <label>View</label>
+                    <button id="reset-lab">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // COLOR SPACE CONVERSIONS
+        // ============================================================================
+
+        function rgbToXyz(r, g, b) {
+            const toLinear = (c) => {
+                c = c / 255.0;
+                return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+            };
+
+            const rLinear = toLinear(r);
+            const gLinear = toLinear(g);
+            const bLinear = toLinear(b);
+
+            const x = rLinear * 0.4124564 + gLinear * 0.3575761 + bLinear * 0.1804375;
+            const y = rLinear * 0.2126729 + gLinear * 0.7151522 + bLinear * 0.0721750;
+            const z = rLinear * 0.0193339 + gLinear * 0.1191920 + bLinear * 0.9503041;
+
+            return [x * 100, y * 100, z * 100];
+        }
+
+        function xyzToLab(x, y, z) {
+            const refX = 95.047;
+            const refY = 100.000;
+            const refZ = 108.883;
+
+            x = x / refX;
+            y = y / refY;
+            z = z / refZ;
+
+            const f = (t) => {
+                const delta = 6 / 29;
+                return t > delta ** 3
+                    ? Math.pow(t, 1 / 3)
+                    : t / (3 * delta ** 2) + 4 / 29;
+            };
+
+            const fx = f(x);
+            const fy = f(y);
+            const fz = f(z);
+
+            const L = 116 * fy - 16;
+            const a = 500 * (fx - fy);
+            const b = 200 * (fy - fz);
+
+            return [L, a, b];
+        }
+
+        function rgbToLab(r, g, b) {
+            const [x, y, z] = rgbToXyz(r, g, b);
+            return xyzToLab(x, y, z);
+        }
+
+        // ============================================================================
+        // PERMUTAHEDRON DATA & POINT CLOUD GENERATION
+        // ============================================================================
+
+        const permutahedronData = {
+            vertices: [
+                [1, 0.5, 0],
+                [1, -0.5, 0],
+                [-1, 0.5, 0],
+                [-1, -0.5, 0],
+                [1, 0, 0.5],
+                [1, 0, -0.5],
+                [-1, 0, 0.5],
+                [-1, 0, -0.5],
+                [0.5, 1, 0],
+                [0.5, -1, 0],
+                [-0.5, 1, 0],
+                [-0.5, -1, 0],
+                [0.5, 0, 1],
+                [0.5, 0, -1],
+                [-0.5, 0, 1],
+                [-0.5, 0, -1],
+                [0, 1, 0.5],
+                [0, 1, -0.5],
+                [0, -1, 0.5],
+                [0, -1, -0.5],
+                [0, 0.5, 1],
+                [0, 0.5, -1],
+                [0, -0.5, 1],
+                [0, -0.5, -1]
+            ],
+            faces: [
+                [15, 21, 13, 23],
+                [12, 20, 14, 22],
+                [5, 1, 9, 19, 23, 13],
+                [17, 8, 0, 5, 13, 21],
+                [11, 3, 7, 15, 23, 19],
+                [11, 19, 9, 18],
+                [6, 3, 11, 18, 22, 14],
+                [6, 2, 7, 3],
+                [4, 12, 22, 18, 9, 1],
+                [4, 1, 5, 0],
+                [10, 17, 21, 15, 7, 2],
+                [16, 8, 17, 10],
+                [16, 10, 2, 6, 14, 20],
+                [16, 20, 12, 4, 0, 8]
+            ],
+            edges: [
+                [15, 21],
+                [13, 21],
+                [13, 23],
+                [15, 23],
+                [12, 20],
+                [14, 20],
+                [14, 22],
+                [12, 22],
+                [1, 5],
+                [1, 9],
+                [9, 19],
+                [19, 23],
+                [5, 13],
+                [8, 17],
+                [0, 8],
+                [0, 5],
+                [17, 21],
+                [3, 11],
+                [3, 7],
+                [7, 15],
+                [11, 19],
+                [9, 18],
+                [11, 18],
+                [3, 6],
+                [18, 22],
+                [6, 14],
+                [2, 6],
+                [2, 7],
+                [4, 12],
+                [1, 4],
+                [0, 4],
+                [10, 17],
+                [2, 10],
+                [8, 16],
+                [10, 16],
+                [16, 20]
+            ]
+        };
+
+        function computeFacePlanes(vertices, faceIndices) {
+            const planes = [];
+
+            for (const face of faceIndices) {
+                // Use first 3 vertices of the face to compute the plane
+                const v0 = vertices[face[0]];
+                const v1 = vertices[face[1]];
+                const v2 = vertices[face[2]];
+
+                // Compute two edges
+                const e1 = [v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]];
+                const e2 = [v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]];
+
+                // Cross product for normal
+                let normal = [
+                    e1[1] * e2[2] - e1[2] * e2[1],
+                    e1[2] * e2[0] - e1[0] * e2[2],
+                    e1[0] * e2[1] - e1[1] * e2[0]
+                ];
+
+                // Normalize
+                const len = Math.sqrt(normal[0]**2 + normal[1]**2 + normal[2]**2);
+                normal[0] /= len;
+                normal[1] /= len;
+                normal[2] /= len;
+
+                // Compute d (plane equation: normal·point + d = 0)
+                const d = -(normal[0] * v0[0] + normal[1] * v0[1] + normal[2] * v0[2]);
+
+                // Check if normal points inward - if so, flip it
+                // We'll use the centroid as a test point (centroid should be inside)
+                const centroid = [0, 0, 0]; // Permutahedron is centered at origin
+                const distToCentroid = normal[0] * centroid[0] + normal[1] * centroid[1] + normal[2] * centroid[2] + d;
+
+                if (distToCentroid > 0) {
+                    // Normal points outward, flip it
+                    normal[0] = -normal[0];
+                    normal[1] = -normal[1];
+                    normal[2] = -normal[2];
+                }
+
+                planes.push({
+                    normal,
+                    d: -(normal[0] * v0[0] + normal[1] * v0[1] + normal[2] * v0[2])
+                });
+            }
+
+            return planes;
+        }
+
+        function isPointInsideConvexHull(point, faces) {
+            const epsilon = 0.001;
+            for (const face of faces) {
+                const dist = face.normal[0] * point[0] + face.normal[1] * point[1] + face.normal[2] * point[2] + face.d;
+                if (dist > epsilon) return false;
+            }
+            return true;
+        }
+
+        function generatePointCloud(data, gridResolution = 100) {
+            const status = document.getElementById('status');
+
+            status.textContent = 'Computing face planes...';
+            const planes = computeFacePlanes(data.vertices, data.faces);
+            console.log(`Using ${planes.length} face planes`);
+
+            const vertices = data.vertices;
+            let minX = Infinity, minY = Infinity, minZ = Infinity;
+            let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+            for (const v of vertices) {
+                minX = Math.min(minX, v[0]);
+                minY = Math.min(minY, v[1]);
+                minZ = Math.min(minZ, v[2]);
+                maxX = Math.max(maxX, v[0]);
+                maxY = Math.max(maxY, v[1]);
+                maxZ = Math.max(maxZ, v[2]);
+            }
+
+            console.log('Bounding box:', {minX, maxX, minY, maxY, minZ, maxZ});
+
+            const points = [];
+            // Ensure truly regular spacing
+            const stepX = (maxX - minX) / (gridResolution - 1);
+            const stepY = (maxY - minY) / (gridResolution - 1);
+            const stepZ = (maxZ - minZ) / (gridResolution - 1);
+
+            status.textContent = 'Generating uniform grid...';
+            let checked = 0;
+            const totalPoints = gridResolution * gridResolution * gridResolution;
+
+            // Generate regular grid with exact spacing
+            for (let i = 0; i < gridResolution; i++) {
+                const x = minX + i * stepX;
+                for (let j = 0; j < gridResolution; j++) {
+                    const y = minY + j * stepY;
+                    for (let k = 0; k < gridResolution; k++) {
+                        const z = minZ + k * stepZ;
+                        const point = [x, y, z];
+
+                        if (isPointInsideConvexHull(point, planes)) {
+                            points.push(point);
+                        }
+
+                        checked++;
+                        if (checked % 20000 === 0) {
+                            status.textContent = `Checked ${checked}/${totalPoints} points, found ${points.length}...`;
+                        }
+                    }
+                }
+            }
+
+            console.log(`Generated ${points.length} points from ${checked} grid points`);
+            console.log(`Grid spacing: ${stepX.toFixed(4)} × ${stepY.toFixed(4)} × ${stepZ.toFixed(4)}`);
+            return points;
+        }
+
+        // ============================================================================
+        // WEBGL RENDERER
+        // ============================================================================
+
+        class PermutahedronViewer {
+            constructor(canvasId, pointCloud, useLabTransform = false) {
+                this.canvas = document.getElementById(canvasId);
+                this.gl = this.canvas.getContext('webgl2', {
+                    antialias: true,
+                    alpha: false
+                });
+
+                if (!this.gl) {
+                    throw new Error('WebGL2 not supported');
+                }
+
+                this.pointCloud = pointCloud;
+                this.useLabTransform = useLabTransform;
+                this.rotationX = 0.3;
+                this.rotationY = 0.5;
+                this.zoom = 1.0;
+                this.isDragging = false;
+                this.lastX = 0;
+                this.lastY = 0;
+
+                this.init();
+                this.setupEventListeners();
+                this.render();
+            }
+
+            init() {
+                const gl = this.gl;
+
+                const vsSource = `#version 300 es
+                    in vec3 aPosition;
+                    in vec3 aColor;
+
+                    uniform mat4 uProjection;
+                    uniform mat4 uModelView;
+                    uniform float uPointSize;
+
+                    out vec3 vColor;
+
+                    void main() {
+                        vColor = aColor;
+                        gl_Position = uProjection * uModelView * vec4(aPosition, 1.0);
+                        gl_PointSize = uPointSize;
+                    }
+                `;
+
+                const fsSource = `#version 300 es
+                    precision mediump float;
+
+                    in vec3 vColor;
+                    out vec4 fragColor;
+
+                    void main() {
+                        fragColor = vec4(vColor, 1.0);
+                    }
+                `;
+
+                const vs = this.compileShader(gl.VERTEX_SHADER, vsSource);
+                const fs = this.compileShader(gl.FRAGMENT_SHADER, fsSource);
+
+                this.program = gl.createProgram();
+                gl.attachShader(this.program, vs);
+                gl.attachShader(this.program, fs);
+                gl.linkProgram(this.program);
+
+                if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
+                    throw new Error('Program link failed: ' + gl.getProgramInfoLog(this.program));
+                }
+
+                this.uProjection = gl.getUniformLocation(this.program, 'uProjection');
+                this.uModelView = gl.getUniformLocation(this.program, 'uModelView');
+                this.uPointSize = gl.getUniformLocation(this.program, 'uPointSize');
+
+                this.prepareGeometry();
+                this.prepareEdgeGeometry();
+
+                gl.enable(gl.DEPTH_TEST);
+                gl.clearColor(0.0, 0.0, 0.0, 1.0);
+            }
+
+            compileShader(type, source) {
+                const gl = this.gl;
+                const shader = gl.createShader(type);
+                gl.shaderSource(shader, source);
+                gl.compileShader(shader);
+
+                if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                    throw new Error('Shader compile failed: ' + gl.getShaderInfoLog(shader));
+                }
+
+                return shader;
+            }
+
+            prepareGeometry() {
+                const gl = this.gl;
+                const positions = [];
+                const colors = [];
+
+                console.log(`Preparing ${this.useLabTransform ? 'LAB' : 'RGB'} geometry for ${this.pointCloud.length} points`);
+
+                for (const point of this.pointCloud) {
+                    // Points are in [-1, 1] range, map to [0, 1] for RGB
+                    const r = (point[0] + 1.0) / 2.0;
+                    const g = (point[1] + 1.0) / 2.0;
+                    const b = (point[2] + 1.0) / 2.0;
+
+                    let transformedPoint;
+                    if (this.useLabTransform) {
+                        const [L, a, bVal] = rgbToLab(r * 255, g * 255, b * 255);
+
+                        // Scale LAB to fit in view
+                        transformedPoint = [
+                            a / 50,           // a: ~[-86, 98] -> ~[-1.7, 2]
+                            (L - 50) / 50,    // L: [0, 100] -> [-1, 1]
+                            bVal / 50         // b: ~[-107, 94] -> ~[-2, 2]
+                        ];
+                    } else {
+                        // Keep original coordinates
+                        transformedPoint = point;
+                    }
+
+                    positions.push(...transformedPoint);
+                    colors.push(r, g, b);
+                }
+
+                console.log(`Created ${positions.length / 3} vertices`);
+
+                this.vao = gl.createVertexArray();
+                gl.bindVertexArray(this.vao);
+
+                const posBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+                gl.enableVertexAttribArray(0);
+                gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+                const colorBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+                gl.enableVertexAttribArray(1);
+                gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+
+                gl.bindVertexArray(null);
+
+                this.vertexCount = positions.length / 3;
+                console.log(`Vertex count: ${this.vertexCount}`);
+            }
+
+            prepareEdgeGeometry() {
+                const gl = this.gl;
+                const edgePositions = [];
+                const edgeColors = [];
+
+                console.log(`Preparing edge geometry for ${permutahedronData.edges.length} edges`);
+
+                const thickness = 0.025; // Thickness of the edge rectangles
+
+                for (const [i, j] of permutahedronData.edges) {
+                    const v1 = permutahedronData.vertices[i];
+                    const v2 = permutahedronData.vertices[j];
+
+                    // Transform vertices
+                    const transformVertex = (v) => {
+                        const r = (v[0] + 1.0) / 2.0;
+                        const g = (v[1] + 1.0) / 2.0;
+                        const b = (v[2] + 1.0) / 2.0;
+
+                        if (this.useLabTransform) {
+                            const [L, a, bVal] = rgbToLab(r * 255, g * 255, b * 255);
+                            return [
+                                a / 50,
+                                (L - 50) / 50,
+                                bVal / 50
+                            ];
+                        } else {
+                            return v;
+                        }
+                    };
+
+                    const t1 = transformVertex(v1);
+                    const t2 = transformVertex(v2);
+
+                    // Compute edge direction
+                    const dir = [
+                        t2[0] - t1[0],
+                        t2[1] - t1[1],
+                        t2[2] - t1[2]
+                    ];
+                    const len = Math.sqrt(dir[0]**2 + dir[1]**2 + dir[2]**2);
+
+                    // Find a perpendicular vector
+                    let perp;
+                    if (Math.abs(dir[0]) < 0.9) {
+                        perp = [1, 0, 0];
+                    } else {
+                        perp = [0, 1, 0];
+                    }
+
+                    // Cross product to get perpendicular
+                    const cross = [
+                        dir[1] * perp[2] - dir[2] * perp[1],
+                        dir[2] * perp[0] - dir[0] * perp[2],
+                        dir[0] * perp[1] - dir[1] * perp[0]
+                    ];
+                    const crossLen = Math.sqrt(cross[0]**2 + cross[1]**2 + cross[2]**2);
+                    const offset = [
+                        cross[0] / crossLen * thickness,
+                        cross[1] / crossLen * thickness,
+                        cross[2] / crossLen * thickness
+                    ];
+
+                    // Create quad vertices (2 triangles)
+                    const p1 = [t1[0] + offset[0], t1[1] + offset[1], t1[2] + offset[2]];
+                    const p2 = [t1[0] - offset[0], t1[1] - offset[1], t1[2] - offset[2]];
+                    const p3 = [t2[0] + offset[0], t2[1] + offset[1], t2[2] + offset[2]];
+                    const p4 = [t2[0] - offset[0], t2[1] - offset[1], t2[2] - offset[2]];
+
+                    // Triangle 1: p1, p2, p3
+                    edgePositions.push(...p1, ...p2, ...p3);
+                    edgeColors.push(0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+                    // Triangle 2: p2, p4, p3
+                    edgePositions.push(...p2, ...p4, ...p3);
+                    edgeColors.push(0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+                    // Create another quad perpendicular to the first for better visibility
+                    const cross2 = [
+                        dir[1] * cross[2] - dir[2] * cross[1],
+                        dir[2] * cross[0] - dir[0] * cross[2],
+                        dir[0] * cross[1] - dir[1] * cross[0]
+                    ];
+                    const cross2Len = Math.sqrt(cross2[0]**2 + cross2[1]**2 + cross2[2]**2);
+                    const offset2 = [
+                        cross2[0] / cross2Len * thickness,
+                        cross2[1] / cross2Len * thickness,
+                        cross2[2] / cross2Len * thickness
+                    ];
+
+                    const q1 = [t1[0] + offset2[0], t1[1] + offset2[1], t1[2] + offset2[2]];
+                    const q2 = [t1[0] - offset2[0], t1[1] - offset2[1], t1[2] - offset2[2]];
+                    const q3 = [t2[0] + offset2[0], t2[1] + offset2[1], t2[2] + offset2[2]];
+                    const q4 = [t2[0] - offset2[0], t2[1] - offset2[1], t2[2] - offset2[2]];
+
+                    // Triangle 1: q1, q2, q3
+                    edgePositions.push(...q1, ...q2, ...q3);
+                    edgeColors.push(0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+                    // Triangle 2: q2, q4, q3
+                    edgePositions.push(...q2, ...q4, ...q3);
+                    edgeColors.push(0, 0, 0, 0, 0, 0, 0, 0, 0);
+                }
+
+                // Create edge VAO
+                this.edgeVao = gl.createVertexArray();
+                gl.bindVertexArray(this.edgeVao);
+
+                const edgePosBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, edgePosBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(edgePositions), gl.STATIC_DRAW);
+                gl.enableVertexAttribArray(0);
+                gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+                const edgeColorBuffer = gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER, edgeColorBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(edgeColors), gl.STATIC_DRAW);
+                gl.enableVertexAttribArray(1);
+                gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
+
+                gl.bindVertexArray(null);
+
+                this.edgeVertexCount = edgePositions.length / 3;
+                console.log(`Edge vertex count: ${this.edgeVertexCount}`);
+            }
+
+            setupEventListeners() {
+                // Mouse events
+                this.canvas.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    this.isDragging = true;
+                    this.lastX = e.clientX;
+                    this.lastY = e.clientY;
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (this.isDragging) {
+                        const deltaX = e.clientX - this.lastX;
+                        const deltaY = e.clientY - this.lastY;
+
+                        this.rotationY += deltaX * 0.01;
+                        this.rotationX += deltaY * 0.01;
+
+                        this.lastX = e.clientX;
+                        this.lastY = e.clientY;
+
+                        this.render();
+                    }
+                });
+
+                window.addEventListener('mouseup', () => {
+                    this.isDragging = false;
+                });
+
+                // Touch events
+                this.canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (e.touches.length === 1) {
+                        this.isDragging = true;
+                        this.lastX = e.touches[0].clientX;
+                        this.lastY = e.touches[0].clientY;
+                    }
+                }, { passive: false });
+
+                this.canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    if (this.isDragging && e.touches.length === 1) {
+                        const deltaX = e.touches[0].clientX - this.lastX;
+                        const deltaY = e.touches[0].clientY - this.lastY;
+
+                        this.rotationY += deltaX * 0.01;
+                        this.rotationX += deltaY * 0.01;
+
+                        this.lastX = e.touches[0].clientX;
+                        this.lastY = e.touches[0].clientY;
+
+                        this.render();
+                    }
+                }, { passive: false });
+
+                this.canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.isDragging = false;
+                }, { passive: false });
+
+                this.canvas.addEventListener('touchcancel', (e) => {
+                    e.preventDefault();
+                    this.isDragging = false;
+                }, { passive: false });
+
+                // Wheel zoom
+                this.canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    this.zoom *= (1 - e.deltaY * 0.001);
+                    this.zoom = Math.max(0.5, Math.min(3.0, this.zoom));
+                    this.render();
+                }, { passive: false });
+
+                window.addEventListener('resize', () => this.handleResize());
+                this.handleResize();
+            }
+
+            handleResize() {
+                const dpr = window.devicePixelRatio || 1;
+                const rect = this.canvas.getBoundingClientRect();
+                this.canvas.width = rect.width * dpr;
+                this.canvas.height = rect.height * dpr;
+                this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+                this.render();
+            }
+
+            reset() {
+                this.rotationX = 0.3;
+                this.rotationY = 0.5;
+                this.zoom = 1.0;
+                this.render();
+            }
+
+            createPerspectiveMatrix(fov, aspect, near, far) {
+                const f = 1.0 / Math.tan(fov / 2);
+                const nf = 1 / (near - far);
+
+                return new Float32Array([
+                    f / aspect, 0, 0, 0,
+                    0, f, 0, 0,
+                    0, 0, (far + near) * nf, -1,
+                    0, 0, 2 * far * near * nf, 0
+                ]);
+            }
+
+            createRotationMatrix(rx, ry) {
+                const cx = Math.cos(rx);
+                const sx = Math.sin(rx);
+                const cy = Math.cos(ry);
+                const sy = Math.sin(ry);
+
+                return new Float32Array([
+                    cy, sx * sy, cx * sy, 0,
+                    0, cx, -sx, 0,
+                    -sy, sx * cy, cx * cy, 0,
+                    0, 0, -4 * this.zoom, 1
+                ]);
+            }
+
+            render() {
+                const gl = this.gl;
+
+                if (this.vertexCount === 0) {
+                    console.warn('No vertices to render');
+                    return;
+                }
+
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                gl.useProgram(this.program);
+
+                const aspect = this.canvas.width / this.canvas.height;
+                const projMatrix = this.createPerspectiveMatrix(Math.PI / 4, aspect, 0.1, 100);
+                gl.uniformMatrix4fv(this.uProjection, false, projMatrix);
+
+                const mvMatrix = this.createRotationMatrix(this.rotationX, this.rotationY);
+                gl.uniformMatrix4fv(this.uModelView, false, mvMatrix);
+
+                // Draw points first
+                gl.uniform1f(this.uPointSize, 10.0);
+                gl.bindVertexArray(this.vao);
+                gl.drawArrays(gl.POINTS, 0, this.vertexCount);
+                gl.bindVertexArray(null);
+
+                // Draw edges with depth offset and without depth write
+                // This keeps proper 3D occlusion but edges always show through nearby points
+                gl.enable(gl.POLYGON_OFFSET_FILL);
+                gl.polygonOffset(-15.0, -15.0);
+                gl.depthMask(false);  // Don't write to depth buffer
+                gl.bindVertexArray(this.edgeVao);
+                gl.drawArrays(gl.TRIANGLES, 0, this.edgeVertexCount);
+                gl.bindVertexArray(null);
+                gl.depthMask(true);   // Re-enable depth writing
+                gl.disable(gl.POLYGON_OFFSET_FILL);
+            }
+        }
+
+        // ============================================================================
+        // INITIALIZE
+        // ============================================================================
+
+        let rgbViewer, labViewer;
+
+        console.log('Generating point cloud...');
+        const pointCloud = generatePointCloud(permutahedronData, 80);
+        console.log('Point cloud ready:', pointCloud.length, 'points');
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const loading = document.getElementById('loading');
+            const container = document.getElementById('container');
+
+            try {
+                if (pointCloud.length === 0) {
+                    throw new Error('Point cloud generation failed');
+                }
+
+                console.log('Initializing viewers...');
+
+                rgbViewer = new PermutahedronViewer('canvas-rgb', pointCloud, false);
+                labViewer = new PermutahedronViewer('canvas-lab', pointCloud, true);
+
+                document.getElementById('reset-rgb').addEventListener('click', () => {
+                    rgbViewer.reset();
+                });
+
+                document.getElementById('reset-lab').addEventListener('click', () => {
+                    labViewer.reset();
+                });
+
+                loading.style.display = 'none';
+                container.style.opacity = '1';
+
+                console.log('Initialization complete');
+            } catch (error) {
+                console.error('Error:', error);
+                loading.innerHTML = `
+                    <div style="font-size: 18px; color: #ff4444;">Error: ${error.message}</div>
+                    <div style="font-size: 13px; color: #888;">Check console for details</div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

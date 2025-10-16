@@ -848,6 +848,45 @@
           return [L, a, bv];
       }
 
+      function lab2rgb(L, a, b) {
+          // Convert LAB back to XYZ
+          const fy = (L + 16) / 116;
+          const fx = a / 500 + fy;
+          const fz = fy - b / 200;
+
+          const finv = (t) => t > 0.206897 ? Math.pow(t, 3) : (t - 16/116) / 7.787;
+
+          const ref = [0.95047, 1.00000, 1.08883];
+          let x = finv(fx) * ref[0];
+          let y = finv(fy) * ref[1];
+          let z = finv(fz) * ref[2];
+
+          // Convert XYZ to linear RGB
+          let lr = x * 3.2404542 + y * -1.5371385 + z * -0.4985314;
+          let lg = x * -0.9692660 + y * 1.8760108 + z * 0.0415560;
+          let lb = x * 0.0556434 + y * -0.2040259 + z * 1.0572252;
+
+          // Convert linear RGB to sRGB
+          const toSRGB = (c) => {
+              if (c <= 0.0031308) {
+                  return 12.92 * c;
+              } else {
+                  return 1.055 * Math.pow(c, 1/2.4) - 0.055;
+              }
+          };
+
+          let r = toSRGB(lr);
+          let g = toSRGB(lg);
+          let bOut = toSRGB(lb);
+
+          // Clamp to [0, 1] range
+          r = Math.max(0, Math.min(1, r));
+          g = Math.max(0, Math.min(1, g));
+          bOut = Math.max(0, Math.min(1, bOut));
+
+          return [r, g, bOut];
+      }
+
       // --- Scene setup ---
       const container = document.getElementById('canvas-container');
       const scene = new THREE.Scene();
@@ -1229,7 +1268,7 @@
                       if (!binColors.has(key)) {
                           binColors.set(key, []);
                       }
-                      binColors.get(key).push({ r, g, b, L });
+                      binColors.get(key).push({ r, g, b, L, a, bv });
                   }
               }
           }
@@ -1239,18 +1278,20 @@
               let representative;
 
               if (method === 'average') {
-                  // Average RGB values
+                  // Average LAB values
                   const sum = colors.reduce((acc, c) => ({
-                      r: acc.r + c.r,
-                      g: acc.g + c.g,
-                      b: acc.b + c.b
-                  }), { r: 0, g: 0, b: 0 });
+                      L: acc.L + c.L,
+                      a: acc.a + c.a,
+                      b: acc.b + c.bv
+                  }), { L: 0, a: 0, b: 0 });
 
-                  representative = {
-                      r: sum.r / colors.length,
-                      g: sum.g / colors.length,
-                      b: sum.b / colors.length
-                  };
+                  const avgL = sum.L / colors.length;
+                  const avgA = sum.a / colors.length;
+                  const avgB = sum.b / colors.length;
+
+                  // Convert averaged LAB back to RGB
+                  const [r, g, b] = lab2rgb(avgL, avgA, avgB);
+                  representative = { r, g, b };
               } else if (method === 'darkest') {
                   // Find color with lowest L value
                   representative = colors.reduce((darkest, c) =>

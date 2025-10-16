@@ -75,7 +75,7 @@
             box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
             padding: 6px 12px;
             z-index: 1001;
-            font-size: 13px;
+            font-size: 17px;
             font-weight: 500;
             color: var(--fg-primary);
             cursor: pointer;
@@ -101,7 +101,7 @@
             box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
             padding: 16px;
             z-index: 1000;
-            min-width: 200px;
+            min-width: 140px;
             max-height: 80vh;
             max-height: -webkit-fill-available;
             max-height: 80svh;
@@ -134,7 +134,7 @@
         }
 
         .control-label {
-            font-size: 11px;
+            font-size: 14px;
             color: var(--fg-secondary);
             margin-bottom: 4px;
             display: block;
@@ -145,7 +145,7 @@
         }
 
         .slice-panel .control-label {
-            font-size: 10px;
+            font-size: 13px;
             margin-bottom: 3px;
         }
 
@@ -201,17 +201,17 @@
         }
 
         .slider-value {
-            font-size: 12px;
+            font-size: 16px;
             color: var(--fg-secondary);
             text-align: right;
         }
 
         .slice-panel .slider-value {
-            font-size: 10px;
+            font-size: 13px;
         }
 
         .bins-panel .control-label {
-            font-size: 10px;
+            font-size: 13px;
             margin-bottom: 3px;
         }
 
@@ -220,7 +220,7 @@
         }
 
         .bins-panel .slider-value {
-            font-size: 10px;
+            font-size: 13px;
         }
 
         /* Action buttons */
@@ -232,7 +232,7 @@
             border: 1px solid var(--border);
             border-radius: 6px;
             color: var(--fg-primary);
-            font-size: 13px;
+            font-size: 17px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -268,7 +268,7 @@
 
         /* Info text */
         .info-text {
-            font-size: 11px;
+            font-size: 14px;
             color: var(--fg-secondary);
             line-height: 1.4;
             margin-top: 4px;
@@ -279,14 +279,14 @@
         }
 
         .slice-panel .info-text {
-            font-size: 9px;
+            font-size: 12px;
             line-height: 1.3;
             padding: 5px;
             margin-top: 6px;
         }
 
         .bins-panel .info-text {
-            font-size: 9px;
+            font-size: 12px;
             line-height: 1.3;
             padding: 5px;
             margin-top: 6px;
@@ -294,7 +294,7 @@
 
         /* Bin display */
         .bin-display {
-            font-size: 10px;
+            font-size: 13px;
             color: var(--fg-primary);
             padding: 6px 8px;
             background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
@@ -323,7 +323,7 @@
             border-radius: 8px;
             box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
             padding: 6px 12px;
-            font-size: 13px;
+            font-size: 17px;
             font-weight: 500;
             color: var(--fg-primary);
             cursor: pointer;
@@ -345,7 +345,7 @@
             right: 108px;
             display: none;
             padding: 12px;
-            min-width: 180px;
+            min-width: 126px;
         }
 
         .bins-panel {
@@ -353,7 +353,7 @@
             right: 20px;
             display: none;
             padding: 12px;
-            min-width: 180px;
+            min-width: 126px;
         }
 
         /* Vector input group */
@@ -371,7 +371,7 @@
         }
 
         .vector-input-label {
-            font-size: 9px;
+            font-size: 12px;
             color: var(--fg-secondary);
             text-align: center;
             font-weight: 500;
@@ -384,7 +384,7 @@
             border: 1px solid var(--border);
             border-radius: 4px;
             color: var(--fg-primary);
-            font-size: 12px;
+            font-size: 16px;
             font-weight: 500;
             text-align: center;
             font-family: inherit;
@@ -436,16 +436,45 @@
         }
 
         .toggle-label {
-            font-size: 12px;
+            font-size: 16px;
             color: var(--fg-secondary);
             cursor: pointer;
             user-select: none;
         }
 
+        /* Toggle row for side-by-side toggles */
+        .toggle-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .toggle-row .toggle-wrapper {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        /* Cycle row for cycle toggle + slider on same line */
+        .cycle-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .cycle-row .toggle-wrapper {
+            flex-shrink: 0;
+            margin-bottom: 0;
+        }
+
+        .cycle-row .slider-wrapper {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .floating-panel {
-                min-width: 180px;
+                min-width: 126px;
                 max-height: 60vh;
                 max-height: -webkit-fill-available;
                 max-height: 60svh;
@@ -473,7 +502,7 @@
                 top: 15px;
                 left: 15px;
                 padding: 6px 10px;
-                font-size: 12px;
+                font-size: 16px;
             }
 
             .top-right-buttons {
@@ -484,7 +513,7 @@
 
             .slice-button, .bins-button {
                 padding: 6px 10px;
-                font-size: 12px;
+                font-size: 16px;
                 min-width: 70px;
             }
         }
@@ -586,6 +615,19 @@
 
     <!-- Bins Panel -->
     <div class="floating-panel bins-panel" id="binsPanel">
+        <!-- Top row: Two toggles side by side -->
+        <div class="toggle-row">
+            <div class="toggle-wrapper">
+                <div class="toggle" id="binFilterToggle"></div>
+                <span class="toggle-label">Single Bin</span>
+            </div>
+            <div class="toggle-wrapper">
+                <div class="toggle" id="representativesToggle"></div>
+                <span class="toggle-label">See Representatives</span>
+            </div>
+        </div>
+
+        <!-- Bins per channel -->
         <div class="control-group">
             <label class="control-label">Bins per Channel</label>
             <div class="vector-inputs">
@@ -604,41 +646,44 @@
             </div>
         </div>
 
+        <!-- Representative method -->
+        <div class="control-group">
+            <label class="control-label">Representative Method</label>
+            <select id="representativeMethod" style="width: 100%; padding: 6px 8px; background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%); border: 1px solid var(--border); border-radius: 6px; color: var(--fg-primary); font-size: 16px; font-family: inherit; cursor: pointer;">
+                <option value="average">Average RGB</option>
+                <option value="darkest">Darkest (Lowest L)</option>
+                <option value="lightest">Lightest (Highest L)</option>
+            </select>
+        </div>
+
+        <!-- Pick color and find bin -->
         <div class="control-group">
             <label class="control-label">Pick Color</label>
             <input type="color" id="colorPicker" value="#808080" style="width: 100%; height: 32px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; background: transparent;">
         </div>
 
         <div class="control-group">
-            <button class="action-btn" id="computeBinBtn">Compute Bin</button>
+            <button class="action-btn" id="computeBinBtn">Find Bin</button>
             <div class="bin-display" id="binDisplay">Bin: -</div>
         </div>
 
+        <!-- Cycle bins with speed slider on same line -->
         <div class="control-group">
-            <div class="toggle-wrapper">
-                <div class="toggle" id="binFilterToggle"></div>
-                <span class="toggle-label">Enable Filter</span>
-            </div>
-        </div>
-
-        <div class="control-group">
-            <label class="control-label">Cycle Speed</label>
-            <div class="slider-wrapper">
-                <input type="range" class="slider" id="cycleSpeed"
-                       min="0.1" max="3" step="0.1" value="1">
-                <div class="slider-value" id="cycleSpeedValue">1.0s</div>
-            </div>
-        </div>
-
-        <div class="control-group">
-            <div class="toggle-wrapper">
-                <div class="toggle" id="cycleBinToggle"></div>
-                <span class="toggle-label">Cycle Bins</span>
+            <div class="cycle-row">
+                <div class="toggle-wrapper">
+                    <div class="toggle" id="cycleBinToggle"></div>
+                    <span class="toggle-label">Cycle Bins</span>
+                </div>
+                <div class="slider-wrapper">
+                    <input type="range" class="slider" id="cycleSpeed"
+                           min="0.1" max="3" step="0.1" value="1">
+                    <div class="slider-value" id="cycleSpeedValue">1.0s</div>
+                </div>
             </div>
         </div>
 
         <div class="info-text">
-            Set bin counts per channel, pick an RGB color, compute its bin, then filter to show only points in the same bin. Cycle Bins iterates through all occupied bins.
+            Set bin counts per channel, pick an RGB color, find its bin, then filter to show only points in the same bin. Cycle Bins iterates through all occupied bins.
         </div>
     </div>
 
@@ -686,6 +731,8 @@
       const binDisplay = document.getElementById('binDisplay');
       const binFilterToggle = document.getElementById('binFilterToggle');
       const cycleBinToggle = document.getElementById('cycleBinToggle');
+      const representativesToggle = document.getElementById('representativesToggle');
+      const representativeMethod = document.getElementById('representativeMethod');
 
       // Slicing parameters
       let slicingEnabled = false;
@@ -702,6 +749,10 @@
       let currentBinIndex = { l: 0, a: 0, b: 0 };
       let validBins = [];
       let validBinCycleIndex = 0;
+
+      // Representatives mode
+      let representativesEnabled = false;
+      let representativeColors = new Map(); // Map from bin key to RGB color
 
       // Options panel toggle
       let panelVisible = false;
@@ -726,6 +777,16 @@
       sliceBtn.addEventListener('click', () => {
           slicePanelVisible = !slicePanelVisible;
           if (slicePanelVisible) {
+              // Close bins panel if open
+              if (binsPanelVisible) {
+                  binsPanelVisible = false;
+                  binsPanel.classList.remove('expanded');
+                  setTimeout(() => {
+                      if (!binsPanelVisible) binsPanel.style.display = 'none';
+                  }, 300);
+                  binsBtn.textContent = 'Bins';
+              }
+
               slicePanel.style.display = 'block';
               slicePanel.offsetHeight; // Force reflow
               slicePanel.classList.add('expanded');
@@ -744,6 +805,16 @@
       binsBtn.addEventListener('click', () => {
           binsPanelVisible = !binsPanelVisible;
           if (binsPanelVisible) {
+              // Close slice panel if open
+              if (slicePanelVisible) {
+                  slicePanelVisible = false;
+                  slicePanel.classList.remove('expanded');
+                  setTimeout(() => {
+                      if (!slicePanelVisible) slicePanel.style.display = 'none';
+                  }, 300);
+                  sliceBtn.textContent = 'Slice';
+              }
+
               binsPanel.style.display = 'block';
               binsPanel.offsetHeight; // Force reflow
               binsPanel.classList.add('expanded');
@@ -821,7 +892,21 @@
                       // Check if point passes both slice and bin filters
                       if (isPointInSlice(a, L, bv) && isPointInTargetBin(a, L, bv)) {
                           points.push(a, L, bv); // X=a, Y=L, Z=b
-                          colors.push(r, g, b);
+
+                          // Use representative color if enabled, otherwise use actual color
+                          if (representativesEnabled) {
+                              const bin = computeBin(L, a, bv);
+                              const key = `${bin.l},${bin.a},${bin.b}`;
+                              const representative = representativeColors.get(key);
+                              if (representative) {
+                                  colors.push(representative.r, representative.g, representative.b);
+                              } else {
+                                  // Fallback to actual color if representative not found
+                                  colors.push(r, g, b);
+                              }
+                          } else {
+                              colors.push(r, g, b);
+                          }
                       }
                   }
               }
@@ -1057,6 +1142,12 @@
           binFilterToggle.classList.toggle('active');
           binFilterEnabled = binFilterToggle.classList.contains('active');
 
+          // Disable representatives mode when single bin is enabled
+          if (binFilterEnabled && representativesEnabled) {
+              representativesToggle.classList.remove('active');
+              representativesEnabled = false;
+          }
+
           if (binFilterEnabled && targetBin.l < 0) {
               // Auto-compute bin if not already computed
               computeBinBtn.click();
@@ -1109,6 +1200,75 @@
           console.log(`Found ${validBins.length} valid bins out of ${binsPerChannel.l * binsPerChannel.a * binsPerChannel.b} possible bins`);
       }
 
+      // Compute representative colors for each bin
+      function computeRepresentativeColors() {
+          // Update bins per channel from inputs
+          binsPerChannel.l = parseInt(binsLInput.value);
+          binsPerChannel.a = parseInt(binsAInput.value);
+          binsPerChannel.b = parseInt(binsBInput.value);
+
+          const method = representativeMethod.value;
+          representativeColors.clear();
+
+          // Map to store all colors in each bin
+          const binColors = new Map();
+
+          // Sample RGB space at high resolution
+          const sampleRes = 32;
+          for (let ri = 0; ri < sampleRes; ri++) {
+              for (let gi = 0; gi < sampleRes; gi++) {
+                  for (let bi = 0; bi < sampleRes; bi++) {
+                      const r = ri / (sampleRes - 1);
+                      const g = gi / (sampleRes - 1);
+                      const b = bi / (sampleRes - 1);
+
+                      const [L, a, bv] = rgb2lab(r, g, b);
+                      const bin = computeBin(L, a, bv);
+                      const key = `${bin.l},${bin.a},${bin.b}`;
+
+                      if (!binColors.has(key)) {
+                          binColors.set(key, []);
+                      }
+                      binColors.get(key).push({ r, g, b, L });
+                  }
+              }
+          }
+
+          // Compute representative for each bin based on method
+          for (const [key, colors] of binColors.entries()) {
+              let representative;
+
+              if (method === 'average') {
+                  // Average RGB values
+                  const sum = colors.reduce((acc, c) => ({
+                      r: acc.r + c.r,
+                      g: acc.g + c.g,
+                      b: acc.b + c.b
+                  }), { r: 0, g: 0, b: 0 });
+
+                  representative = {
+                      r: sum.r / colors.length,
+                      g: sum.g / colors.length,
+                      b: sum.b / colors.length
+                  };
+              } else if (method === 'darkest') {
+                  // Find color with lowest L value
+                  representative = colors.reduce((darkest, c) =>
+                      c.L < darkest.L ? c : darkest
+                  );
+              } else if (method === 'lightest') {
+                  // Find color with highest L value
+                  representative = colors.reduce((lightest, c) =>
+                      c.L > lightest.L ? c : lightest
+                  );
+              }
+
+              representativeColors.set(key, representative);
+          }
+
+          console.log(`Computed ${representativeColors.size} representative colors using method: ${method}`);
+      }
+
       // Iterate through valid bins only
       function selectNextBin() {
           if (validBins.length === 0) return;
@@ -1130,23 +1290,45 @@
           cycleBinEnabled = cycleBinToggle.classList.contains('active');
 
           if (cycleBinEnabled) {
+              // Disable representatives mode first
+              if (representativesEnabled) {
+                  representativesToggle.classList.remove('active');
+                  representativesEnabled = false;
+              }
+
               // Enable bin filter automatically
               if (!binFilterEnabled) {
                   binFilterToggle.classList.add('active');
                   binFilterEnabled = true;
               }
 
-              // Compute which bins contain RGB values
+              // Update bins per channel from inputs
+              binsPerChannel.l = parseInt(binsLInput.value);
+              binsPerChannel.a = parseInt(binsAInput.value);
+              binsPerChannel.b = parseInt(binsBInput.value);
+
+              // Compute which bins contain RGB values (non-empty bins only)
               computeValidBins();
+
+              if (validBins.length === 0) {
+                  console.warn('No valid bins found!');
+                  cycleBinToggle.classList.remove('active');
+                  cycleBinEnabled = false;
+                  return;
+              }
 
               // Reset to first valid bin
               validBinCycleIndex = 0;
 
-              // Select first bin immediately
+              // Select first bin immediately (this will update the point cloud)
               selectNextBin();
 
-              // Start interval to change bins every second
-              cycleBinInterval = setInterval(selectNextBin, 1000);
+              // Get cycle speed from slider
+              const cycleSpeedSeconds = parseFloat(document.getElementById('cycleSpeed').value);
+              const intervalMs = cycleSpeedSeconds * 1000;
+
+              // Start interval to change bins
+              cycleBinInterval = setInterval(selectNextBin, intervalMs);
           } else {
               // Stop the interval
               if (cycleBinInterval) {
@@ -1156,10 +1338,88 @@
           }
       });
 
+      // Representatives toggle
+      representativesToggle.addEventListener('click', () => {
+          representativesToggle.classList.toggle('active');
+          representativesEnabled = representativesToggle.classList.contains('active');
+
+          if (representativesEnabled) {
+              // Disable single bin filter when representatives is enabled
+              if (binFilterEnabled) {
+                  binFilterToggle.classList.remove('active');
+                  binFilterEnabled = false;
+                  // Stop cycling if active
+                  if (cycleBinEnabled) {
+                      cycleBinToggle.classList.remove('active');
+                      cycleBinEnabled = false;
+                      if (cycleBinInterval) {
+                          clearInterval(cycleBinInterval);
+                          cycleBinInterval = null;
+                      }
+                  }
+              }
+
+              // Compute representative colors
+              computeRepresentativeColors();
+          }
+
+          // Regenerate point cloud
+          createPointCloud(parseInt(gridResSlider.value), parseFloat(pointSizeSlider.value));
+      });
+
+      // Representative method dropdown
+      representativeMethod.addEventListener('change', () => {
+          if (representativesEnabled) {
+              // Recompute representatives with new method
+              computeRepresentativeColors();
+              // Regenerate point cloud
+              createPointCloud(parseInt(gridResSlider.value), parseFloat(pointSizeSlider.value));
+          }
+      });
+
+      // Bin input changes - recompute representatives if enabled
+      binsLInput.addEventListener('input', () => {
+          if (representativesEnabled) {
+              computeRepresentativeColors();
+              createPointCloud(parseInt(gridResSlider.value), parseFloat(pointSizeSlider.value));
+          }
+      });
+
+      binsAInput.addEventListener('input', () => {
+          if (representativesEnabled) {
+              computeRepresentativeColors();
+              createPointCloud(parseInt(gridResSlider.value), parseFloat(pointSizeSlider.value));
+          }
+      });
+
+      binsBInput.addEventListener('input', () => {
+          if (representativesEnabled) {
+              computeRepresentativeColors();
+              createPointCloud(parseInt(gridResSlider.value), parseFloat(pointSizeSlider.value));
+          }
+      });
+
+      // Cycle speed slider
+      const cycleSpeedSlider = document.getElementById('cycleSpeed');
+      const cycleSpeedValue = document.getElementById('cycleSpeedValue');
+
+      cycleSpeedSlider.addEventListener('input', () => {
+          const speed = parseFloat(cycleSpeedSlider.value);
+          cycleSpeedValue.textContent = `${speed.toFixed(1)}s`;
+
+          // If cycling is active, restart the interval with new speed
+          if (cycleBinEnabled && cycleBinInterval) {
+              clearInterval(cycleBinInterval);
+              const intervalMs = speed * 1000;
+              cycleBinInterval = setInterval(selectNextBin, intervalMs);
+          }
+      });
+
       // Slice toggle
       sliceToggle.addEventListener('click', () => {
           sliceToggle.classList.toggle('active');
           slicingEnabled = sliceToggle.classList.contains('active');
+
           createPointCloud(parseInt(gridResSlider.value), parseFloat(pointSizeSlider.value));
       });
 

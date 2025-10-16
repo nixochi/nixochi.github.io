@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>sRGB Gamut in CIELAB Space</title>
+
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+    <style>
+        /* CSS Variables - Dark mode only */
+        :root {
+            --bg-primary: #161617;
+            --bg-secondary: #1c1c1e;
+            --fg-primary: #f3f3f3;
+            --fg-secondary: #b9b9b9;
+            --border: #222224;
+            --shadow: rgba(0,0,0,0.5);
+            --backdrop-blur: rgba(28, 28, 30, 0.9);
+            --radius: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            height: 100vh;
+            height: -webkit-fill-available;
+            height: 100svh;
+            overflow: hidden;
+            touch-action: none;
+            -ms-touch-action: none;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        body {
+            visibility: visible;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--fg-primary);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            width: -webkit-fill-available;
+            width: 100svw;
+            height: 100vh;
+            height: -webkit-fill-available;
+            height: 100svh;
+            display: block;
+            position: relative;
+        }
+
+        /* Options button - Top Left */
+        .options-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: var(--backdrop-blur);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
+            padding: 6px 12px;
+            z-index: 1001;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--fg-primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            min-width: 80px;
+            text-align: center;
+            font-family: inherit;
+        }
+
+        .options-button:hover {
+            background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+            border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+        }
+
+        /* Floating Panel */
+        .floating-panel {
+            position: absolute;
+            background: var(--backdrop-blur);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
+            padding: 16px;
+            z-index: 1000;
+            min-width: 200px;
+            max-height: 80vh;
+            max-height: -webkit-fill-available;
+            max-height: 80svh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            transition: all 0.3s ease;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+        }
+
+        .floating-panel.expanded {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .controls-panel {
+            top: 68px;
+            left: 20px;
+            display: none;
+        }
+
+        .control-group {
+            margin-bottom: 10px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-label {
+            font-size: 11px;
+            color: var(--fg-secondary);
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .slice-panel .control-group {
+            margin-bottom: 8px;
+        }
+
+        .slice-panel .control-label {
+            font-size: 10px;
+            margin-bottom: 3px;
+        }
+
+        /* Slider wrapper */
+        .slider-wrapper {
+            margin-bottom: 12px;
+        }
+
+        .slider-wrapper:last-child {
+            margin-bottom: 0;
+        }
+
+        .slice-panel .slider-wrapper {
+            margin-bottom: 0;
+        }
+
+        /* Range slider styling */
+        .slider {
+            width: 100%;
+            margin-bottom: 4px;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            outline: none;
+            appearance: none;
+            cursor: pointer;
+        }
+
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.1s ease;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            background: color-mix(in srgb, var(--fg-secondary) 80%, var(--bg-secondary) 20%);
+            transform: scale(1.1);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .slider-value {
+            font-size: 12px;
+            color: var(--fg-secondary);
+            text-align: right;
+        }
+
+        .slice-panel .slider-value {
+            font-size: 10px;
+        }
+
+        .bins-panel .control-label {
+            font-size: 10px;
+            margin-bottom: 3px;
+        }
+
+        .bins-panel .slider-wrapper {
+            margin-bottom: 0;
+        }
+
+        .bins-panel .slider-value {
+            font-size: 10px;
+        }
+
+        /* Action buttons */
+        .action-btn {
+            width: 100%;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--fg-primary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+
+        .action-btn:hover {
+            background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+            border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+        }
+
+        .action-btn:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Custom scrollbar for floating panels */
+        .floating-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .floating-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .floating-panel::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        .floating-panel::-webkit-scrollbar-thumb:hover {
+            background: var(--fg-secondary);
+        }
+
+        /* Info text */
+        .info-text {
+            font-size: 11px;
+            color: var(--fg-secondary);
+            line-height: 1.4;
+            margin-top: 4px;
+            padding: 6px;
+            background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .slice-panel .info-text {
+            font-size: 9px;
+            line-height: 1.3;
+            padding: 5px;
+            margin-top: 6px;
+        }
+
+        .bins-panel .info-text {
+            font-size: 9px;
+            line-height: 1.3;
+            padding: 5px;
+            margin-top: 6px;
+        }
+
+        /* Bin display */
+        .bin-display {
+            font-size: 10px;
+            color: var(--fg-primary);
+            padding: 6px 8px;
+            background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            margin-top: 4px;
+        }
+
+        /* Top Right Buttons */
+        .top-right-buttons {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+            z-index: 1001;
+        }
+
+        .slice-button,
+        .bins-button {
+            background: var(--backdrop-blur);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px rgba(0,0,0,.06);
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--fg-primary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            min-width: 80px;
+            text-align: center;
+            font-family: inherit;
+        }
+
+        .slice-button:hover,
+        .bins-button:hover {
+            background: color-mix(in srgb, var(--bg-secondary) 60%, var(--border) 40%);
+            border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+        }
+
+        .slice-panel {
+            top: 68px;
+            right: 108px;
+            display: none;
+            padding: 12px;
+            min-width: 180px;
+        }
+
+        .bins-panel {
+            top: 68px;
+            right: 20px;
+            display: none;
+            padding: 12px;
+            min-width: 180px;
+        }
+
+        /* Vector input group */
+        .vector-inputs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .vector-input-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .vector-input-label {
+            font-size: 9px;
+            color: var(--fg-secondary);
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .vector-input {
+            width: 100%;
+            padding: 4px 6px;
+            background: color-mix(in srgb, var(--bg-secondary) 80%, var(--border) 20%);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--fg-primary);
+            font-size: 12px;
+            font-weight: 500;
+            text-align: center;
+            font-family: inherit;
+        }
+
+        .vector-input:focus {
+            outline: none;
+            border-color: color-mix(in srgb, var(--border) 70%, var(--fg-secondary) 30%);
+        }
+
+        /* Toggle wrapper */
+        .toggle-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 0;
+        }
+
+        /* Toggle switch */
+        .toggle {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            background-color: var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .toggle.active {
+            background-color: color-mix(in srgb, var(--fg-secondary) 70%, var(--bg-secondary) 30%);
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .toggle.active::after {
+            transform: translateX(16px);
+        }
+
+        .toggle-label {
+            font-size: 12px;
+            color: var(--fg-secondary);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .floating-panel {
+                min-width: 180px;
+                max-height: 60vh;
+                max-height: -webkit-fill-available;
+                max-height: 60svh;
+            }
+
+            .controls-panel {
+                top: 60px;
+                left: 15px;
+                padding: 12px;
+            }
+
+            .slice-panel {
+                top: 60px;
+                right: 95px;
+                padding: 12px;
+            }
+
+            .bins-panel {
+                top: 60px;
+                right: 15px;
+                padding: 12px;
+            }
+
+            .options-button {
+                top: 15px;
+                left: 15px;
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+
+            .top-right-buttons {
+                top: 15px;
+                right: 15px;
+                gap: 6px;
+            }
+
+            .slice-button, .bins-button {
+                padding: 6px 10px;
+                font-size: 12px;
+                min-width: 70px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Left Button -->
+    <button class="options-button" id="optionsBtn">Options</button>
+
+    <!-- Top Right Buttons -->
+    <div class="top-right-buttons">
+        <button class="slice-button" id="sliceBtn">Slice</button>
+        <button class="bins-button" id="binsBtn">Bins</button>
+    </div>
+
+    <!-- Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Compact Controls Panel -->
+    <div class="floating-panel controls-panel" id="controlsPanel">
+        <div class="control-group">
+            <label class="control-label">Grid Resolution</label>
+            <div class="slider-wrapper">
+                <input type="range" class="slider" id="gridResolution"
+                       min="8" max="32" step="2" value="32">
+                <div class="slider-value"><span id="resLabel">32</span> per channel (<span id="pointCount">32,768</span> pts)</div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Point Size</label>
+            <div class="slider-wrapper">
+                <input type="range" class="slider" id="pointSize"
+                       min="0.5" max="8" step="0.5" value="8">
+                <div class="slider-value" id="sizeLabel">8.0</div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Actions</label>
+            <button class="action-btn" id="exportBtn">Export Image</button>
+        </div>
+
+        <div class="info-text">
+            Full CIELAB space: L[0,100], a[-128,128], b[-128,128]<br>
+            Drag to rotate • Scroll to zoom
+        </div>
+    </div>
+
+    <!-- Slice Panel -->
+    <div class="floating-panel slice-panel" id="slicePanel">
+        <div class="control-group">
+            <label class="control-label">Plane Normal (A, L, B)</label>
+            <div class="vector-inputs">
+                <div class="vector-input-wrapper">
+                    <div class="vector-input-label">A</div>
+                    <input type="number" class="vector-input" id="normalA" value="0" step="0.1">
+                </div>
+                <div class="vector-input-wrapper">
+                    <div class="vector-input-label">L</div>
+                    <input type="number" class="vector-input" id="normalL" value="1" step="0.1">
+                </div>
+                <div class="vector-input-wrapper">
+                    <div class="vector-input-label">B</div>
+                    <input type="number" class="vector-input" id="normalB" value="0" step="0.1">
+                </div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Plane Position</label>
+            <div class="slider-wrapper">
+                <input type="range" class="slider" id="planeDistance"
+                       min="-100" max="200" step="1" value="50">
+                <div class="slider-value" id="planeDistValue">50</div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Slice Thickness</label>
+            <div class="slider-wrapper">
+                <input type="range" class="slider" id="sliceTolerance"
+                       min="1" max="50" step="1" value="10">
+                <div class="slider-value" id="toleranceValue">10</div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="toggle-wrapper">
+                <div class="toggle" id="sliceToggle"></div>
+                <span class="toggle-label">Enable Slicing</span>
+            </div>
+        </div>
+
+        <div class="info-text">
+            Define a cutting plane using its normal vector (A, L, B). Move the plane with the position slider and adjust thickness to control visibility.
+        </div>
+    </div>
+
+    <!-- Bins Panel -->
+    <div class="floating-panel bins-panel" id="binsPanel">
+        <div class="control-group">
+            <label class="control-label">Bins per Channel</label>
+            <div class="vector-inputs">
+                <div class="vector-input-wrapper">
+                    <div class="vector-input-label">L</div>
+                    <input type="number" class="vector-input" id="binsL" value="8" min="1" max="32" step="1">
+                </div>
+                <div class="vector-input-wrapper">
+                    <div class="vector-input-label">A</div>
+                    <input type="number" class="vector-input" id="binsA" value="8" min="1" max="32" step="1">
+                </div>
+                <div class="vector-input-wrapper">
+                    <div class="vector-input-label">B</div>
+                    <input type="number" class="vector-input" id="binsB" value="8" min="1" max="32" step="1">
+                </div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Pick Color</label>
+            <input type="color" id="colorPicker" value="#808080" style="width: 100%; height: 32px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; background: transparent;">
+        </div>
+
+        <div class="control-group">
+            <button class="action-btn" id="computeBinBtn">Compute Bin</button>
+            <div class="bin-display" id="binDisplay">Bin: -</div>
+        </div>
+
+        <div class="control-group">
+            <div class="toggle-wrapper">
+                <div class="toggle" id="binFilterToggle"></div>
+                <span class="toggle-label">Enable Filter</span>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label class="control-label">Cycle Speed</label>
+            <div class="slider-wrapper">
+                <input type="range" class="slider" id="cycleSpeed"
+                       min="0.1" max="3" step="0.1" value="1">
+                <div class="slider-value" id="cycleSpeedValue">1.0s</div>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="toggle-wrapper">
+                <div class="toggle" id="cycleBinToggle"></div>
+                <span class="toggle-label">Cycle Bins</span>
+            </div>
+        </div>
+
+        <div class="info-text">
+            Set bin counts per channel, pick an RGB color, compute its bin, then filter to show only points in the same bin. Cycle Bins iterates through all occupied bins.
+        </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from 'three';
+      import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+      // DOM elements
+      const optionsBtn = document.getElementById('optionsBtn');
+      const controlsPanel = document.getElementById('controlsPanel');
+      const gridResSlider = document.getElementById('gridResolution');
+      const pointSizeSlider = document.getElementById('pointSize');
+      const resLabel = document.getElementById('resLabel');
+      const pointCountEl = document.getElementById('pointCount');
+      const sizeLabel = document.getElementById('sizeLabel');
+      const exportBtn = document.getElementById('exportBtn');
+
+      const sliceBtn = document.getElementById('sliceBtn');
+      const slicePanel = document.getElementById('slicePanel');
+      const normalAInput = document.getElementById('normalA');
+      const normalLInput = document.getElementById('normalL');
+      const normalBInput = document.getElementById('normalB');
+      const planeDistSlider = document.getElementById('planeDistance');
+      const planeDistValue = document.getElementById('planeDistValue');
+      const toleranceSlider = document.getElementById('sliceTolerance');
+      const toleranceValue = document.getElementById('toleranceValue');
+      const sliceToggle = document.getElementById('sliceToggle');
+
+      const binsBtn = document.getElementById('binsBtn');
+      const binsPanel = document.getElementById('binsPanel');
+      const binsLInput = document.getElementById('binsL');
+      const binsAInput = document.getElementById('binsA');
+      const binsBInput = document.getElementById('binsB');
+      const colorPicker = document.getElementById('colorPicker');
+      const computeBinBtn = document.getElementById('computeBinBtn');
+      const binDisplay = document.getElementById('binDisplay');
+      const binFilterToggle = document.getElementById('binFilterToggle');
+      const cycleBinToggle = document.getElementById('cycleBinToggle');
+
+      // Slicing parameters
+      let slicingEnabled = false;
+      let sliceNormal = { a: 0, l: 1, b: 0 };
+      let sliceDistance = 50;
+      let sliceTolerance = 10;
+
+      // Binning parameters
+      let binFilterEnabled = false;
+      let cycleBinEnabled = false;
+      let cycleBinInterval = null;
+      let binsPerChannel = { l: 8, a: 8, b: 8 };
+      let targetBin = { l: -1, a: -1, b: -1 };
+      let currentBinIndex = { l: 0, a: 0, b: 0 };
+      let validBins = [];
+      let validBinCycleIndex = 0;
+
+      // Options panel toggle
+      let panelVisible = false;
+      optionsBtn.addEventListener('click', () => {
+          panelVisible = !panelVisible;
+          if (panelVisible) {
+              controlsPanel.style.display = 'block';
+              controlsPanel.offsetHeight; // Force reflow
+              controlsPanel.classList.add('expanded');
+              optionsBtn.textContent = 'Close';
+          } else {
+              controlsPanel.classList.remove('expanded');
+              setTimeout(() => {
+                  if (!panelVisible) controlsPanel.style.display = 'none';
+              }, 300);
+              optionsBtn.textContent = 'Options';
+          }
+      });
+
+      // Slice panel toggle
+      let slicePanelVisible = false;
+      sliceBtn.addEventListener('click', () => {
+          slicePanelVisible = !slicePanelVisible;
+          if (slicePanelVisible) {
+              slicePanel.style.display = 'block';
+              slicePanel.offsetHeight; // Force reflow
+              slicePanel.classList.add('expanded');
+              sliceBtn.textContent = 'Close';
+          } else {
+              slicePanel.classList.remove('expanded');
+              setTimeout(() => {
+                  if (!slicePanelVisible) slicePanel.style.display = 'none';
+              }, 300);
+              sliceBtn.textContent = 'Slice';
+          }
+      });
+
+      // Bins panel toggle
+      let binsPanelVisible = false;
+      binsBtn.addEventListener('click', () => {
+          binsPanelVisible = !binsPanelVisible;
+          if (binsPanelVisible) {
+              binsPanel.style.display = 'block';
+              binsPanel.offsetHeight; // Force reflow
+              binsPanel.classList.add('expanded');
+              binsBtn.textContent = 'Close';
+          } else {
+              binsPanel.classList.remove('expanded');
+              setTimeout(() => {
+                  if (!binsPanelVisible) binsPanel.style.display = 'none';
+              }, 300);
+              binsBtn.textContent = 'Bins';
+          }
+      });
+
+      // --- Color space conversion functions ---
+      function rgb2lab(r, g, b) {
+          const toLinear = (c) => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+          let lr = toLinear(r), lg = toLinear(g), lb = toLinear(b);
+
+          let x = lr * 0.4124564 + lg * 0.3575761 + lb * 0.1804375;
+          let y = lr * 0.2126729 + lg * 0.7151522 + lb * 0.0721750;
+          let z = lr * 0.0193339 + lg * 0.1191920 + lb * 0.9503041;
+
+          const ref = [0.95047, 1.00000, 1.08883];
+          x /= ref[0]; y /= ref[1]; z /= ref[2];
+          const f = (t) => t > 0.008856 ? Math.pow(t, 1/3) : 7.787 * t + 16/116;
+          const fx = f(x), fy = f(y), fz = f(z);
+          const L = 116 * fy - 16;
+          const a = 500 * (fx - fy);
+          const bv = 200 * (fy - fz);
+
+          return [L, a, bv];
+      }
+
+      // --- Scene setup ---
+      const container = document.getElementById('canvas-container');
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x161617);
+
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+      camera.position.set(200, 120, 200); // View from above and to the side
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      container.appendChild(renderer.domElement);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.target.set(0, 50, 0); // Center on neutral gray: a=0, L=50, b=0
+
+      // --- Lighting ---
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+      scene.add(ambientLight);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.3);
+      directionalLight.position.set(1, 1, 1);
+      scene.add(directionalLight);
+
+      // --- Point cloud geometry ---
+      let pointCloud = null;
+
+      function generateGamutPoints(resolution) {
+          const points = [];
+          const colors = [];
+
+          for (let ri = 0; ri < resolution; ri++) {
+              for (let gi = 0; gi < resolution; gi++) {
+                  for (let bi = 0; bi < resolution; bi++) {
+                      const r = ri / (resolution - 1);
+                      const g = gi / (resolution - 1);
+                      const b = bi / (resolution - 1);
+
+                      const [L, a, bv] = rgb2lab(r, g, b);
+
+                      // Check if point passes both slice and bin filters
+                      if (isPointInSlice(a, L, bv) && isPointInTargetBin(a, L, bv)) {
+                          points.push(a, L, bv); // X=a, Y=L, Z=b
+                          colors.push(r, g, b);
+                      }
+                  }
+              }
+          }
+
+          return { points, colors };
+      }
+
+      function createPointCloud(resolution, pointSize) {
+          if (pointCloud) {
+              scene.remove(pointCloud);
+              pointCloud.geometry.dispose();
+              pointCloud.material.dispose();
+          }
+
+          const { points, colors } = generateGamutPoints(resolution);
+
+          const geometry = new THREE.BufferGeometry();
+          geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+          geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+          const material = new THREE.PointsMaterial({
+              size: pointSize,
+              vertexColors: true,
+              sizeAttenuation: true
+          });
+
+          pointCloud = new THREE.Points(geometry, material);
+          scene.add(pointCloud);
+
+          // Update point count (actual visible points)
+          const actualCount = points.length / 3;
+          const totalCount = resolution ** 3;
+          if ((slicingEnabled || binFilterEnabled) && actualCount < totalCount) {
+              pointCountEl.textContent = `${actualCount.toLocaleString()} of ${totalCount.toLocaleString()}`;
+          } else {
+              pointCountEl.textContent = totalCount.toLocaleString();
+          }
+      }
+
+      // --- Axis helpers and labels ---
+      function createAxes() {
+          const axisGroup = new THREE.Group();
+          const axisColor = 0xaaaaaa;
+          const lineWidth = 2;
+
+          // Full CIELAB space ranges:
+          // L*: [0, 100] -> Y axis (vertical, up)
+          // a*: [-128, 128] (green to red) -> X axis (horizontal)
+          // b*: [-128, 128] (blue to yellow) -> Z axis (depth)
+
+          // L axis (lightness, Y/vertical)
+          const lAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+              new THREE.Vector3(0, 0, 0),
+              new THREE.Vector3(0, 100, 0)
+          ]);
+          const lAxis = new THREE.Line(
+              lAxisGeometry,
+              new THREE.LineBasicMaterial({ color: axisColor, linewidth: lineWidth })
+          );
+          axisGroup.add(lAxis);
+
+          // A axis (green-red, X/horizontal)
+          const aAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+              new THREE.Vector3(-128, 0, 0),
+              new THREE.Vector3(128, 0, 0)
+          ]);
+          const aAxis = new THREE.Line(
+              aAxisGeometry,
+              new THREE.LineBasicMaterial({ color: axisColor, linewidth: lineWidth })
+          );
+          axisGroup.add(aAxis);
+
+          // B axis (blue-yellow, Z/depth)
+          const bAxisGeometry = new THREE.BufferGeometry().setFromPoints([
+              new THREE.Vector3(0, 0, -128),
+              new THREE.Vector3(0, 0, 128)
+          ]);
+          const bAxis = new THREE.Line(
+              bAxisGeometry,
+              new THREE.LineBasicMaterial({ color: axisColor, linewidth: lineWidth })
+          );
+          axisGroup.add(bAxis);
+
+          // Horizontal grid planes at L=0, L=50, L=100 (different Y heights)
+          const gridColor = 0x666666; // Light gray - visible against dark background
+          const gridDivisions = 25;
+          const gridSize = 300;
+
+          // Grid at L=0 (bottom, Y=0)
+          const gridHelper0 = new THREE.GridHelper(gridSize, gridDivisions, gridColor, 0x333333);
+          gridHelper0.position.set(0, 0, 0);
+          axisGroup.add(gridHelper0);
+
+          // Grid at L=50 (middle, Y=50)
+          const gridHelper50 = new THREE.GridHelper(gridSize, gridDivisions, gridColor, 0x444444);
+          gridHelper50.position.set(0, 50, 0);
+          axisGroup.add(gridHelper50);
+
+          // Grid at L=100 (top, Y=100)
+          const gridHelper100 = new THREE.GridHelper(gridSize, gridDivisions, gridColor, 0x333333);
+          gridHelper100.position.set(0, 100, 0);
+          axisGroup.add(gridHelper100);
+
+          scene.add(axisGroup);
+
+          // Add text labels
+          const labelColor = 0xcccccc;
+          addTextLabel('L=0\n(black)', -20, 0, -20, labelColor);
+          addTextLabel('L=50\n(mid)', -20, 50, -20, labelColor);
+          addTextLabel('L=100\n(white)', -20, 100, -20, labelColor);
+          addTextLabel('a=+128\n(red)', 135, 0, 0, labelColor);
+          addTextLabel('a=-128\n(green)', -145, 0, 0, labelColor);
+          addTextLabel('b=+128\n(yellow)', 0, 0, 135, labelColor);
+          addTextLabel('b=-128\n(blue)', 0, 0, -145, labelColor);
+      }
+
+      function addTextLabel(text, x, y, z, color) {
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.width = 256;
+          canvas.height = 64;
+
+          context.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+          context.font = 'Bold 48px Arial';
+          context.textAlign = 'center';
+          context.textBaseline = 'middle';
+          context.fillText(text, 128, 32);
+
+          const texture = new THREE.CanvasTexture(canvas);
+          const material = new THREE.SpriteMaterial({ map: texture });
+          const sprite = new THREE.Sprite(material);
+          sprite.position.set(x, y, z);
+          sprite.scale.set(20, 5, 1);
+          scene.add(sprite);
+      }
+
+      // --- Slicing functions ---
+      function updateSliceParams() {
+          sliceNormal.a = parseFloat(normalAInput.value) || 0;
+          sliceNormal.l = parseFloat(normalLInput.value) || 0;
+          sliceNormal.b = parseFloat(normalBInput.value) || 0;
+          sliceDistance = parseFloat(planeDistSlider.value);
+          sliceTolerance = parseFloat(toleranceSlider.value);
+
+          if (slicingEnabled) {
+              createPointCloud(parseInt(gridResSlider.value), parseFloat(pointSizeSlider.value));
+          }
+      }
+
+      function isPointInSlice(a, L, b) {
+          if (!slicingEnabled) return true;
+
+          const { a: nA, l: nL, b: nB } = sliceNormal;
+          const normLength = Math.sqrt(nA * nA + nL * nL + nB * nB);
+
+          if (normLength < 0.0001) return true; // Degenerate normal, show all points
+
+          // Distance from point to plane: |n·p - d| / |n|
+          const distance = Math.abs(nA * a + nL * L + nB * b - sliceDistance) / normLength;
+          return distance <= sliceTolerance;
+      }
+
+      // --- Binning functions ---
+      function computeBin(L, a, b) {
+          // Compute which bin a LAB value falls into
+          // L: [0, 100], a: [-128, 128], b: [-128, 128]
+          const binL = Math.floor((L / 100) * binsPerChannel.l);
+          const binA = Math.floor(((a + 128) / 256) * binsPerChannel.a);
+          const binB = Math.floor(((b + 128) / 256) * binsPerChannel.b);
+
+          // Clamp to valid range
+          return {
+              l: Math.max(0, Math.min(binsPerChannel.l - 1, binL)),
+              a: Math.max(0, Math.min(binsPerChannel.a - 1, binA)),
+              b: Math.max(0, Math.min(binsPerChannel.b - 1, binB))
+          };
+      }
+
+      function isPointInTargetBin(a, L, b) {
+          if (!binFilterEnabled || targetBin.l < 0) return true;
+
+          const pointBin = computeBin(L, a, b);
+          return pointBin.l === targetBin.l &&
+                 pointBin.a === targetBin.a &&
+                 pointBin.b === targetBin.b;
+      }
+
+      // Helper function to convert hex color to RGB
+      function hexToRgb(hex) {
+          const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+          return result ? {
+              r: parseInt(result[1], 16) / 255,
+              g: parseInt(result[2], 16) / 255,
+              b: parseInt(result[3], 16) / 255
+          } : null;
+      }
+
+      // Function to compute and display bin from color picker
+      function computeBinFromPicker() {
+          // Get RGB from color picker
+          const rgb = hexToRgb(colorPicker.value);
+          if (!rgb) return;
+
+          // Convert RGB to LAB
+          const [L, a, b] = rgb2lab(rgb.r, rgb.g, rgb.b);
+
+          binsPerChannel.l = parseInt(binsLInput.value);
+          binsPerChannel.a = parseInt(binsAInput.value);
+          binsPerChannel.b = parseInt(binsBInput.value);
+
+          targetBin = computeBin(L, a, b);
+          binDisplay.textContent = `Bin: (${targetBin.l}, ${targetBin.a}, ${targetBin.b})`;
+
+          // If filter is enabled, update the view
+          if (binFilterEnabled) {
+              createPointCloud(parseInt(gridResSlider.value), parseFloat(pointSizeSlider.value));
+          }
+      }
+
+      // Compute bin button
+      computeBinBtn.addEventListener('click', computeBinFromPicker);
+
+      // Also auto-compute when color picker changes
+      colorPicker.addEventListener('input', () => {
+          if (binFilterEnabled) {
+              computeBinFromPicker();
+          }
+      });
+
+      // Bin filter toggle
+      binFilterToggle.addEventListener('click', () => {
+          binFilterToggle.classList.toggle('active');
+          binFilterEnabled = binFilterToggle.classList.contains('active');
+
+          if (binFilterEnabled && targetBin.l < 0) {
+              // Auto-compute bin if not already computed
+              computeBinBtn.click();
+          } else {
+              createPointCloud(parseInt(gridResSlider.value), parseFloat(pointSizeSlider.value));
+          }
+      });
+
+      // Compute all bins that contain sRGB values
+      function computeValidBins() {
+          // Update bins per channel from inputs
+          binsPerChannel.l = parseInt(binsLInput.value);
+          binsPerChannel.a = parseInt(binsAInput.value);
+          binsPerChannel.b = parseInt(binsBInput.value);
+
+          const binSet = new Set();
+
+          // Sample RGB space at high resolution to find all occupied bins
+          const sampleRes = 32; // High resolution to capture all bins
+          for (let ri = 0; ri < sampleRes; ri++) {
+              for (let gi = 0; gi < sampleRes; gi++) {
+                  for (let bi = 0; bi < sampleRes; bi++) {
+                      const r = ri / (sampleRes - 1);
+                      const g = gi / (sampleRes - 1);
+                      const b = bi / (sampleRes - 1);
+
+                      const [L, a, bv] = rgb2lab(r, g, b);
+                      const bin = computeBin(L, a, bv);
+
+                      // Create unique key for this bin
+                      const key = `${bin.l},${bin.a},${bin.b}`;
+                      binSet.add(key);
+                  }
+              }
+          }
+
+          // Convert set to array of bin objects
+          validBins = Array.from(binSet).map(key => {
+              const [l, a, b] = key.split(',').map(Number);
+              return { l, a, b };
+          });
+
+          // Sort bins for consistent ordering (L, then A, then B)
+          validBins.sort((a, b) => {
+              if (a.l !== b.l) return a.l - b.l;
+              if (a.a !== b.a) return a.a - b.a;
+              return a.b - b.b;
+          });
+
+          console.log(`Found ${validBins.length} valid bins out of ${binsPerChannel.l * binsPerChannel.a * binsPerChannel.b} possible bins`);
+      }
+
+      // Iterate through valid bins only
+      function selectNextBin() {
+          if (validBins.length === 0) return;
+
+          // Set current bin as target
+          targetBin = { ...validBins[validBinCycleIndex] };
+          binDisplay.textContent = `Bin: (${targetBin.l}, ${targetBin.a}, ${targetBin.b}) [${validBinCycleIndex + 1}/${validBins.length}]`;
+
+          // Move to next valid bin
+          validBinCycleIndex = (validBinCycleIndex + 1) % validBins.length;
+
+          // Update point cloud
+          createPointCloud(parseInt(gridResSlider.value), parseFloat(pointSizeSlider.value));
+      }
+
+      // Cycle bin toggle
+      cycleBinToggle.addEventListener('click', () => {
+          cycleBinToggle.classList.toggle('active');
+          cycleBinEnabled = cycleBinToggle.classList.contains('active');
+
+          if (cycleBinEnabled) {
+              // Enable bin filter automatically
+              if (!binFilterEnabled) {
+                  binFilterToggle.classList.add('active');
+                  binFilterEnabled = true;
+              }
+
+              // Compute which bins contain RGB values
+              computeValidBins();
+
+              // Reset to first valid bin
+              validBinCycleIndex = 0;
+
+              // Select first bin immediately
+              selectNextBin();
+
+              // Start interval to change bins every second
+              cycleBinInterval = setInterval(selectNextBin, 1000);
+          } else {
+              // Stop the interval
+              if (cycleBinInterval) {
+                  clearInterval(cycleBinInterval);
+                  cycleBinInterval = null;
+              }
+          }
+      });
+
+      // Slice toggle
+      sliceToggle.addEventListener('click', () => {
+          sliceToggle.classList.toggle('active');
+          slicingEnabled = sliceToggle.classList.contains('active');
+          createPointCloud(parseInt(gridResSlider.value), parseFloat(pointSizeSlider.value));
+      });
+
+      // Normal vector inputs
+      normalAInput.addEventListener('input', updateSliceParams);
+      normalLInput.addEventListener('input', updateSliceParams);
+      normalBInput.addEventListener('input', updateSliceParams);
+
+      // Plane distance slider
+      planeDistSlider.addEventListener('input', () => {
+          planeDistValue.textContent = planeDistSlider.value;
+          updateSliceParams();
+      });
+
+      // Tolerance slider
+      toleranceSlider.addEventListener('input', () => {
+          toleranceValue.textContent = toleranceSlider.value;
+          updateSliceParams();
+      });
+
+      // --- Event listeners ---
+      gridResSlider.addEventListener('input', () => {
+          const res = parseInt(gridResSlider.value);
+          resLabel.textContent = res;
+          createPointCloud(res, parseFloat(pointSizeSlider.value));
+      });
+
+      pointSizeSlider.addEventListener('input', () => {
+          const size = parseFloat(pointSizeSlider.value);
+          sizeLabel.textContent = size.toFixed(1);
+          if (pointCloud) {
+              pointCloud.material.size = size;
+          }
+      });
+
+      exportBtn.addEventListener('click', () => {
+          try {
+              const dataURL = renderer.domElement.toDataURL('image/png');
+              const link = document.createElement('a');
+              const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+              link.download = `srgb-gamut-lab-${timestamp}.png`;
+              link.href = dataURL;
+              link.click();
+          } catch (e) {
+              console.error('Export failed:', e);
+              alert('Failed to export image. Please try again.');
+          }
+      });
+
+      window.addEventListener('resize', () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // --- Animation loop ---
+      function animate() {
+          requestAnimationFrame(animate);
+          controls.update();
+          renderer.render(scene, camera);
+      }
+
+      // --- Initialize ---
+      createAxes();
+      createPointCloud(32, 8.0);
+      animate();
+    </script>
+</body>
+</html>

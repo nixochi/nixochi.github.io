@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RGB-Binned Color Wheel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body { height: 100%; }
+    canvas { image-rendering: pixelated; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-100">
+  <div class="max-w-5xl mx-auto p-6">
+    <header class="flex items-center justify-between gap-4 mb-6">
+      <div>
+        <h1 class="text-2xl font-bold">RGB‑Binned Color Wheel</h1>
+        <p class="text-sm text-slate-300">Each pixel's RGB is quantized into <span id="binsLabel" class="font-semibold">16</span> bins per channel (total <span id="totalBins">4096</span> bins), using the same binning logic as your shader.</p>
+      </div>
+      <a class="text-xs text-slate-300 underline" href="#" id="downloadPng">Download PNG</a>
+    </header>
+
+    <!-- Hover tooltip: vertical bin label, then original & bin center swatches -->
+    <div id="hoverTooltip" class="hidden fixed z-50 pointer-events-none">
+      <div class="flex items-stretch bg-slate-800/95 backdrop-blur rounded-xl shadow-xl ring-1 ring-slate-700 overflow-hidden">
+        <div class="px-2 py-2 text-[10px] leading-tight text-slate-200 bg-slate-900/60 border-r border-slate-700" style="writing-mode: vertical-rl; text-orientation: mixed;">
+          <span id="ttBinLabel">bin</span>
+        </div>
+        <div class="p-2 grid grid-cols-1 gap-2">
+          <div class="flex items-center gap-2">
+            <div id="ttOrigSwatch" class="w-10 h-10 rounded border border-slate-600"></div>
+            <div class="text-[10px] leading-tight">
+              <div class="text-slate-300">original</div>
+              <div id="ttOrigText" class="text-slate-400">rgb(0,0,0)</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <div id="ttBinSwatch" class="w-10 h-10 rounded border border-slate-600"></div>
+            <div class="text-[10px] leading-tight">
+              <div class="text-slate-300">bin center</div>
+              <div id="ttBinText" class="text-slate-400">rgb(0,0,0)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="grid grid-cols-1 md:grid-cols-5 gap-6 items-start">
+      <div class="md:col-span-3 bg-slate-800 rounded-2xl shadow p-3 flex flex-col">
+        <div class="flex items-center justify-between px-2 py-1 text-xs text-slate-300">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-4 h-4 rounded border border-slate-600" id="hoverSwatch"></span>
+            <span id="hoverRGBA">r,g,b</span>
+          </div>
+          <div id="hoverBins" class="text-slate-400">bin (r,g,b)</div>
+        </div>
+        <canvas id="glcanvas" class="rounded-xl w-full grow min-h-[50vh] max-h-[70vh]"></canvas>
+      </div>
+
+      <div class="md:col-span-2 bg-slate-800 rounded-2xl shadow p-5 space-y-6">
+        <div>
+          <label for="colorSpace" class="block text-sm mb-2">Binning color space</label>
+          <select id="colorSpace" class="w-full bg-slate-700 text-slate-100 rounded px-3 py-2 text-sm border border-slate-600">
+            <option value="rgb">RGB (Red, Green, Blue)</option>
+            <option value="hsv">HSV (Hue, Saturation, Value)</option>
+            <option value="lab">LAB (Perceptually uniform)</option>
+          </select>
+          <p class="text-xs text-slate-400 mt-1">Choose which color space to bin in. Different spaces produce different quantization patterns.</p>
+        </div>
+
+        <div id="labLBinningControl" class="hidden">
+          <label for="labLBinning" class="block text-sm mb-2">LAB L-dimension binning</label>
+          <select id="labLBinning" class="w-full bg-slate-700 text-slate-100 rounded px-3 py-2 text-sm border border-slate-600">
+            <option value="full">Full L×A×B binning</option>
+            <option value="collapsed">Collapsed L (1×A×B bins)</option>
+          </select>
+          <p class="text-xs text-slate-400 mt-1">Collapsed mode treats L as a single bin, only subdividing A and B.</p>
+        </div>
+
+        <div>
+          <label for="bins" class="block text-sm mb-2">Bins per channel</label>
+          <input id="bins" type="range" min="2" max="64" value="16" step="1" class="w-full">
+          <div class="flex justify-between text-xs text-slate-400"><span>2</span><span id="binsMaxLabel">64</span></div>
+        </div>
+
+        <div>
+          <label for="hsvValue" class="block text-sm mb-2">HSV Value (brightness): <span id="valueLabel" class="font-semibold">1.00</span></label>
+          <input id="hsvValue" type="range" min="0" max="100" value="100" step="1" class="w-full">
+          <div class="flex justify-between text-xs text-slate-400"><span>0.00 (black)</span><span>1.00 (full brightness)</span></div>
+          <p class="text-xs text-slate-400 mt-1">Explore different slices through the 3D HSV color space.</p>
+        </div>
+
+        <div class="space-y-2">
+          <label class="inline-flex items-center gap-2">
+            <input id="showOriginal" type="checkbox" class="accent-indigo-500">
+            <span class="text-sm">Show original (unbinned) wheel</span>
+          </label>
+          <p class="text-xs text-slate-400">Toggle to compare the continuous HSV wheel vs the RGB‑binned output.</p>
+        </div>
+
+
+        <div class="text-xs text-slate-400">
+          <p><span class="font-semibold">Tip:</span> Hover the wheel to see the exact bin indices and the even‑spaced bin center for that pixel.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="mt-8 text-xs text-slate-500">
+      Built with WebGL. Bin centers are even per channel: for bins=k, centers are at (i + 0.5)/k for i=0..k-1. This page constructs the exact 1D bin-center texture and samples it in the shader, matching your reference.
+    </footer>
+  </div>
+
+  <script>
+    // --- WebGL utilities ---
+    function createShader(gl, type, source) {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        const info = gl.getShaderInfoLog(shader);
+        gl.deleteShader(shader);
+        throw new Error('Shader compile error: ' + info);
+      }
+      return shader;
+    }
+
+    function createProgram(gl, vertSrc, fragSrc) {
+      const vs = createShader(gl, gl.VERTEX_SHADER, vertSrc);
+      const fs = createShader(gl, gl.FRAGMENT_SHADER, fragSrc);
+      const prog = gl.createProgram();
+      gl.attachShader(prog, vs);
+      gl.attachShader(prog, fs);
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+        throw new Error('Program link error: ' + gl.getProgramInfoLog(prog));
+      }
+      return prog;
+    }
+
+    // Vertex shader (WebGL1 GLSL ES 1.00)
+    const vert = `
+    attribute vec2 a_pos;
+    varying vec2 v_uv;
+    varying vec2 v_pos;
+    void main() {
+      v_pos = a_pos; // NDC
+      v_uv = a_pos * 0.5 + 0.5; // map [-1,1] -> [0,1]
+      gl_Position = vec4(a_pos, 0.0, 1.0);
+    }`;
+
+    // Fragment: sample source texture per pixel, then bin in selected space & lookup center
+    const frag = `#ifdef GL_ES
+    precision mediump float;
+    #endif
+
+    varying vec2 v_uv;
+    varying vec2 v_pos;
+    uniform vec2 u_resolution;
+    uniform float u_bins;
+    uniform int u_colorSpace; // 0=RGB, 1=HSV, 2=LAB
+    uniform bool u_showOriginal;
+    uniform bool u_clipCircle;
+    uniform bool u_labLCollapsed; // If true and colorSpace==LAB, L is in 1 bin
+    uniform sampler2D u_texture;    // source color wheel texture
+    uniform sampler2D u_binCenters; // 1D bin-centers texture
+
+    vec3 rgb2hsv(vec3 c) {
+      vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+      vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+      vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+      float d = q.x - min(q.w, q.y);
+      float e = 1.0e-10;
+      return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+    }
+
+    vec3 hsv2rgb(vec3 c) {
+      vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+      vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+      return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+    }
+
+    vec3 rgb2lab(vec3 rgb) {
+      // sRGB to XYZ
+      vec3 c = rgb;
+      c = mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
+      mat3 m = mat3(
+        0.4124564, 0.3575761, 0.1804375,
+        0.2126729, 0.7151522, 0.0721750,
+        0.0193339, 0.1191920, 0.9503041
+      );
+      vec3 xyz = m * c;
+      // XYZ to LAB (D65 illuminant)
+      vec3 ref = vec3(0.95047, 1.00000, 1.08883);
+      xyz = xyz / ref;
+      vec3 f = mix(7.787 * xyz + 16.0/116.0, pow(xyz, vec3(1.0/3.0)), step(0.008856, xyz));
+      float L = 116.0 * f.y - 16.0;
+      float a = 500.0 * (f.x - f.y);
+      float b = 200.0 * (f.y - f.z);
+      // Map to [0,1] using sRGB-specific ranges: L[0,100], a[-90,100], b[-110,95]
+      return vec3(L / 100.0, (a + 90.0) / 190.0, (b + 110.0) / 205.0);
+    }
+
+    vec3 lab2rgb_raw(float L, float a, float b) {
+      // LAB to RGB without clamping
+      float fy = (L + 16.0) / 116.0;
+      float fx = a / 500.0 + fy;
+      float fz = fy - b / 200.0;
+      vec3 xyz = vec3(fx, fy, fz);
+      vec3 xyz3 = xyz * xyz * xyz;
+      xyz = mix((xyz - 16.0/116.0) / 7.787, xyz3, step(0.008856, xyz3));
+      vec3 ref = vec3(0.95047, 1.00000, 1.08883);
+      xyz = xyz * ref;
+      mat3 m = mat3(
+        3.2404542, -1.5371385, -0.4985314,
+        -0.9692660, 1.8760108, 0.0415560,
+        0.0556434, -0.2040259, 1.0572252
+      );
+      vec3 c = m * xyz;
+      c = mix(c * 12.92, 1.055 * pow(c, vec3(1.0/2.4)) - 0.055, step(0.0031308, c));
+      return c;
+    }
+
+    bool isInGamut(vec3 rgb) {
+      return rgb.r >= 0.0 && rgb.r <= 1.0 &&
+             rgb.g >= 0.0 && rgb.g <= 1.0 &&
+             rgb.b >= 0.0 && rgb.b <= 1.0;
+    }
+
+    vec3 lab2rgb(vec3 lab) {
+      // LAB to XYZ - using sRGB-specific ranges: L[0,100], a[-90,100], b[-110,95]
+      float L = lab.x * 100.0;
+      float a = lab.y * 190.0 - 90.0;
+      float b = lab.z * 205.0 - 110.0;
+
+      // Try the color as-is first
+      vec3 rgb = lab2rgb_raw(L, a, b);
+      if (isInGamut(rgb)) {
+        return rgb;
+      }
+
+      // Out of gamut: reduce chroma by binary search
+      // Move (a,b) toward (0,0) while keeping L constant
+      float chromaScale = 0.5;
+      float step = 0.25;
+
+      for (int i = 0; i < 16; i++) {
+        rgb = lab2rgb_raw(L, a * chromaScale, b * chromaScale);
+        if (isInGamut(rgb)) {
+          chromaScale += step;
+        } else {
+          chromaScale -= step;
+        }
+        step *= 0.5;
+      }
+
+      // Final attempt with found scale
+      rgb = lab2rgb_raw(L, a * chromaScale, b * chromaScale);
+      return clamp(rgb, 0.0, 1.0);
+    }
+
+    void main() {
+      float s = min(u_resolution.x, u_resolution.y);
+      vec2 uvPos = v_pos * vec2(u_resolution.x / s, u_resolution.y / s);
+      float rad = length(uvPos);
+
+      vec4 colorSample = texture2D(u_texture, v_uv);
+      vec3 color = colorSample.rgb;
+
+      // Discard pixels outside the circle (where alpha = 0)
+      if (colorSample.a < 0.5) discard;
+
+      // Convert to the target color space for binning
+      vec3 colorInSpace = color;
+      if (u_colorSpace == 1) colorInSpace = rgb2hsv(color);
+      else if (u_colorSpace == 2) colorInSpace = rgb2lab(color);
+
+      if (u_showOriginal) {
+        // Show bin boundaries as thin antialiased black lines overlaid on the color
+        float bins = u_bins;
+        vec3 scaled = colorInSpace * bins;
+        vec3 frac = fract(scaled);
+
+        // Distance to nearest boundary in each channel
+        vec3 distToBoundary = min(frac, 1.0 - frac);
+        float minDist = min(min(distToBoundary.r, distToBoundary.g), distToBoundary.b);
+
+        // Thin line with antialiasing
+        float pixelSize = 1.0 / max(u_resolution.x, u_resolution.y);
+        float lineWidth = pixelSize * bins * 0.5;
+        float aaWidth = pixelSize * bins * 1.0;
+
+        // Smooth transition from color to black at boundary
+        float alpha = 1.0 - smoothstep(lineWidth - aaWidth, lineWidth + aaWidth, minDist);
+        vec3 finalColor = mix(color, vec3(0.0), alpha);
+
+        gl_FragColor = vec4(finalColor, 1.0);
+        return;
+      }
+
+      float bins = u_bins;
+      float ch0bin, ch1bin, ch2bin, binIndex, totalBins;
+
+      if (u_colorSpace == 2 && u_labLCollapsed) {
+        // LAB with collapsed L: L is always bin 0, only A and B are subdivided
+        ch0bin = 0.0; // L bin (always 0)
+        ch1bin = min(floor(colorInSpace.g * bins), bins - 1.0); // A bin
+        ch2bin = min(floor(colorInSpace.b * bins), bins - 1.0); // B bin
+
+        binIndex = ch1bin + (ch2bin * bins); // a + b*bins
+        totalBins = bins * bins;
+      } else {
+        // Full 3D binning
+        ch0bin = min(floor(colorInSpace.r * bins), bins - 1.0);
+        ch1bin = min(floor(colorInSpace.g * bins), bins - 1.0);
+        ch2bin = min(floor(colorInSpace.b * bins), bins - 1.0);
+
+        binIndex = ch0bin + (ch1bin * bins) + (ch2bin * bins * bins);
+        totalBins = bins * bins * bins;
+      }
+
+      float texCoord = (binIndex + 0.5) / totalBins;
+      vec3 binCenter = texture2D(u_binCenters, vec2(texCoord, 0.5)).rgb;
+
+      gl_FragColor = vec4(binCenter, 1.0);
+    }`;
+
+    // --- Init ---
+    const canvas = document.getElementById('glcanvas');
+    const binsSlider = document.getElementById('bins');
+    const binsLabel = document.getElementById('binsLabel');
+    const totalBinsEl = document.getElementById('totalBins');
+    const showOriginal = document.getElementById('showOriginal');
+    const hsvValueSlider = document.getElementById('hsvValue');
+    const valueLabel = document.getElementById('valueLabel');
+    const colorSpaceSelect = document.getElementById('colorSpace');
+    const labLBinningSelect = document.getElementById('labLBinning');
+    const labLBinningControl = document.getElementById('labLBinningControl');
+    const downloadBtn = document.getElementById('downloadPng');
+
+    const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true, antialias: false });
+    if (!gl) alert('WebGL not supported in this browser.');
+
+    const program = createProgram(gl, vert, frag);
+    gl.useProgram(program);
+
+    // Detect max texture size and clamp slider max so bins^3 <= MAX_TEXTURE_SIZE
+    const maxTexSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 8192;
+    const binsMax = Math.max(2, Math.floor(Math.cbrt(maxTexSize)));
+    const binsInput = document.getElementById('bins');
+    const binsMaxLabel = document.getElementById('binsMaxLabel');
+    if (binsMaxLabel) binsMaxLabel.textContent = String(binsMax);
+    binsInput.max = String(binsMax);
+
+    // Source color wheel texture (precisely pixel-mapped)
+    const srcTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, srcTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    // 1D bin-centers texture (single declaration)
+    const binTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, binTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    // Offscreen canvas to generate HSV wheel once per resize
+    const srcCanvas = document.createElement('canvas');
+    const srcCtx = srcCanvas.getContext('2d', { willReadFrequently: true });
+
+    function rebuildBinCentersTexture(bins, colorSpace, labLBinning) {
+      const isLabCollapsed = colorSpace === 'lab' && labLBinning === 'collapsed';
+      const totalBins = isLabCollapsed ? bins * bins : bins * bins * bins;
+      const data = new Uint8Array(totalBins * 3);
+      let idx = 0;
+
+      if (isLabCollapsed) {
+        // LAB with collapsed L: 1×A×B bins
+        // L is always at 0.5 (center of single bin)
+        const ch0Center = 0.5; // L center
+        for (let b = 0; b < bins; b++) {
+          for (let a = 0; a < bins; a++) {
+            // 1D index must match shader formula: a + b*bins
+            const ch1Center = (a + 0.5) / bins; // A center
+            const ch2Center = (b + 0.5) / bins; // B center
+
+            const rgb = lab2rgb(ch0Center, ch1Center, ch2Center);
+
+            data[idx++] = Math.round(rgb[0] * 255);
+            data[idx++] = Math.round(rgb[1] * 255);
+            data[idx++] = Math.round(rgb[2] * 255);
+          }
+        }
+      } else {
+        // Full 3D binning
+        for (let b = 0; b < bins; b++) {
+          for (let g = 0; g < bins; g++) {
+            for (let r = 0; r < bins; r++) {
+              // 1D index must match shader formula: r + g*bins + b*bins*bins
+              const ch0Center = (r + 0.5) / bins;
+              const ch1Center = (g + 0.5) / bins;
+              const ch2Center = (b + 0.5) / bins;
+
+              let rgb;
+              if (colorSpace === 'rgb') {
+                rgb = [ch0Center, ch1Center, ch2Center];
+              } else if (colorSpace === 'hsv') {
+                rgb = hsv2rgbJS(ch0Center, ch1Center, ch2Center);
+              } else if (colorSpace === 'lab') {
+                rgb = lab2rgb(ch0Center, ch1Center, ch2Center);
+              }
+
+              data[idx++] = Math.round(rgb[0] * 255);
+              data[idx++] = Math.round(rgb[1] * 255);
+              data[idx++] = Math.round(rgb[2] * 255);
+            }
+          }
+        }
+      }
+
+      gl.bindTexture(gl.TEXTURE_2D, binTex);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGB,
+        totalBins,
+        1,
+        0,
+        gl.RGB,
+        gl.UNSIGNED_BYTE,
+        data
+      );
+    }
+
+    // Fullscreen quad
+    const quad = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    const verts = new Float32Array([
+      -1, -1,   1, -1,   -1, 1,
+       -1,  1,  1, -1,    1, 1,
+    ]);
+    gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+
+    const a_pos = gl.getAttribLocation(program, 'a_pos');
+    gl.enableVertexAttribArray(a_pos);
+    gl.vertexAttribPointer(a_pos, 2, gl.FLOAT, false, 0, 0);
+
+    const u_resolution = gl.getUniformLocation(program, 'u_resolution');
+    const u_bins = gl.getUniformLocation(program, 'u_bins');
+    const u_colorSpace = gl.getUniformLocation(program, 'u_colorSpace');
+    const u_showOriginal = gl.getUniformLocation(program, 'u_showOriginal');
+    const u_clipCircleLoc = gl.getUniformLocation(program, 'u_clipCircle');
+    const u_labLCollapsedLoc = gl.getUniformLocation(program, 'u_labLCollapsed');
+    const u_textureLoc = gl.getUniformLocation(program, 'u_texture');
+    const u_binCentersLoc = gl.getUniformLocation(program, 'u_binCenters');
+
+    // Color space conversion functions (JavaScript)
+    function rgb2hsv(r, g, b) {
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const d = max - min;
+      let h = 0;
+      const s = max === 0 ? 0 : d / max;
+      const v = max;
+      if (d !== 0) {
+        if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        else if (max === g) h = ((b - r) / d + 2) / 6;
+        else h = ((r - g) / d + 4) / 6;
+      }
+      return [h, s, v];
+    }
+
+    function hsv2rgbJS(h, s, v) {
+      const k = (n) => (n + h * 6) % 6;
+      const f = (n) => v - v * s * Math.max(Math.min(k(n), 4 - k(n), 1), 0);
+      return [f(5), f(3), f(1)];
+    }
+
+    function rgb2lab(r, g, b) {
+      // sRGB to linear RGB
+      const toLinear = (c) => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      let lr = toLinear(r), lg = toLinear(g), lb = toLinear(b);
+      // Linear RGB to XYZ
+      let x = lr * 0.4124564 + lg * 0.3575761 + lb * 0.1804375;
+      let y = lr * 0.2126729 + lg * 0.7151522 + lb * 0.0721750;
+      let z = lr * 0.0193339 + lg * 0.1191920 + lb * 0.9503041;
+      // XYZ to LAB
+      const ref = [0.95047, 1.00000, 1.08883];
+      x /= ref[0]; y /= ref[1]; z /= ref[2];
+      const f = (t) => t > 0.008856 ? Math.pow(t, 1/3) : 7.787 * t + 16/116;
+      const fx = f(x), fy = f(y), fz = f(z);
+      const L = 116 * fy - 16;
+      const a = 500 * (fx - fy);
+      const bv = 200 * (fy - fz);
+      // Map to [0,1] using sRGB-specific ranges: L[0,100], a[-90,100], b[-110,95]
+      return [L / 100, (a + 90) / 190, (bv + 110) / 205];
+    }
+
+    function lab2rgb_raw(L, a, b) {
+      // LAB to RGB without clamping
+      const fy = (L + 16) / 116;
+      const fx = a / 500 + fy;
+      const fz = fy - b / 200;
+      const finv = (t) => t > 0.206897 ? t * t * t : (t - 16/116) / 7.787;
+      let x = finv(fx) * 0.95047;
+      let y = finv(fy) * 1.00000;
+      let z = finv(fz) * 1.08883;
+      let lr = x * 3.2404542 + y * -1.5371385 + z * -0.4985314;
+      let lg = x * -0.9692660 + y * 1.8760108 + z * 0.0415560;
+      let lb = x * 0.0556434 + y * -0.2040259 + z * 1.0572252;
+      const toSRGB = (c) => c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1/2.4) - 0.055;
+      return [toSRGB(lr), toSRGB(lg), toSRGB(lb)];
+    }
+
+    function isInGamut(rgb) {
+      return rgb[0] >= 0 && rgb[0] <= 1 &&
+             rgb[1] >= 0 && rgb[1] <= 1 &&
+             rgb[2] >= 0 && rgb[2] <= 1;
+    }
+
+    function lab2rgb(L, a, b) {
+      // LAB to XYZ - using sRGB-specific ranges: L[0,100], a[-90,100], b[-110,95]
+      L = L * 100;
+      a = a * 190 - 90;
+      b = b * 205 - 110;
+
+      // Try the color as-is first
+      let rgb = lab2rgb_raw(L, a, b);
+      if (isInGamut(rgb)) {
+        return rgb;
+      }
+
+      // Out of gamut: reduce chroma by binary search
+      // Move (a,b) toward (0,0) while keeping L constant
+      let chromaScale = 0.5;
+      let step = 0.25;
+
+      for (let i = 0; i < 16; i++) {
+        rgb = lab2rgb_raw(L, a * chromaScale, b * chromaScale);
+        if (isInGamut(rgb)) {
+          chromaScale += step;
+        } else {
+          chromaScale -= step;
+        }
+        step *= 0.5;
+      }
+
+      // Final attempt with found scale
+      rgb = lab2rgb_raw(L, a * chromaScale, b * chromaScale);
+      return [
+        Math.max(0, Math.min(1, rgb[0])),
+        Math.max(0, Math.min(1, rgb[1])),
+        Math.max(0, Math.min(1, rgb[2]))
+      ];
+    }
+
+    function updateLabels(b) {
+      const colorSpace = colorSpaceSelect.value;
+      const labLBinning = labLBinningSelect.value;
+      const isLabCollapsed = colorSpace === 'lab' && labLBinning === 'collapsed';
+
+      binsLabel.textContent = b.toString();
+      totalBinsEl.textContent = isLabCollapsed ? (b*b).toString() : (b*b*b).toString();
+    }
+
+    function updateLabLBinningVisibility() {
+      const colorSpace = colorSpaceSelect.value;
+      if (colorSpace === 'lab') {
+        labLBinningControl.classList.remove('hidden');
+      } else {
+        labLBinningControl.classList.add('hidden');
+      }
+    }
+
+    function hsv2rgb(h, s, v) {
+      const k = (n) => (n + h * 6) % 6;
+      const f = (n) => v - v * s * Math.max(Math.min(k(n), 4 - k(n), 1), 0);
+      return [f(5), f(3), f(1)];
+    }
+
+    function buildWheelToCanvas(c, ctx, hsvVal) {
+      const w = c.width, h = c.height;
+      const img = ctx.createImageData(w, h);
+      const minSide = Math.min(w, h);
+      const cx = w / 2, cy = h / 2;
+      let p = 0;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const nx = (x + 0.5 - cx) / (minSide / 2);
+          const ny = (y + 0.5 - cy) / (minSide / 2);
+          const r = Math.hypot(nx, ny);
+          let rgb, alpha;
+          if (r <= 1.0) {
+            const hue = (Math.atan2(ny, nx) / (2*Math.PI) + 1.0) % 1.0;
+            const sat = Math.min(Math.max(r, 0), 1);
+            const val = hsvVal;
+            const [R,G,B] = hsv2rgb(hue, sat, val);
+            rgb = [Math.round(R*255), Math.round(G*255), Math.round(B*255)];
+            alpha = 255;
+          } else {
+            rgb = [0,0,0];
+            alpha = 0; // Transparent outside the circle
+          }
+          img.data[p++] = rgb[0];
+          img.data[p++] = rgb[1];
+          img.data[p++] = rgb[2];
+          img.data[p++] = alpha;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+    }
+
+    function uploadSourceTexture() {
+      gl.bindTexture(gl.TEXTURE_2D, srcTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, srcCanvas);
+    }
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(200, Math.floor(rect.width * dpr));
+      const height = Math.max(200, Math.floor(rect.height * dpr));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+        // Rebuild source color wheel texture at exact pixel resolution
+        srcCanvas.width = width;
+        srcCanvas.height = height;
+        const hsvVal = parseInt(hsvValueSlider.value, 10) / 100;
+        buildWheelToCanvas(srcCanvas, srcCtx, hsvVal);
+        uploadSourceTexture();
+        gl.viewport(0, 0, width, height);
+        draw();
+      }
+    }
+
+    function rebuildWheel() {
+      const hsvVal = parseInt(hsvValueSlider.value, 10) / 100;
+      valueLabel.textContent = hsvVal.toFixed(2);
+      buildWheelToCanvas(srcCanvas, srcCtx, hsvVal);
+      uploadSourceTexture();
+      draw();
+    }
+
+    function draw() {
+      const bins = parseInt(binsSlider.value, 10);
+      const colorSpace = colorSpaceSelect.value;
+      const labLBinning = labLBinningSelect.value;
+      const colorSpaceInt = colorSpace === 'rgb' ? 0 : colorSpace === 'hsv' ? 1 : 2;
+
+      updateLabels(bins);
+      rebuildBinCentersTexture(bins, colorSpace, labLBinning);
+
+      gl.useProgram(program);
+      // Bind textures: 0 = source wheel, 1 = bin centers
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, srcTex);
+      gl.uniform1i(u_textureLoc, 0);
+
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, binTex);
+      gl.uniform1i(u_binCentersLoc, 1);
+
+      gl.uniform2f(u_resolution, canvas.width, canvas.height);
+      gl.uniform1f(u_bins, bins);
+      gl.uniform1i(u_colorSpace, colorSpaceInt);
+      gl.uniform1i(u_showOriginal, showOriginal.checked ? 1 : 0);
+      gl.uniform1i(u_clipCircleLoc, 0);
+      gl.uniform1i(u_labLCollapsedLoc, (colorSpace === 'lab' && labLBinning === 'collapsed') ? 1 : 0);
+
+      gl.clearColor(0.04, 0.06, 0.10, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+
+    binsSlider.addEventListener('input', draw);
+    showOriginal.addEventListener('change', draw);
+    hsvValueSlider.addEventListener('input', rebuildWheel);
+    colorSpaceSelect.addEventListener('change', () => {
+      updateLabLBinningVisibility();
+      draw();
+    });
+    labLBinningSelect.addEventListener('change', draw);
+
+    window.addEventListener('resize', resize);
+    resize();
+    // Ensure initial source texture exists even if resize didn't trigger
+    if (srcCanvas.width === 0 || srcCanvas.height === 0) {
+      srcCanvas.width = canvas.width;
+      srcCanvas.height = canvas.height;
+      const hsvVal = parseInt(hsvValueSlider.value, 10) / 100;
+      buildWheelToCanvas(srcCanvas, srcCtx, hsvVal);
+      uploadSourceTexture();
+    }
+    updateLabLBinningVisibility();
+    draw();
+
+    // Hover readout + tooltip
+    const hoverRGBAEl = document.getElementById('hoverRGBA');
+    const hoverBinsEl = document.getElementById('hoverBins');
+    const hoverSwatch = document.getElementById('hoverSwatch');
+
+    function updateHover(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const xCanvas = Math.floor((e.clientX - rect.left) * scaleX);
+      const yCanvas = Math.floor((e.clientY - rect.top) * scaleY);
+
+      // WebGL texture coordinates are flipped: top of screen samples bottom of texture
+      // In shader: v_uv.y = 0 at bottom of screen, v_uv.y = 1 at top of screen
+      // But texture data: y=0 is top of canvas data, y=height-1 is bottom
+      // So we need to flip Y to match what WebGL samples
+      const ySrc = canvas.height - 1 - yCanvas;
+
+      // Read ORIGINAL color from the source canvas (1:1 pixels)
+      const srcPx = srcCtx.getImageData(xCanvas, ySrc, 1, 1).data;
+      const r0 = srcPx[0], g0 = srcPx[1], b0 = srcPx[2], a0 = srcPx[3];
+
+      // Skip if outside the circle (transparent)
+      if (a0 < 128) {
+        document.getElementById('hoverTooltip').classList.add('hidden');
+        hoverRGBAEl.textContent = 'r,g,b';
+        hoverBinsEl.textContent = 'bin (r,g,b)';
+        hoverSwatch.style.backgroundColor = 'transparent';
+        return;
+      }
+
+      // Calculate bin indices from original color
+      const bins = parseInt(binsSlider.value, 10);
+      const colorSpace = colorSpaceSelect.value;
+      const labLBinning = labLBinningSelect.value;
+      const isLabCollapsed = colorSpace === 'lab' && labLBinning === 'collapsed';
+
+      // Convert to target color space
+      let colorInSpace;
+      if (colorSpace === 'rgb') {
+        colorInSpace = [r0/255, g0/255, b0/255];
+      } else if (colorSpace === 'hsv') {
+        colorInSpace = rgb2hsv(r0/255, g0/255, b0/255);
+      } else if (colorSpace === 'lab') {
+        colorInSpace = rgb2lab(r0/255, g0/255, b0/255);
+      }
+
+      let ch0bin, ch1bin, ch2bin, binIndex;
+      let ch0Center, ch1Center, ch2Center;
+
+      if (isLabCollapsed) {
+        // LAB with collapsed L: L is always bin 0, only A and B are subdivided
+        ch0bin = 0; // L bin (always 0)
+        ch1bin = Math.min(Math.floor(colorInSpace[1] * bins), bins - 1); // A bin
+        ch2bin = Math.min(Math.floor(colorInSpace[2] * bins), bins - 1); // B bin
+        binIndex = ch1bin + ch2bin*bins; // a + b*bins
+
+        // Calculate bin center color in target space
+        ch0Center = 0.5; // L center (always 0.5)
+        ch1Center = (ch1bin + 0.5) / bins; // A center
+        ch2Center = (ch2bin + 0.5) / bins; // B center
+      } else {
+        // Full 3D binning
+        ch0bin = Math.min(Math.floor(colorInSpace[0] * bins), bins - 1);
+        ch1bin = Math.min(Math.floor(colorInSpace[1] * bins), bins - 1);
+        ch2bin = Math.min(Math.floor(colorInSpace[2] * bins), bins - 1);
+        binIndex = ch0bin + ch1bin*bins + ch2bin*bins*bins;
+
+        // Calculate bin center color in target space
+        ch0Center = (ch0bin + 0.5) / bins;
+        ch1Center = (ch1bin + 0.5) / bins;
+        ch2Center = (ch2bin + 0.5) / bins;
+      }
+
+      // Convert back to RGB
+      let rgbCenter;
+      if (colorSpace === 'rgb') {
+        rgbCenter = [ch0Center * 255, ch1Center * 255, ch2Center * 255];
+      } else if (colorSpace === 'hsv') {
+        const rgb = hsv2rgbJS(ch0Center, ch1Center, ch2Center);
+        rgbCenter = [rgb[0] * 255, rgb[1] * 255, rgb[2] * 255];
+      } else if (colorSpace === 'lab') {
+        const rgb = lab2rgb(ch0Center, ch1Center, ch2Center);
+        rgbCenter = [rgb[0] * 255, rgb[1] * 255, rgb[2] * 255];
+      }
+
+      const rCenter = Math.round(rgbCenter[0]);
+      const gCenter = Math.round(rgbCenter[1]);
+      const bCenter = Math.round(rgbCenter[2]);
+
+      // Labels for display
+      const spaceLabel = colorSpace === 'rgb' ? 'RGB' : colorSpace === 'hsv' ? 'HSV' : 'LAB';
+      const ch0nameLower = colorSpace === 'rgb' ? 'r' : colorSpace === 'hsv' ? 'h' : 'l';
+      const ch1nameLower = colorSpace === 'rgb' ? 'g' : colorSpace === 'hsv' ? 's' : 'a';
+      const ch2nameLower = colorSpace === 'rgb' ? 'b' : colorSpace === 'hsv' ? 'v' : 'b';
+      const ch0nameUpper = colorSpace === 'rgb' ? 'R' : colorSpace === 'hsv' ? 'H' : 'L';
+      const ch1nameUpper = colorSpace === 'rgb' ? 'G' : colorSpace === 'hsv' ? 'S' : 'A';
+      const ch2nameUpper = colorSpace === 'rgb' ? 'B' : colorSpace === 'hsv' ? 'V' : 'B';
+
+      // Update simple header readout
+      hoverRGBAEl.textContent = `RGB center: ${(rCenter/255).toFixed(3)}, ${(gCenter/255).toFixed(3)}, ${(bCenter/255).toFixed(3)}`;
+      hoverBinsEl.textContent = `bin indices (${spaceLabel}) → ${ch0nameLower}:${ch0bin}, ${ch1nameLower}:${ch1bin}, ${ch2nameLower}:${ch2bin} (index ${binIndex})`;
+      hoverSwatch.style.backgroundColor = `rgb(${rCenter}, ${gCenter}, ${bCenter})`;
+
+      // Update tooltip content
+      const tt = document.getElementById('hoverTooltip');
+      const ttBinLabel = document.getElementById('ttBinLabel');
+      const ttOrigSwatch = document.getElementById('ttOrigSwatch');
+      const ttBinSwatch = document.getElementById('ttBinSwatch');
+      const ttOrigText = document.getElementById('ttOrigText');
+      const ttBinText = document.getElementById('ttBinText');
+
+      ttBinLabel.textContent = `bin\n${ch0nameUpper}:${ch0bin}\n${ch1nameUpper}:${ch1bin}\n${ch2nameUpper}:${ch2bin}`;
+      ttOrigSwatch.style.backgroundColor = `rgb(${r0}, ${g0}, ${b0})`;
+      ttBinSwatch.style.backgroundColor = `rgb(${rCenter}, ${gCenter}, ${bCenter})`;
+      ttOrigText.textContent = `rgb(${r0}, ${g0}, ${b0})`;
+      ttBinText.textContent = `#${binIndex} • rgb(${rCenter}, ${gCenter}, ${bCenter})`;
+
+      // Position tooltip near cursor, keep on-screen
+      tt.classList.remove('hidden');
+      const pad = 10;
+      const ttRect = tt.getBoundingClientRect();
+      let left = e.clientX + 12;
+      let top = e.clientY + 12;
+      if (left + ttRect.width + pad > window.innerWidth) left = e.clientX - ttRect.width - 12;
+      if (top + ttRect.height + pad > window.innerHeight) top = e.clientY - ttRect.height - 12;
+      tt.style.left = `${left}px`;
+      tt.style.top = `${top}px`;
+    }
+
+    canvas.addEventListener('mousemove', updateHover);
+    canvas.addEventListener('mouseleave', () => {
+      const tt = document.getElementById('hoverTooltip');
+      tt.classList.add('hidden');
+    });
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.touches && e.touches[0]) updateHover(e.touches[0]);
+    }, { passive: true });
+
+    // Download PNG at canvas size
+    downloadBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rgb-binned-color-wheel-${binsSlider.value}.png`;
+      a.click();
+    });
+  </script>
+</body>
+</html>

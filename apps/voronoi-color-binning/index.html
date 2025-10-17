@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Voronoi Palette Editor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Debug Panel -->
+    <div class="debug-panel" id="debugPanel">
+        <div class="debug-header">
+            <div class="debug-title">Debug Console (Press D to toggle)</div>
+            <div style="display: flex; gap: 8px;">
+                <button class="debug-copy" id="debugCopy">Copy All</button>
+                <button class="debug-clear" id="debugClear">Clear</button>
+            </div>
+        </div>
+        <div class="debug-logs" id="debugLogs"></div>
+    </div>
+
+    <div class="container">
+        <!-- Top: Voronoi Visualization -->
+        <div class="bins-panel">
+            <div class="bins-grid" id="voronoiGrid"></div>
+            <!-- Fullscreen 2D view hidden - keeping 3D only for now -->
+            <!-- <div class="fullscreen-2d-view" id="fullscreen2DView">
+                <canvas class="fullscreen-2d-canvas" id="fullscreen2DCanvas"></canvas>
+            </div> -->
+        </div>
+
+        <!-- Bottom: Palette Editor -->
+        <div class="palette-panel">
+            <!-- Controls Row -->
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <div style="flex: 3; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 14px; color: var(--fg-secondary); white-space: nowrap;">Display</span>
+                    <input type="range" id="resolutionSlider" min="16" max="256" step="8" value="64" style="flex: 1; height: 6px; background: var(--border); border-radius: 3px; outline: none; appearance: none; cursor: pointer;">
+                    <span id="resolutionValue" style="font-size: 14px; color: var(--fg-secondary); min-width: 40px; text-align: right;">64</span>
+                </div>
+                <!-- 2D View button hidden - keeping 3D only for now -->
+                <!-- <button class="btn btn-secondary" id="viewModeBtn" style="flex: 1;">2D View</button> -->
+                <button class="btn btn-secondary" id="clearBtn" style="flex: 1;">Clear</button>
+            </div>
+
+            <!-- Palette Colors Section (includes Add card) -->
+            <div class="palette-colors" id="paletteColors">
+                <!-- Add Color Card -->
+                <div class="palette-color-item add-color-card">
+                    <div style="display: flex; flex-direction: column; gap: 8px; align-items: stretch; width: 100%;">
+                        <input type="color" id="colorPicker" value="#ff6b6b" style="width: 100%; height: 40px;">
+                        <input type="text" id="colorHex" value="#ff6b6b" placeholder="#000000" style="width: 100%; padding: 6px; font-size: 12px;">
+                        <button class="btn" id="addColorBtn" style="width: 100%; padding: 6px; font-size: 12px;">Add</button>
+                    </div>
+                </div>
+                <!-- Palette colors will be added dynamically here -->
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>

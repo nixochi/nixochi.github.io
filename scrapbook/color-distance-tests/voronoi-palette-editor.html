@@ -317,6 +317,55 @@
             flex-direction: column;
             min-height: 200px;
             max-height: 100%;
+            position: relative;
+        }
+
+        .cell-mode-toggle {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 100;
+            display: flex;
+            gap: 4px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 2px;
+        }
+
+        .mode-btn {
+            padding: 4px 8px;
+            font-size: 10px;
+            font-weight: 600;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: transparent;
+            color: var(--fg-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .mode-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .cell-2d-grid {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            display: none;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .cell-2d-grid.active {
+            display: block;
+        }
+
+        .cell-2d-canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
         }
 
         .cell-canvas-container {
@@ -360,80 +409,6 @@
             border-radius: 5px;
         }
 
-
-
-        /* Enlarged View Modal */
-        .enlarged-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.95);
-            z-index: 4000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-        }
-
-        .enlarged-modal.active {
-            display: flex;
-        }
-
-        .enlarged-content {
-            width: 90vw;
-            height: 90vh;
-            height: 90svh;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .enlarged-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px;
-            background: var(--bg-secondary);
-            border-radius: var(--radius) var(--radius) 0 0;
-        }
-
-        .enlarged-color-info {
-            font-size: 24px;
-            font-weight: 600;
-            font-family: 'Courier New', monospace;
-        }
-
-        .enlarged-close {
-            padding: 10px 20px;
-            background: rgba(255, 59, 48, 0.1);
-            border: 1px solid rgba(255, 59, 48, 0.3);
-            border-radius: 6px;
-            color: #ff3b30;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 500;
-        }
-
-
-        .enlarged-canvas-container {
-            flex: 1;
-            border-radius: 0 0 var(--radius) var(--radius);
-            overflow: hidden;
-            background: var(--bg-primary);
-        }
-
-        .enlarged-canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-            touch-action: none;
-        }
-
-        .voronoi-cell {
-            cursor: pointer;
-        }
 
         /* Mobile Responsive (small phones only) */
         @media (max-width: 480px) {
@@ -487,44 +462,105 @@
             .cell-canvas-container {
                 min-height: 120px;
             }
+        }
 
-            .enlarged-modal {
-                padding: 10px;
-            }
+        /* Debug Panel */
+        .debug-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 500px;
+            max-height: 80vh;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid var(--accent);
+            border-radius: var(--radius);
+            padding: 12px;
+            z-index: 10000;
+            display: none;
+            flex-direction: column;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
 
-            .enlarged-content {
-                width: 98vw;
-                height: 98vh;
-                height: 98svh;
-            }
+        .debug-panel.active {
+            display: flex;
+        }
 
-            .enlarged-header {
-                padding: 10px;
-            }
+        .debug-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--accent);
+        }
 
-            .enlarged-color-info {
-                font-size: 16px;
-            }
+        .debug-title {
+            color: var(--accent);
+            font-weight: bold;
+        }
 
-            .enlarged-close {
-                padding: 6px 10px;
-                font-size: 13px;
-            }
+        .debug-copy {
+            padding: 4px 8px;
+            background: rgba(10, 132, 255, 0.2);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 10px;
+        }
+
+        .debug-clear {
+            padding: 4px 8px;
+            background: rgba(255, 59, 48, 0.2);
+            border: 1px solid #ff3b30;
+            border-radius: 4px;
+            color: #ff3b30;
+            cursor: pointer;
+            font-size: 10px;
+        }
+
+        .debug-logs {
+            flex: 1;
+            overflow-y: auto;
+            color: #00ff00;
+            line-height: 1.4;
+        }
+
+        .debug-log {
+            margin-bottom: 4px;
+            padding: 4px;
+            border-radius: 3px;
+            word-wrap: break-word;
+        }
+
+        .debug-log.error {
+            color: #ff3b30;
+            background: rgba(255, 59, 48, 0.1);
+        }
+
+        .debug-log.warn {
+            color: #ffcc00;
+            background: rgba(255, 204, 0, 0.1);
+        }
+
+        .debug-log.info {
+            color: var(--accent);
+            background: rgba(10, 132, 255, 0.1);
         }
     </style>
 </head>
 <body>
-    <!-- Enlarged View Modal -->
-    <div class="enlarged-modal" id="enlargedModal">
-        <div class="enlarged-content" id="enlargedContent">
-            <div class="enlarged-header" id="enlargedHeader">
-                <div class="enlarged-color-info" id="enlargedColorInfo"></div>
-                <button class="enlarged-close" id="enlargedCloseBtn">Close</button>
-            </div>
-            <div class="enlarged-canvas-container">
-                <canvas class="enlarged-canvas" id="enlargedCanvas"></canvas>
+    <!-- Debug Panel -->
+    <div class="debug-panel" id="debugPanel">
+        <div class="debug-header">
+            <div class="debug-title">Debug Console (Press D to toggle)</div>
+            <div style="display: flex; gap: 8px;">
+                <button class="debug-copy" id="debugCopy">Copy All</button>
+                <button class="debug-clear" id="debugClear">Clear</button>
             </div>
         </div>
+        <div class="debug-logs" id="debugLogs"></div>
     </div>
 
     <div class="container">
@@ -538,10 +574,11 @@
             <!-- Controls Row -->
             <div style="display: flex; gap: 10px; align-items: center;">
                 <div style="flex: 3; display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 14px; color: var(--fg-secondary); white-space: nowrap;">Resolution</span>
-                    <input type="range" id="resolutionSlider" min="8" max="64" step="4" value="32" style="flex: 1; height: 6px; background: var(--border); border-radius: 3px; outline: none; appearance: none; cursor: pointer;">
-                    <span id="resolutionValue" style="font-size: 14px; color: var(--fg-secondary); min-width: 30px; text-align: right;">32</span>
+                    <span style="font-size: 14px; color: var(--fg-secondary); white-space: nowrap;">Display</span>
+                    <input type="range" id="resolutionSlider" min="16" max="256" step="8" value="64" style="flex: 1; height: 6px; background: var(--border); border-radius: 3px; outline: none; appearance: none; cursor: pointer;">
+                    <span id="resolutionValue" style="font-size: 14px; color: var(--fg-secondary); min-width: 40px; text-align: right;">64</span>
                 </div>
+                <button class="btn btn-secondary" id="exportBtn" style="flex: 1;">Export PDF</button>
                 <button class="btn btn-secondary" id="clearBtn" style="flex: 1;">Clear</button>
             </div>
 
@@ -560,6 +597,8 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <script type="importmap">
       {
         "imports": {
@@ -574,206 +613,76 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
         // ==========================================
-        // ENLARGED VIEW SYSTEM
+        // DEBUG CONSOLE
         // ==========================================
 
-        const enlargedModal = document.getElementById('enlargedModal');
-        const enlargedColorInfo = document.getElementById('enlargedColorInfo');
-        const enlargedCloseBtn = document.getElementById('enlargedCloseBtn');
-        const enlargedCanvas = document.getElementById('enlargedCanvas');
-        const enlargedHeader = document.getElementById('enlargedHeader');
-        let enlargedScene = null;
-        let enlargedRenderer = null;
-        let enlargedCamera = null;
-        let enlargedControls = null;
-        let enlargedAnimationId = null;
+        const debugPanel = document.getElementById('debugPanel');
+        const debugLogs = document.getElementById('debugLogs');
+        const debugCopy = document.getElementById('debugCopy');
+        const debugClear = document.getElementById('debugClear');
 
-        function openEnlargedView(cellIdx) {
-            const cell = voronoiCells[cellIdx];
-            if (!cell) return;
+        // Intercept console methods
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
 
-            console.log(`Opening enlarged view for cell ${cellIdx} (${cell.seed.hex})`);
-
-            // Set header color and info
-            enlargedHeader.style.background = cell.seed.hex;
-            enlargedColorInfo.textContent = cell.seed.hex;
-            enlargedColorInfo.style.color = getContrastColor(cell.seed.hex);
-            enlargedCloseBtn.style.color = getContrastColor(cell.seed.hex);
-
-            // Show modal
-            enlargedModal.classList.add('active');
-
-            // Create 3D scene for enlarged view
-            createEnlargedScene(cell);
+        function addDebugLog(message, type = 'log') {
+            // Call original console method
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.createElement('div');
+            logDiv.className = `debug-log ${type}`;
+            logDiv.textContent = `[${timestamp}] ${message}`;
+            debugLogs.appendChild(logDiv);
+            debugLogs.scrollTop = debugLogs.scrollHeight;
         }
 
-        function closeEnlargedView() {
-            enlargedModal.classList.remove('active');
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addDebugLog(args.join(' '), 'log');
+        };
 
-            // Stop animation
-            if (enlargedAnimationId) {
-                cancelAnimationFrame(enlargedAnimationId);
-                enlargedAnimationId = null;
-            }
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addDebugLog(args.join(' '), 'error');
+        };
 
-            // Clean up
-            if (enlargedControls) {
-                enlargedControls.dispose();
-            }
-            if (enlargedRenderer) {
-                enlargedRenderer.dispose();
-            }
-            enlargedScene = null;
-            enlargedRenderer = null;
-            enlargedCamera = null;
-            enlargedControls = null;
-        }
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addDebugLog(args.join(' '), 'warn');
+        };
 
-        function getContrastColor(hex) {
-            const [r, g, b] = hexToRgb(hex);
-            const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-            return luminance > 0.5 ? '#000000' : '#ffffff';
-        }
-
-        function createEnlargedScene(cell) {
-            const container = enlargedCanvas.parentElement;
-            const width = container.clientWidth;
-            const height = container.clientHeight;
-
-            console.log(`Creating enlarged scene: ${width}x${height}`);
-
-            // Scene setup
-            enlargedScene = new THREE.Scene();
-            enlargedScene.background = new THREE.Color(0x161617);
-
-            enlargedCamera = new THREE.PerspectiveCamera(50, width / height, 1, 1000);
-
-            // Renderer
-            enlargedRenderer = new THREE.WebGLRenderer({
-                canvas: enlargedCanvas,
-                antialias: true
-            });
-            enlargedRenderer.setSize(width, height);
-            enlargedRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-            // Controls
-            enlargedControls = new OrbitControls(enlargedCamera, enlargedCanvas);
-            enlargedControls.enableDamping = true;
-            enlargedControls.dampingFactor = 0.05;
-            enlargedControls.target.set(0, 0, 0);
-
-            // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-            enlargedScene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-            directionalLight.position.set(1, 1, 1);
-            enlargedScene.add(directionalLight);
-            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
-            directionalLight2.position.set(-1, -1, -1);
-            enlargedScene.add(directionalLight2);
-
-            // Calculate center of mass and bounds
-            let sumA = 0, sumL = 0, sumB = 0;
-            let minA = Infinity, maxA = -Infinity;
-            let minL = Infinity, maxL = -Infinity;
-            let minB = Infinity, maxB = -Infinity;
-
-            cell.points.forEach(point => {
-                const [L, a, b] = point.lab;
-                sumA += a;
-                sumL += L;
-                sumB += b;
-                minA = Math.min(minA, a);
-                maxA = Math.max(maxA, a);
-                minL = Math.min(minL, L);
-                maxL = Math.max(maxL, L);
-                minB = Math.min(minB, b);
-                maxB = Math.max(maxB, b);
-            });
-            const centerA = sumA / cell.points.length;
-            const centerL = sumL / cell.points.length;
-            const centerB = sumB / cell.points.length;
-
-            // Calculate extent for camera positioning
-            const extentA = maxA - minA;
-            const extentL = maxL - minL;
-            const extentB = maxB - minB;
-            const maxExtent = Math.max(extentA, extentL, extentB, 10);
-
-            // Create point cloud
-            const positions = [];
-            const colors = [];
-
-            cell.points.forEach(point => {
-                const [L, a, b] = point.lab;
-                positions.push(a - centerA, L - centerL, b - centerB);
-                colors.push(...point.rgb);
-            });
-
-            const geometry = new THREE.BufferGeometry();
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-
-            const pointSize = Math.max(3, maxExtent / 15);
-
-            const material = new THREE.PointsMaterial({
-                size: pointSize,
-                vertexColors: true,
-                sizeAttenuation: true
-            });
-
-            const pointCloud = new THREE.Points(geometry, material);
-            enlargedScene.add(pointCloud);
-
-            // Position camera
-            const cameraDistance = maxExtent * 2.5;
-            enlargedCamera.position.set(cameraDistance, cameraDistance * 0.8, cameraDistance);
-
-            // Start animation loop
-            function animate() {
-                enlargedAnimationId = requestAnimationFrame(animate);
-                enlargedControls.update();
-                enlargedRenderer.render(enlargedScene, enlargedCamera);
-            }
-            animate();
-        }
-
-        // Event listeners
-        enlargedCloseBtn.addEventListener('click', closeEnlargedView);
-
-        enlargedModal.addEventListener('click', (e) => {
-            if (e.target === enlargedModal) {
-                closeEnlargedView();
+        // Toggle debug panel with 'd' key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'd' || e.key === 'D') {
+                debugPanel.classList.toggle('active');
             }
         });
 
-        // Handle window resize for enlarged view
-        window.addEventListener('resize', () => {
-            if (enlargedModal.classList.contains('active') && enlargedRenderer) {
-                const container = enlargedCanvas.parentElement;
-                const width = container.clientWidth;
-                const height = container.clientHeight;
+        // Copy all logs to clipboard
+        debugCopy.addEventListener('click', async () => {
+            const allLogs = Array.from(debugLogs.children)
+                .map(log => log.textContent)
+                .join('\n');
 
-                enlargedCamera.aspect = width / height;
-                enlargedCamera.updateProjectionMatrix();
-                enlargedRenderer.setSize(width, height);
+            try {
+                await navigator.clipboard.writeText(allLogs);
+                const originalText = debugCopy.textContent;
+                debugCopy.textContent = 'Copied!';
+                setTimeout(() => {
+                    debugCopy.textContent = originalText;
+                }, 1000);
+            } catch (err) {
+                console.error('Failed to copy logs:', err);
+                alert('Failed to copy logs to clipboard');
             }
         });
 
-        // ==========================================
-        // VORONOI PALETTE SYSTEM
-        // ==========================================
+        // Clear logs
+        debugClear.addEventListener('click', () => {
+            debugLogs.innerHTML = '';
+        });
 
-        // Store Three.js scenes for each cell
-        const cellScenes = new Map();
-
-        // Shared renderer (ONE WebGL context for all cells)
-        let sharedRenderer = null;
-        let sharedCanvas = null;
-
-        // Intersection observer for visibility tracking
-        let intersectionObserver = null;
-        const visibleCells = new Set();
+        console.log('Debug console initialized');
 
         // ==========================================
         // COLOR SPACE CONVERSION
@@ -853,7 +762,7 @@
                 const hexColors = colorsParam.split(',').map(c => '#' + c.toUpperCase());
                 return {
                     colors: hexColors,
-                    resolution: parseInt(params.get('resolution')) || 32
+                    resolution: parseInt(params.get('resolution')) || 64
                 };
             }
 
@@ -867,6 +776,7 @@
         const colorPicker = document.getElementById('colorPicker');
         const colorHex = document.getElementById('colorHex');
         const addColorBtn = document.getElementById('addColorBtn');
+        const exportBtn = document.getElementById('exportBtn');
         const clearBtn = document.getElementById('clearBtn');
         const paletteColors = document.getElementById('paletteColors');
         const resolutionSlider = document.getElementById('resolutionSlider');
@@ -888,7 +798,7 @@
             const [r, g, b] = hexToRgb(hex);
             const [L, a, bv] = rgb2lab(r, g, b);
 
-            palette.push({ hex, rgb: [r, g, b], lab: [L, a, bv] });
+            palette.push({ hex, rgb: [r, g, b], lab: [L, a, bv], weight: 1.0 });
             updatePaletteUI();
             voronoiCells = null; // Clear previous computation
 
@@ -948,6 +858,7 @@
                     <div class="color-info">
                         <div class="color-hex">${color.hex}</div>
                     </div>
+                    <input type="number" class="weight-input" value="${color.weight}" min="0.1" max="10" step="0.1" data-color-hex="${color.hex}" style="width: 100%; padding: 4px; font-size: 11px; text-align: center; -webkit-user-select: text; -moz-user-select: text; user-select: text;" placeholder="Weight">
                     <button class="btn-delete" onclick="removeColor('${color.hex}')">×</button>
                 `;
                 paletteColors.appendChild(item);
@@ -961,72 +872,269 @@
                     updateColorInPalette(oldHex, newHex);
                 });
             });
+
+            // Add change handlers to weight inputs (only on Enter or blur)
+            document.querySelectorAll('.palette-color-item:not(.add-color-card) .weight-input').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const hex = input.dataset.colorHex;
+                    const weight = parseFloat(e.target.value) || 1.0;
+                    updateWeightInPalette(hex, weight);
+                });
+
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const hex = input.dataset.colorHex;
+                        const weight = parseFloat(e.target.value) || 1.0;
+                        updateWeightInPalette(hex, weight);
+                    }
+                });
+            });
         }
 
         // ==========================================
-        // VORONOI COMPUTATION
+        // VORONOI COMPUTATION (FULLY GPU-BASED)
         // ==========================================
 
+        // WebGL context for voronoi computation
+        let gl = null;
+        let voronoiProgram = null;
+        let voronoiTexture = null;
+        let voronoiFramebuffer = null;
+        let quadBuffer = null;
+        let currentResolution = 0;
+        let cachedVoronoiPixels = null; // Cache the GPU texture data
+
+        // Shader sources
+        const vertexShaderSource = `
+            attribute vec2 position;
+            varying vec2 vUv;
+            void main() {
+                vUv = position * 0.5 + 0.5;
+                gl_Position = vec4(position, 0.0, 1.0);
+            }
+        `;
+
+        // Fragment shader for computing voronoi indices
+        const voronoiFragmentSource = `
+            precision highp float;
+            varying vec2 vUv;
+
+            uniform vec3 paletteColors[32];
+            uniform float paletteWeights[32];
+            uniform int paletteCount;
+            uniform int resolution;
+            uniform int slicesPerRow;
+
+            vec3 rgb2lab(vec3 rgb) {
+                vec3 linear;
+                for (int i = 0; i < 3; i++) {
+                    float c = rgb[i];
+                    linear[i] = c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4);
+                }
+
+                float x = linear.r * 0.4124564 + linear.g * 0.3575761 + linear.b * 0.1804375;
+                float y = linear.r * 0.2126729 + linear.g * 0.7151522 + linear.b * 0.0721750;
+                float z = linear.r * 0.0193339 + linear.g * 0.1191920 + linear.b * 0.9503041;
+
+                x /= 0.95047; y /= 1.00000; z /= 1.08883;
+
+                float fx = x > 0.008856 ? pow(x, 1.0/3.0) : (7.787 * x + 16.0/116.0);
+                float fy = y > 0.008856 ? pow(y, 1.0/3.0) : (7.787 * y + 16.0/116.0);
+                float fz = z > 0.008856 ? pow(z, 1.0/3.0) : (7.787 * z + 16.0/116.0);
+
+                return vec3(116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz));
+            }
+
+            void main() {
+                float res = float(resolution);
+                float slicesPerRowF = float(slicesPerRow);
+
+                float sliceY = floor(vUv.y * slicesPerRowF);
+                float sliceX = floor(vUv.x * slicesPerRowF);
+                float sliceIdx = sliceY * slicesPerRowF + sliceX;
+
+                vec2 posInSlice = fract(vUv * slicesPerRowF);
+
+                float b = sliceIdx / (res - 1.0);
+                vec3 rgb = vec3(posInSlice.x, posInSlice.y, b);
+                vec3 lab = rgb2lab(rgb);
+
+                float minWeightedDist = 1e10;
+                int nearestIdx = 0;
+
+                for (int i = 0; i < 32; i++) {
+                    if (i >= paletteCount) break;
+                    float dist = length(lab - paletteColors[i]);
+                    float weightedDist = dist / paletteWeights[i];
+                    if (weightedDist < minWeightedDist) {
+                        minWeightedDist = weightedDist;
+                        nearestIdx = i;
+                    }
+                }
+
+                gl_FragColor = vec4(float(nearestIdx) / 255.0, 0.0, 0.0, 1.0);
+            }
+        `;
+
+        function initWebGL() {
+            const canvas = document.createElement('canvas');
+            gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+
+            if (!gl) {
+                console.error('WebGL not supported');
+                return false;
+            }
+
+            // Compile shaders
+            function compileShader(source, type) {
+                const shader = gl.createShader(type);
+                gl.shaderSource(shader, source);
+                gl.compileShader(shader);
+                if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                    console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+                    return null;
+                }
+                return shader;
+            }
+
+            function createProgram(vertSrc, fragSrc) {
+                const program = gl.createProgram();
+                gl.attachShader(program, compileShader(vertSrc, gl.VERTEX_SHADER));
+                gl.attachShader(program, compileShader(fragSrc, gl.FRAGMENT_SHADER));
+                gl.linkProgram(program);
+                if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                    console.error('Program link error:', gl.getProgramInfoLog(program));
+                    return null;
+                }
+                return program;
+            }
+
+            voronoiProgram = createProgram(vertexShaderSource, voronoiFragmentSource);
+
+            // Setup quad
+            const positions = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
+            quadBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+            console.log('WebGL initialized');
+            return true;
+        }
+
         async function computeVoronoi() {
-            if (palette.length === 0) {
+            if (palette.length === 0) return;
+            if (isComputing) return;
+
+            isComputing = true;
+            const originalClearText = clearBtn.textContent;
+            clearBtn.textContent = 'Computing...';
+            clearBtn.disabled = true;
+
+            if (!gl && !initWebGL()) {
+                isComputing = false;
+                clearBtn.textContent = originalClearText;
+                clearBtn.disabled = false;
                 return;
             }
 
-            if (isComputing) return;
-            isComputing = true;
+            // ALWAYS compute at full resolution (256)
+            const computeResolution = 256;
+            const slicesPerRow = Math.ceil(Math.sqrt(computeResolution));
+            const textureSize = slicesPerRow * computeResolution;
 
-            // Update Clear button to show progress
-            const originalClearText = clearBtn.textContent;
-            clearBtn.textContent = '0%';
-            clearBtn.disabled = true;
+            console.log(`Computing voronoi at FULL resolution: ${computeResolution}^3 = ${computeResolution ** 3} colors, texture: ${textureSize}x${textureSize}`);
 
-            const resolution = parseInt(resolutionSlider.value);
+            // Create/resize texture and framebuffer (only once at max resolution)
+            if (!voronoiTexture || currentResolution !== computeResolution) {
+                if (voronoiTexture) gl.deleteTexture(voronoiTexture);
+                if (voronoiFramebuffer) gl.deleteFramebuffer(voronoiFramebuffer);
 
-            // Initialize cells
+                voronoiTexture = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, voronoiTexture);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, textureSize, textureSize, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+                voronoiFramebuffer = gl.createFramebuffer();
+                gl.bindFramebuffer(gl.FRAMEBUFFER, voronoiFramebuffer);
+                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, voronoiTexture, 0);
+
+                currentResolution = computeResolution;
+            }
+
+            // Render voronoi to texture
+            gl.bindFramebuffer(gl.FRAMEBUFFER, voronoiFramebuffer);
+            gl.viewport(0, 0, textureSize, textureSize);
+            gl.useProgram(voronoiProgram);
+
+            const paletteLabFlat = new Float32Array(32 * 3);
+            const paletteWeightsFlat = new Float32Array(32);
+            palette.forEach((color, i) => {
+                paletteLabFlat[i * 3] = color.lab[0];
+                paletteLabFlat[i * 3 + 1] = color.lab[1];
+                paletteLabFlat[i * 3 + 2] = color.lab[2];
+                paletteWeightsFlat[i] = color.weight || 1.0;
+            });
+
+            gl.uniform3fv(gl.getUniformLocation(voronoiProgram, 'paletteColors'), paletteLabFlat);
+            gl.uniform1fv(gl.getUniformLocation(voronoiProgram, 'paletteWeights'), paletteWeightsFlat);
+            gl.uniform1i(gl.getUniformLocation(voronoiProgram, 'paletteCount'), palette.length);
+            gl.uniform1i(gl.getUniformLocation(voronoiProgram, 'resolution'), computeResolution);
+            gl.uniform1i(gl.getUniformLocation(voronoiProgram, 'slicesPerRow'), slicesPerRow);
+
+            const posLoc = gl.getAttribLocation(voronoiProgram, 'position');
+            gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+            gl.enableVertexAttribArray(posLoc);
+            gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            // Read pixels ONCE and cache
+            const voronoiPixels = new Uint8Array(textureSize * textureSize * 4);
+            gl.readPixels(0, 0, textureSize, textureSize, gl.RGBA, gl.UNSIGNED_BYTE, voronoiPixels);
+            cachedVoronoiPixels = voronoiPixels; // Cache for later use
+
+            console.log('GPU computation done, downsampling for visualization...');
+
+            // Get display resolution from slider
+            const displayResolution = parseInt(resolutionSlider.value);
+            const step = Math.floor(computeResolution / displayResolution);
+
+            console.log(`Downsampling from ${computeResolution} to ${displayResolution} (step: ${step})`);
+
+            // Build point clouds from pixels (downsampled)
             const cells = palette.map(seed => ({
                 seed,
-                points: []  // Store {rgb, lab, hex}
+                points: []
             }));
 
-            const totalColors = resolution ** 3;
-            let processed = 0;
+            // Decode pixels to build point arrays (with downsampling)
+            for (let ri = 0; ri < computeResolution; ri += step) {
+                for (let gi = 0; gi < computeResolution; gi += step) {
+                    for (let bi = 0; bi < computeResolution; bi += step) {
+                        const sliceIdx = bi;
+                        const sliceY = Math.floor(sliceIdx / slicesPerRow);
+                        const sliceX = sliceIdx % slicesPerRow;
 
-            // Process in chunks to avoid blocking UI
-            const chunkSize = 1000;
+                        const texX = sliceX * computeResolution + ri;
+                        const texY = sliceY * computeResolution + gi;
 
-            for (let ri = 0; ri < resolution; ri++) {
-                for (let gi = 0; gi < resolution; gi++) {
-                    for (let bi = 0; bi < resolution; bi++) {
-                        const r = ri / (resolution - 1);
-                        const g = gi / (resolution - 1);
-                        const b = bi / (resolution - 1);
-                        const hex = rgbToHex(r, g, b);
-                        const lab = rgb2lab(r, g, b);
+                        const pixelIdx = (texY * textureSize + texX) * 4;
+                        const paletteIdx = voronoiPixels[pixelIdx];
 
-                        // Find nearest seed
-                        let minDist = Infinity;
-                        let nearestIdx = 0;
+                        if (paletteIdx < cells.length) {
+                            const r = ri / (computeResolution - 1);
+                            const g = gi / (computeResolution - 1);
+                            const b = bi / (computeResolution - 1);
+                            const lab = rgb2lab(r, g, b);
 
-                        for (let i = 0; i < palette.length; i++) {
-                            const dist = labDistance(lab, palette[i].lab);
-                            if (dist < minDist) {
-                                minDist = dist;
-                                nearestIdx = i;
-                            }
-                        }
-
-                        cells[nearestIdx].points.push({
-                            rgb: [r, g, b],
-                            lab: lab,
-                            hex: hex
-                        });
-                        processed++;
-
-                        // Update progress periodically
-                        if (processed % chunkSize === 0) {
-                            const percent = Math.round((processed / totalColors) * 100);
-                            clearBtn.textContent = `${percent}%`;
-                            await new Promise(resolve => setTimeout(resolve, 0));
+                            cells[paletteIdx].points.push({
+                                rgb: [r, g, b],
+                                lab: lab,
+                                hex: rgbToHex(r, g, b)
+                            });
                         }
                     }
                 }
@@ -1034,13 +1142,21 @@
 
             voronoiCells = cells;
             isComputing = false;
-
-            // Restore Clear button
             clearBtn.textContent = originalClearText;
             clearBtn.disabled = false;
 
+            console.log('Point clouds built:', cells.map(c => `${c.seed.hex}: ${c.points.length} points`));
             updateVoronoiUI();
         }
+
+        // Shared renderer and cell scenes
+        const cellScenes = new Map();
+        const cellModes = new Map(); // Track 2D/3D mode per cell
+        let sharedRenderer = null;
+        let sharedCanvas = null;
+        let intersectionObserver = null;
+        const visibleCells = new Set();
+        let animationFrameId = null;
 
         function updateVoronoiUI() {
             if (!voronoiCells || voronoiCells.length === 0) {
@@ -1057,9 +1173,13 @@
                 intersectionObserver.disconnect();
             }
 
-            // Create shared renderer if needed (ONLY ONCE for all cells)
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+
+            // Create shared renderer (ONE WebGL context for all cells)
             if (!sharedRenderer) {
-                console.log('Creating shared WebGL renderer (ONE context for all cells)');
+                console.log('Creating shared WebGL renderer');
                 sharedCanvas = document.createElement('canvas');
                 sharedRenderer = new THREE.WebGLRenderer({
                     canvas: sharedCanvas,
@@ -1073,12 +1193,22 @@
             voronoiGrid.innerHTML = voronoiCells.map((cell, idx) => {
                 return `
                     <div class="voronoi-cell" style="border-color: ${cell.seed.hex}; background: ${cell.seed.hex};" data-cell-idx="${idx}">
-                        <div class="cell-canvas-container">
+                        <div class="cell-mode-toggle">
+                            <button class="mode-btn mode-3d active" data-cell-idx="${idx}">3D</button>
+                            <button class="mode-btn mode-2d" data-cell-idx="${idx}">2D</button>
+                        </div>
+                        <div class="cell-canvas-container" id="canvas-container-${idx}">
                             <canvas class="cell-canvas" id="canvas-${idx}"></canvas>
                         </div>
+                        <div class="cell-2d-grid" id="grid-${idx}"></div>
                     </div>
                 `;
             }).join('');
+
+            // Initialize all cells to 3D mode
+            voronoiCells.forEach((cell, idx) => {
+                cellModes.set(idx, '3d');
+            });
 
             // Create 3D scenes for each cell
             voronoiCells.forEach((cell, idx) => {
@@ -1088,17 +1218,23 @@
                 }
             });
 
+            // Setup mode toggle handlers
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const idx = parseInt(btn.dataset.cellIdx);
+                    const is3D = btn.classList.contains('mode-3d');
+                    toggleCellMode(idx, is3D ? '3d' : '2d');
+                });
+            });
 
-            // Set up intersection observer to track visibility
+            // Set up intersection observer
             intersectionObserver = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     const idx = parseInt(entry.target.dataset.cellIdx);
                     if (entry.isIntersecting) {
                         visibleCells.add(idx);
-                        console.log(`Cell ${idx} is now visible`);
                     } else {
                         visibleCells.delete(idx);
-                        console.log(`Cell ${idx} is now hidden`);
                     }
                 });
             }, {
@@ -1107,12 +1243,11 @@
                 threshold: 0.01
             });
 
-            // Observe all cell containers and mark initially visible ones
+            // Observe all cells and mark initially visible ones
             document.querySelectorAll('.voronoi-cell').forEach((cell, idx) => {
                 cell.dataset.cellIdx = idx;
                 intersectionObserver.observe(cell);
 
-                // Check if initially visible and add to set
                 const rect = cell.getBoundingClientRect();
                 const isVisible = (
                     rect.top < window.innerHeight &&
@@ -1122,34 +1257,237 @@
                 );
                 if (isVisible) {
                     visibleCells.add(idx);
-                    console.log(`Cell ${idx} initially visible`);
                 }
             });
 
             // Start shared animation loop
             startSharedAnimationLoop();
+
+            console.log('Voronoi UI updated with 3D visualizations');
         }
 
-        // Shared animation loop
-        let animationFrameId = null;
-        let frameCount = 0;
-        function startSharedAnimationLoop() {
-            // Cancel previous loop if exists
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
+        function create3DVisualization(canvas, cell, idx) {
+            const container = canvas.parentElement;
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            console.log(`Creating 3D viz for cell ${idx}: ${width}x${height}, ${cell.points.length} points`);
+
+            if (!cell.points || cell.points.length === 0) {
+                console.warn(`Cell ${idx} has no points`);
+                return;
             }
 
+            // Set canvas size
+            canvas.width = width;
+            canvas.height = height;
+
+            // Scene setup
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x161617);
+
+            const camera = new THREE.PerspectiveCamera(50, width / height, 1, 1000);
+
+            // Controls (attached to canvas)
+            const controls = new OrbitControls(camera, canvas);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(0, 0, 0);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+
+            // Calculate center of mass and bounds in Lab space
+            let sumA = 0, sumL = 0, sumB = 0;
+            let minA = Infinity, maxA = -Infinity;
+            let minL = Infinity, maxL = -Infinity;
+            let minB = Infinity, maxB = -Infinity;
+
+            cell.points.forEach(point => {
+                const [L, a, b] = point.lab;
+                sumA += a; sumL += L; sumB += b;
+                minA = Math.min(minA, a); maxA = Math.max(maxA, a);
+                minL = Math.min(minL, L); maxL = Math.max(maxL, L);
+                minB = Math.min(minB, b); maxB = Math.max(maxB, b);
+            });
+
+            const centerA = sumA / cell.points.length;
+            const centerL = sumL / cell.points.length;
+            const centerB = sumB / cell.points.length;
+
+            const extentA = maxA - minA;
+            const extentL = maxL - minL;
+            const extentB = maxB - minB;
+            const maxExtent = Math.max(extentA, extentL, extentB, 10);
+
+            // Create point cloud positioned in Lab space
+            const positions = [];
+            const colors = [];
+
+            cell.points.forEach(point => {
+                const [L, a, b] = point.lab;
+                // Position: X=a, Y=L, Z=b, centered at origin
+                positions.push(a - centerA, L - centerL, b - centerB);
+                colors.push(...point.rgb);
+            });
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+            const pointSize = Math.max(3, maxExtent / 15);
+            const material = new THREE.PointsMaterial({
+                size: pointSize,
+                vertexColors: true,
+                sizeAttenuation: true
+            });
+
+            const pointCloud = new THREE.Points(geometry, material);
+            scene.add(pointCloud);
+
+            // Position camera
+            const cameraDistance = maxExtent * 2.5;
+            camera.position.set(cameraDistance, cameraDistance * 0.8, cameraDistance);
+
+            // Store scene data
+            cellScenes.set(idx, {
+                scene,
+                camera,
+                canvas,
+                controls
+            });
+
+            console.log(`Cell ${idx} 3D scene created (extent: ${maxExtent.toFixed(1)})`);
+        }
+
+        function toggleCellMode(idx, mode) {
+            cellModes.set(idx, mode);
+
+            // Update button states
+            const cell = document.querySelector(`.voronoi-cell[data-cell-idx="${idx}"]`);
+            const btn3d = cell.querySelector('.mode-3d');
+            const btn2d = cell.querySelector('.mode-2d');
+            const canvasContainer = document.getElementById(`canvas-container-${idx}`);
+            const gridContainer = document.getElementById(`grid-${idx}`);
+
+            if (mode === '3d') {
+                btn3d.classList.add('active');
+                btn2d.classList.remove('active');
+                canvasContainer.style.display = 'block';
+                gridContainer.classList.remove('active');
+            } else {
+                btn3d.classList.remove('active');
+                btn2d.classList.add('active');
+                canvasContainer.style.display = 'none';
+                gridContainer.classList.add('active');
+
+                // Build 2D grid if not already built
+                if (!gridContainer.hasChildNodes()) {
+                    create2DGrid(idx);
+                }
+            }
+
+            console.log(`Cell ${idx} switched to ${mode} mode`);
+        }
+
+        function create2DGrid(idx) {
+            const cell = voronoiCells[idx];
+            if (!cell || !cell.points) return;
+
+            const gridContainer = document.getElementById(`grid-${idx}`);
+
+            // Check if we have cached voronoi data
+            if (!cachedVoronoiPixels) {
+                console.warn(`Cell ${idx}: No cached voronoi data available`);
+                return;
+            }
+
+            console.log(`Cell ${idx}: Building 2D grid from cached data...`);
+
+            // Get ALL points from full resolution (not downsampled)
+            const computeResolution = 256;
+            const slicesPerRow = Math.ceil(Math.sqrt(computeResolution));
+            const textureSize = slicesPerRow * computeResolution;
+
+            const allColors = [];
+
+            // Get ALL points at full resolution as RGB values with luminance
+            for (let ri = 0; ri < computeResolution; ri++) {
+                for (let gi = 0; gi < computeResolution; gi++) {
+                    for (let bi = 0; bi < computeResolution; bi++) {
+                        const sliceIdx = bi;
+                        const sliceY = Math.floor(sliceIdx / slicesPerRow);
+                        const sliceX = sliceIdx % slicesPerRow;
+
+                        const texX = sliceX * computeResolution + ri;
+                        const texY = sliceY * computeResolution + gi;
+
+                        const pixelIdx = (texY * textureSize + texX) * 4;
+                        const paletteIdx = cachedVoronoiPixels[pixelIdx];
+
+                        if (paletteIdx === idx) {
+                            const r = Math.round(ri * 255 / (computeResolution - 1));
+                            const g = Math.round(gi * 255 / (computeResolution - 1));
+                            const b = Math.round(bi * 255 / (computeResolution - 1));
+
+                            // Calculate luminance for sorting
+                            const [L, a, bv] = rgb2lab(r / 255, g / 255, b / 255);
+                            allColors.push({ r, g, b, L });
+                        }
+                    }
+                }
+            }
+
+            console.log(`Cell ${idx}: Collected ${allColors.length} colors, sorting by luminance...`);
+
+            // Sort by luminance (L value from Lab color space)
+            allColors.sort((a, b) => b.L - a.L); // Descending (bright to dark)
+
+            console.log(`Cell ${idx}: Rendering ${allColors.length} colors in 2D grid (canvas)`);
+
+            // Use canvas for efficient rendering
+            const swatchSize = 8;
+            const containerWidth = gridContainer.parentElement.clientWidth - 16; // Account for padding
+            const cols = Math.floor(containerWidth / swatchSize);
+            const rows = Math.ceil(allColors.length / cols);
+
+            const canvas = document.createElement('canvas');
+            canvas.className = 'cell-2d-canvas';
+            canvas.width = cols * swatchSize;
+            canvas.height = rows * swatchSize;
+
+            const ctx = canvas.getContext('2d');
+
+            // Draw all color swatches (now sorted by luminance)
+            let colorIdx = 0;
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    if (colorIdx >= allColors.length) break;
+                    const { r, g, b } = allColors[colorIdx];
+                    ctx.fillStyle = `rgb(${r},${g},${b})`;
+                    ctx.fillRect(col * swatchSize, row * swatchSize, swatchSize, swatchSize);
+                    colorIdx++;
+                }
+                if (colorIdx >= allColors.length) break;
+            }
+
+            gridContainer.appendChild(canvas);
+            console.log(`Cell ${idx}: 2D grid rendered successfully`);
+        }
+
+        function startSharedAnimationLoop() {
             function animate() {
                 animationFrameId = requestAnimationFrame(animate);
-                frameCount++;
 
-                // Debug log every 60 frames
-                if (frameCount % 60 === 0) {
-                    console.log(`Rendering ${visibleCells.size} visible cells:`, Array.from(visibleCells));
-                }
-
-                // Only render visible cells using the SHARED renderer
+                // Only render visible cells in 3D mode using shared renderer
                 visibleCells.forEach(idx => {
+                    // Skip if in 2D mode
+                    if (cellModes.get(idx) === '2d') return;
+
                     const cellData = cellScenes.get(idx);
                     if (cellData) {
                         const { scene, camera, canvas, controls } = cellData;
@@ -1167,132 +1505,239 @@
                             camera.updateProjectionMatrix();
                         }
 
-                        // Render to shared renderer canvas
+                        // Render to shared renderer
                         sharedRenderer.setSize(width, height, false);
                         sharedRenderer.render(scene, camera);
 
-                        // Copy from shared renderer to this cell's canvas
+                        // Copy from shared canvas to cell canvas
                         const ctx = canvas.getContext('2d');
                         if (ctx) {
                             ctx.clearRect(0, 0, width, height);
                             ctx.drawImage(sharedCanvas, 0, 0, width, height);
                         }
-                    } else {
-                        console.warn(`No cell data for index ${idx}`);
                     }
                 });
             }
-
             animate();
         }
 
-        function create3DVisualization(canvas, cell, idx) {
-            const container = canvas.parentElement;
-            const width = container.clientWidth;
-            const height = container.clientHeight;
+        // ==========================================
+        // EXPORT FUNCTIONALITY
+        // ==========================================
 
-            // Debug: log cell info
-            console.log(`Cell ${idx} (${cell.seed.hex}): ${cell.points.length} points`);
-
-            // Skip if no points
-            if (!cell.points || cell.points.length === 0) {
-                console.warn(`Cell ${idx} has no points, skipping visualization`);
+        async function exportPalettePDF() {
+            if (!palette || palette.length === 0) {
+                alert('No palette to export. Please add colors first.');
                 return;
             }
 
-            // Scene setup
-            const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x161617);
+            if (!cachedVoronoiPixels) {
+                alert('No voronoi data computed yet. Please wait for computation to finish.');
+                return;
+            }
 
-            const camera = new THREE.PerspectiveCamera(50, width / height, 1, 1000);
+            console.log('Starting PDF export...');
+            exportBtn.disabled = true;
 
-            // Set canvas size (no individual renderer - using shared one)
-            console.log(`Setting up canvas for cell ${idx}: ${width}x${height}`);
-            canvas.width = width;
-            canvas.height = height;
+            try {
+                const computeResolution = 256;
+                const slicesPerRow = Math.ceil(Math.sqrt(computeResolution));
+                const textureSize = slicesPerRow * computeResolution;
 
-            // Setup controls
-            const controls = new OrbitControls(camera, canvas);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.target.set(0, 0, 0);
+                // Collect all colors for each palette entry
+                exportBtn.textContent = 'Collecting...';
+                const paletteData = [];
 
-            // Lighting (better lighting for StandardMaterial)
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-            scene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-            directionalLight.position.set(1, 1, 1);
-            scene.add(directionalLight);
-            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
-            directionalLight2.position.set(-1, -1, -1);
-            scene.add(directionalLight2);
+                for (let idx = 0; idx < palette.length; idx++) {
+                    exportBtn.textContent = `Collecting (${idx + 1}/${palette.length})...`;
+                    await new Promise(resolve => requestAnimationFrame(resolve));
 
-            // Calculate center of mass and bounds
-            let sumA = 0, sumL = 0, sumB = 0;
-            let minA = Infinity, maxA = -Infinity;
-            let minL = Infinity, maxL = -Infinity;
-            let minB = Infinity, maxB = -Infinity;
+                    const colors = [];
+                    const color = palette[idx];
 
-            cell.points.forEach(point => {
-                const [L, a, b] = point.lab;
-                sumA += a;
-                sumL += L;
-                sumB += b;
-                minA = Math.min(minA, a);
-                maxA = Math.max(maxA, a);
-                minL = Math.min(minL, L);
-                maxL = Math.max(maxL, L);
-                minB = Math.min(minB, b);
-                maxB = Math.max(maxB, b);
-            });
-            const centerA = sumA / cell.points.length;
-            const centerL = sumL / cell.points.length;
-            const centerB = sumB / cell.points.length;
+                    for (let ri = 0; ri < computeResolution; ri++) {
+                        for (let gi = 0; gi < computeResolution; gi++) {
+                            for (let bi = 0; bi < computeResolution; bi++) {
+                                const sliceIdx = bi;
+                                const sliceY = Math.floor(sliceIdx / slicesPerRow);
+                                const sliceX = sliceIdx % slicesPerRow;
 
-            // Calculate extent for camera positioning
-            const extentA = maxA - minA;
-            const extentL = maxL - minL;
-            const extentB = maxB - minB;
-            const maxExtent = Math.max(extentA, extentL, extentB, 10); // At least 10 units
+                                const texX = sliceX * computeResolution + ri;
+                                const texY = sliceY * computeResolution + gi;
 
-            // Create point cloud from cell data, centered at origin
-            const positions = [];
-            const colors = [];
+                                const pixelIdx = (texY * textureSize + texX) * 4;
+                                const paletteIdx = cachedVoronoiPixels[pixelIdx];
 
-            cell.points.forEach(point => {
-                const [L, a, b] = point.lab;
-                // Position: X=a, Y=L, Z=b, centered at origin
-                positions.push(a - centerA, L - centerL, b - centerB);
-                colors.push(...point.rgb);
-            });
+                                if (paletteIdx === idx) {
+                                    const r = Math.round(ri * 255 / (computeResolution - 1));
+                                    const g = Math.round(gi * 255 / (computeResolution - 1));
+                                    const b = Math.round(bi * 255 / (computeResolution - 1));
+                                    const [L] = rgb2lab(r / 255, g / 255, b / 255);
+                                    colors.push({ r, g, b, L });
+                                }
+                            }
+                        }
+                    }
 
-            const geometry = new THREE.BufferGeometry();
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                    // Sort by luminance
+                    colors.sort((a, b) => b.L - a.L);
+                    paletteData.push({ color, colors });
+                }
 
-            // Adjust point size based on extent
-            const pointSize = Math.max(2, maxExtent / 15);
+                console.log('Data collected, creating PDF...');
+                exportBtn.textContent = 'Creating PDF...';
+                await new Promise(resolve => requestAnimationFrame(resolve));
 
-            const material = new THREE.PointsMaterial({
-                size: pointSize,
-                vertexColors: true,
-                sizeAttenuation: true
-            });
+                // Initialize PDF (A4 landscape for more width)
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'mm',
+                    format: 'a4'
+                });
 
-            const pointCloud = new THREE.Points(geometry, material);
-            scene.add(pointCloud);
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+                const margin = 10;
+                const contentWidth = pageWidth - 2 * margin;
+                const contentHeight = pageHeight - 2 * margin;
 
-            // Position camera based on actual extent
-            const cameraDistance = maxExtent * 2.5;
-            camera.position.set(cameraDistance, cameraDistance * 0.8, cameraDistance);
+                let yPosition = margin;
+                let isFirstPage = true;
 
-            // Store scene data (shared renderer will render to this canvas)
-            cellScenes.set(idx, {
-                scene,
-                camera,
-                canvas,
-                controls
-            });
+                // PDF header on first page
+                pdf.setFontSize(16);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text('Voronoi Palette Analysis', margin, yPosition);
+                yPosition += 10;
+
+                // Palette swatches
+                const swatchWidth = Math.min(10, contentWidth / palette.length);
+                palette.forEach((color, idx) => {
+                    pdf.setFillColor(color.hex);
+                    pdf.rect(margin + idx * swatchWidth, yPosition, swatchWidth - 1, 5, 'F');
+                });
+                yPosition += 10;
+
+                // Render each palette section
+                const swatchSize = 2; // Small swatches for PDF
+                const cols = Math.floor(contentWidth / swatchSize);
+
+                for (let i = 0; i < paletteData.length; i++) {
+                    exportBtn.textContent = `Rendering (${i + 1}/${paletteData.length})...`;
+                    await new Promise(resolve => requestAnimationFrame(resolve));
+
+                    const { color, colors } = paletteData[i];
+
+                    // Check if we need a new page
+                    const sectionHeaderHeight = 15;
+                    if (yPosition + sectionHeaderHeight > pageHeight - margin) {
+                        pdf.addPage();
+                        yPosition = margin;
+                        isFirstPage = false;
+                    }
+
+                    // Section header
+                    pdf.setFontSize(12);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(`${color.hex} (${colors.length} colors)`, margin, yPosition + 5);
+                    pdf.setFillColor(color.hex);
+                    pdf.rect(margin + 50, yPosition, 15, 5, 'F');
+                    yPosition += sectionHeaderHeight;
+
+                    // Render color swatches as small canvas, then add to PDF
+                    const rows = Math.ceil(colors.length / cols);
+                    const canvasWidth = cols * swatchSize;
+                    const canvasHeight = rows * swatchSize;
+
+                    // Create temporary canvas for this section
+                    const canvas = document.createElement('canvas');
+                    canvas.width = canvasWidth;
+                    canvas.height = canvasHeight;
+                    const ctx = canvas.getContext('2d');
+
+                    // Draw using ImageData (fast)
+                    const imageData = ctx.createImageData(canvasWidth, canvasHeight);
+                    const data = imageData.data;
+
+                    let colorIdx = 0;
+                    for (let row = 0; row < rows; row++) {
+                        for (let col = 0; col < cols; col++) {
+                            if (colorIdx >= colors.length) break;
+                            const { r, g, b } = colors[colorIdx];
+
+                            for (let sy = 0; sy < swatchSize; sy++) {
+                                for (let sx = 0; sx < swatchSize; sx++) {
+                                    const px = col * swatchSize + sx;
+                                    const py = row * swatchSize + sy;
+                                    const idx = (py * canvasWidth + px) * 4;
+                                    data[idx] = r;
+                                    data[idx + 1] = g;
+                                    data[idx + 2] = b;
+                                    data[idx + 3] = 255;
+                                }
+                            }
+                            colorIdx++;
+                        }
+                    }
+
+                    ctx.putImageData(imageData, 0, 0);
+
+                    // Convert canvas to image and add to PDF
+                    const imgData = canvas.toDataURL('image/png');
+                    const imgHeightMM = (canvasHeight / canvasWidth) * contentWidth;
+
+                    // Split across pages if too tall
+                    let remainingHeight = imgHeightMM;
+                    let srcY = 0;
+
+                    while (remainingHeight > 0) {
+                        const availableHeight = pageHeight - yPosition - margin;
+                        const heightToAdd = Math.min(remainingHeight, availableHeight);
+                        const srcHeightPx = (heightToAdd / imgHeightMM) * canvasHeight;
+
+                        // Add portion of image
+                        pdf.addImage(
+                            imgData,
+                            'PNG',
+                            margin,
+                            yPosition,
+                            contentWidth,
+                            heightToAdd,
+                            undefined,
+                            'FAST',
+                            0
+                        );
+
+                        remainingHeight -= heightToAdd;
+                        srcY += srcHeightPx;
+
+                        if (remainingHeight > 0) {
+                            pdf.addPage();
+                            yPosition = margin;
+                        } else {
+                            yPosition += heightToAdd + 5;
+                        }
+                    }
+                }
+
+                console.log('PDF created, downloading...');
+                exportBtn.textContent = 'Downloading...';
+                await new Promise(resolve => requestAnimationFrame(resolve));
+
+                // Download PDF
+                pdf.save(`voronoi-palette-${Date.now()}.pdf`);
+
+                exportBtn.textContent = 'Export PDF';
+                exportBtn.disabled = false;
+                console.log('PDF export complete!');
+
+            } catch (error) {
+                console.error('Export error:', error);
+                alert(`Export failed: ${error.message}`);
+                exportBtn.textContent = 'Export PDF';
+                exportBtn.disabled = false;
+            }
         }
 
         // ==========================================
@@ -1313,10 +1758,11 @@
         function updateColorInPalette(oldHex, newHex) {
             const colorIndex = palette.findIndex(c => c.hex === oldHex);
             if (colorIndex !== -1) {
-                // Update the color
+                // Update the color, preserve weight
                 const [r, g, b] = hexToRgb(newHex);
                 const [L, a, bv] = rgb2lab(r, g, b);
-                palette[colorIndex] = { hex: newHex, rgb: [r, g, b], lab: [L, a, bv] };
+                const weight = palette[colorIndex].weight || 1.0;
+                palette[colorIndex] = { hex: newHex, rgb: [r, g, b], lab: [L, a, bv], weight };
 
                 // Update UI and recompute
                 updatePaletteUI();
@@ -1334,6 +1780,24 @@
             }
         }
 
+        function updateWeightInPalette(hex, weight) {
+            const colorIndex = palette.findIndex(c => c.hex === hex);
+            if (colorIndex !== -1) {
+                palette[colorIndex].weight = weight;
+                voronoiCells = null;
+
+                // Update URL with new state
+                encodeStateToURL();
+
+                // Auto-compute
+                if (autoComputeEnabled && palette.length > 0) {
+                    computeVoronoi();
+                }
+
+                console.log(`Updated weight for ${hex} to ${weight}`);
+            }
+        }
+
         addColorBtn.addEventListener('click', () => {
             const hex = colorHex.value;
             if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
@@ -1347,12 +1811,84 @@
             }
         });
 
+        exportBtn.addEventListener('click', exportPalettePDF);
+
         clearBtn.addEventListener('click', clearPalette);
 
         resolutionSlider.addEventListener('input', () => {
             const res = parseInt(resolutionSlider.value);
             resolutionValue.textContent = res;
+
+            // Only rebuild visualization (no GPU recomputation)
+            if (voronoiCells && voronoiCells.length > 0) {
+                console.log(`Resolution changed to ${res}, rebuilding visualization...`);
+                rebuildVisualizationFromCache();
+            }
         });
+
+        // Rebuild visualization from cached GPU results at new resolution
+        function rebuildVisualizationFromCache() {
+            if (!gl || !voronoiTexture || !palette.length) return;
+
+            const computeResolution = 256;
+            const slicesPerRow = Math.ceil(Math.sqrt(computeResolution));
+            const textureSize = slicesPerRow * computeResolution;
+            const displayResolution = parseInt(resolutionSlider.value);
+            const step = Math.floor(computeResolution / displayResolution);
+
+            console.log(`Rebuilding at display resolution ${displayResolution} (step: ${step})`);
+
+            // Use cached data if available, otherwise re-read
+            let voronoiPixels;
+            if (cachedVoronoiPixels) {
+                voronoiPixels = cachedVoronoiPixels;
+                console.log('Using cached voronoi data');
+            } else {
+                gl.bindFramebuffer(gl.FRAMEBUFFER, voronoiFramebuffer);
+                voronoiPixels = new Uint8Array(textureSize * textureSize * 4);
+                gl.readPixels(0, 0, textureSize, textureSize, gl.RGBA, gl.UNSIGNED_BYTE, voronoiPixels);
+                cachedVoronoiPixels = voronoiPixels;
+            }
+
+            const cells = palette.map(seed => ({
+                seed,
+                points: []
+            }));
+
+            // Decode with new step size
+            for (let ri = 0; ri < computeResolution; ri += step) {
+                for (let gi = 0; gi < computeResolution; gi += step) {
+                    for (let bi = 0; bi < computeResolution; bi += step) {
+                        const sliceIdx = bi;
+                        const sliceY = Math.floor(sliceIdx / slicesPerRow);
+                        const sliceX = sliceIdx % slicesPerRow;
+
+                        const texX = sliceX * computeResolution + ri;
+                        const texY = sliceY * computeResolution + gi;
+
+                        const pixelIdx = (texY * textureSize + texX) * 4;
+                        const paletteIdx = voronoiPixels[pixelIdx];
+
+                        if (paletteIdx < cells.length) {
+                            const r = ri / (computeResolution - 1);
+                            const g = gi / (computeResolution - 1);
+                            const b = bi / (computeResolution - 1);
+                            const lab = rgb2lab(r, g, b);
+
+                            cells[paletteIdx].points.push({
+                                rgb: [r, g, b],
+                                lab: lab,
+                                hex: rgbToHex(r, g, b)
+                            });
+                        }
+                    }
+                }
+            }
+
+            voronoiCells = cells;
+            console.log('Visualization rebuilt:', cells.map(c => `${c.seed.hex}: ${c.points.length} points`));
+            updateVoronoiUI();
+        }
 
         // ==========================================
         // INITIALIZATION
@@ -1378,7 +1914,7 @@
                 if (!palette.some(c => c.hex === normalized)) {
                     const [r, g, b] = hexToRgb(normalized);
                     const [L, a, bv] = rgb2lab(r, g, b);
-                    palette.push({ hex: normalized, rgb: [r, g, b], lab: [L, a, bv] });
+                    palette.push({ hex: normalized, rgb: [r, g, b], lab: [L, a, bv], weight: 1.0 });
                 }
             });
 
@@ -1404,7 +1940,7 @@
                 if (!palette.some(c => c.hex === normalized)) {
                     const [r, g, b] = hexToRgb(normalized);
                     const [L, a, bv] = rgb2lab(r, g, b);
-                    palette.push({ hex: normalized, rgb: [r, g, b], lab: [L, a, bv] });
+                    palette.push({ hex: normalized, rgb: [r, g, b], lab: [L, a, bv], weight: 1.0 });
                 }
             });
 

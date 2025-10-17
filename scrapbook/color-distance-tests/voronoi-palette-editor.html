@@ -851,6 +851,40 @@
         let isComputing = false;
 
         // ==========================================
+        // URL STATE MANAGEMENT
+        // ==========================================
+
+        function encodeStateToURL() {
+            const params = new URLSearchParams();
+
+            // Encode colors (hex values without #)
+            if (palette.length > 0) {
+                const colors = palette.map(c => c.hex.replace('#', '')).join(',');
+                params.set('colors', colors);
+            }
+
+            // Update URL without reloading the page
+            const newURL = `${window.location.pathname}?${params.toString()}`;
+            window.history.replaceState({}, '', newURL);
+        }
+
+        function decodeStateFromURL() {
+            const params = new URLSearchParams(window.location.search);
+
+            // Decode colors
+            const colorsParam = params.get('colors');
+            if (colorsParam) {
+                const hexColors = colorsParam.split(',').map(c => '#' + c.toUpperCase());
+                return {
+                    colors: hexColors,
+                    resolution: parseInt(params.get('resolution')) || 32
+                };
+            }
+
+            return null;
+        }
+
+        // ==========================================
         // DOM ELEMENTS
         // ==========================================
 
@@ -882,6 +916,9 @@
             updatePaletteUI();
             voronoiCells = null; // Clear previous computation
 
+            // Update URL with new state
+            encodeStateToURL();
+
             // Auto-compute Voronoi cells (if enabled)
             if (autoComputeEnabled && palette.length > 0) {
                 computeVoronoi();
@@ -892,6 +929,9 @@
             palette = palette.filter(c => c.hex !== hex);
             updatePaletteUI();
             voronoiCells = null;
+
+            // Update URL with new state
+            encodeStateToURL();
 
             // Auto-compute Voronoi cells (if enabled)
             if (autoComputeEnabled) {
@@ -908,6 +948,9 @@
             updatePaletteUI();
             voronoiCells = null;
             updateVoronoiUI();
+
+            // Update URL with new state
+            encodeStateToURL();
         }
 
         function updatePaletteUI() {
@@ -1303,6 +1346,9 @@
                 updatePaletteUI();
                 voronoiCells = null;
 
+                // Update URL with new state
+                encodeStateToURL();
+
                 // Auto-compute
                 if (autoComputeEnabled && palette.length > 0) {
                     computeVoronoi();
@@ -1339,32 +1385,60 @@
         // Temporarily disable auto-compute for initial load
         let autoComputeEnabled = false;
 
-        const defaultColors = [
-            // Earths & Browns
-            '#8B4513', '#A0522D', '#D2691E', '#CD853F',
-            // Greens (plants, moss, forest)
-            '#228B22', '#3CB371', '#556B2F', '#6B8E23',
-            // Blues (sky, water)
-            '#4682B4', '#5F9EA0', '#87CEEB', '#708090',
-            // Grays & Stones
-            '#696969', '#808080', '#A9A9A9', '#D3D3D3',
-            // Warm naturals (clay, sand, ochre)
-            '#DAA520', '#BDB76B', '#BC8F8F', '#F4A460'
-        ];
+        // Try to restore state from URL
+        const urlState = decodeStateFromURL();
 
-        // Add all default colors without auto-computing
-        defaultColors.forEach(hex => {
-            const normalized = hex.toUpperCase();
-            if (!palette.some(c => c.hex === normalized)) {
-                const [r, g, b] = hexToRgb(normalized);
-                const [L, a, bv] = rgb2lab(r, g, b);
-                palette.push({ hex: normalized, rgb: [r, g, b], lab: [L, a, bv] });
-            }
-        });
+        if (urlState) {
+            // Restore from URL
+            console.log('Restoring state from URL:', urlState);
 
-        updatePaletteUI();
+            // Set resolution
+            resolutionSlider.value = urlState.resolution;
+            resolutionValue.textContent = urlState.resolution;
 
-        // Enable auto-compute and compute once with all default colors
+            // Add colors from URL
+            urlState.colors.forEach(hex => {
+                const normalized = hex.toUpperCase();
+                if (!palette.some(c => c.hex === normalized)) {
+                    const [r, g, b] = hexToRgb(normalized);
+                    const [L, a, bv] = rgb2lab(r, g, b);
+                    palette.push({ hex: normalized, rgb: [r, g, b], lab: [L, a, bv] });
+                }
+            });
+
+            updatePaletteUI();
+        } else {
+            // Use default colors if no URL state
+            const defaultColors = [
+                // Earths & Browns
+                '#8B4513', '#A0522D', '#D2691E', '#CD853F',
+                // Greens (plants, moss, forest)
+                '#228B22', '#3CB371', '#556B2F', '#6B8E23',
+                // Blues (sky, water)
+                '#4682B4', '#5F9EA0', '#87CEEB', '#708090',
+                // Grays & Stones
+                '#696969', '#808080', '#A9A9A9', '#D3D3D3',
+                // Warm naturals (clay, sand, ochre)
+                '#DAA520', '#BDB76B', '#BC8F8F', '#F4A460'
+            ];
+
+            // Add all default colors without auto-computing
+            defaultColors.forEach(hex => {
+                const normalized = hex.toUpperCase();
+                if (!palette.some(c => c.hex === normalized)) {
+                    const [r, g, b] = hexToRgb(normalized);
+                    const [L, a, bv] = rgb2lab(r, g, b);
+                    palette.push({ hex: normalized, rgb: [r, g, b], lab: [L, a, bv] });
+                }
+            });
+
+            updatePaletteUI();
+
+            // Set initial URL with default colors
+            encodeStateToURL();
+        }
+
+        // Enable auto-compute and compute once
         autoComputeEnabled = true;
         computeVoronoi();
     </script>

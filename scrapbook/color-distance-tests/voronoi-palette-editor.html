@@ -60,9 +60,9 @@
             height: 100vh;
             height: -webkit-fill-available;
             height: 100svh;
-            gap: 10px;
-            padding: 10px;
-            padding: env(safe-area-inset-top, 10px) env(safe-area-inset-right, 10px) env(safe-area-inset-bottom, 10px) env(safe-area-inset-left, 10px);
+            gap: 8px;
+            padding: 8px;
+            padding: env(safe-area-inset-top, 8px) env(safe-area-inset-right, 8px) env(safe-area-inset-bottom, 8px) env(safe-area-inset-left, 8px);
         }
 
         .palette-panel {
@@ -70,17 +70,17 @@
             background: var(--bg-secondary);
             border: 1px solid var(--border);
             border-radius: var(--radius);
-            padding: 15px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
         }
 
         .section {
             background: color-mix(in srgb, var(--bg-primary) 80%, transparent 20%);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 12px;
+            padding: 8px;
         }
 
         .color-input-group {
@@ -314,12 +314,12 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, 400px);
             grid-auto-flow: column;
-            grid-template-rows: repeat(2, 1fr);
+            grid-template-rows: repeat(2, minmax(0, 1fr));
             gap: 15px;
             overflow-x: auto;
             overflow-y: hidden;
             -webkit-overflow-scrolling: touch;
-            padding: 10px;
+            padding: 8px;
             height: 100%;
         }
 
@@ -333,13 +333,14 @@
             width: 400px;
             display: flex;
             flex-direction: column;
-            min-height: 250px;
+            min-height: 200px;
+            max-height: 100%;
         }
 
         .cell-canvas-container {
             width: 100%;
-            height: 100%;
-            min-height: 200px;
+            flex: 1;
+            min-height: 150px;
             border-radius: 8px;
             overflow: hidden;
             background: var(--bg-primary);
@@ -381,146 +382,6 @@
             background: var(--fg-secondary);
         }
 
-        /* Debug Modal */
-        .debug-button {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 12px 20px;
-            background: #ff9500;
-            border: none;
-            border-radius: 8px;
-            color: white;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            z-index: 2000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            transition: all 0.2s ease;
-        }
-
-        .debug-button:hover {
-            background: #ff9f1a;
-            transform: translateY(-2px);
-        }
-
-        .debug-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.8);
-            z-index: 3000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .debug-modal.active {
-            display: flex;
-        }
-
-        .debug-content {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            width: 90%;
-            max-width: 900px;
-            height: 80vh;
-            height: 80svh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .debug-header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .debug-title {
-            font-size: 20px;
-            font-weight: 600;
-        }
-
-        .debug-close {
-            padding: 8px 16px;
-            background: rgba(255, 59, 48, 0.1);
-            border: 1px solid rgba(255, 59, 48, 0.3);
-            border-radius: 6px;
-            color: #ff3b30;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .debug-close:hover {
-            background: rgba(255, 59, 48, 0.2);
-        }
-
-        .debug-controls {
-            padding: 12px 20px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            gap: 10px;
-        }
-
-        .debug-control-btn {
-            padding: 6px 12px;
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--fg-primary);
-            cursor: pointer;
-            font-size: 13px;
-        }
-
-        .debug-control-btn:hover {
-            background: var(--border);
-        }
-
-        .debug-logs {
-            flex: 1;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            padding: 20px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.5;
-        }
-
-        .debug-log-entry {
-            padding: 6px 10px;
-            margin-bottom: 4px;
-            border-radius: 4px;
-            border-left: 3px solid transparent;
-        }
-
-        .debug-log-entry.log {
-            background: color-mix(in srgb, var(--bg-primary) 80%, transparent 20%);
-            border-left-color: #0a84ff;
-        }
-
-        .debug-log-entry.warn {
-            background: rgba(255, 149, 0, 0.1);
-            border-left-color: #ff9500;
-            color: #ff9500;
-        }
-
-        .debug-log-entry.error {
-            background: rgba(255, 59, 48, 0.1);
-            border-left-color: #ff3b30;
-            color: #ff3b30;
-        }
-
-        .debug-log-time {
-            color: var(--fg-secondary);
-            margin-right: 10px;
-        }
 
         /* Enlarged View Modal */
         .enlarged-modal {
@@ -601,20 +462,54 @@
         /* Mobile Responsive (small phones only) */
         @media (max-width: 480px) {
             .container {
-                padding: 5px;
-                gap: 5px;
+                padding: 4px;
+                gap: 4px;
             }
 
             .palette-panel {
-                padding: 10px;
+                padding: 6px;
+                gap: 6px;
+            }
+
+            .palette-colors {
+                gap: 6px;
+            }
+
+            .palette-color-item {
+                padding: 6px;
+                gap: 6px;
+                min-width: 80px;
+            }
+
+            .color-preview {
+                width: 32px;
+                height: 32px;
+            }
+
+            input[type="color"] {
+                width: 40px;
+                height: 36px;
+            }
+
+            .btn {
+                padding: 6px 10px;
+                font-size: 13px;
             }
 
             .voronoi-cell {
                 width: 280px;
+                min-height: 150px;
             }
 
             .bins-grid {
                 grid-template-columns: repeat(auto-fill, 280px);
+                grid-template-rows: repeat(2, minmax(0, 1fr));
+                padding: 4px;
+                gap: 8px;
+            }
+
+            .cell-canvas-container {
+                min-height: 120px;
             }
 
             .enlarged-modal {
@@ -643,9 +538,6 @@
     </style>
 </head>
 <body>
-    <!-- Debug Button -->
-    <button class="debug-button" id="debugBtn">Debug Console</button>
-
     <!-- Enlarged View Modal -->
     <div class="enlarged-modal" id="enlargedModal">
         <div class="enlarged-content" id="enlargedContent">
@@ -659,23 +551,6 @@
         </div>
     </div>
 
-    <!-- Debug Modal -->
-    <div class="debug-modal" id="debugModal">
-        <div class="debug-content">
-            <div class="debug-header">
-                <div class="debug-title">Debug Console</div>
-                <button class="debug-close" id="debugCloseBtn">Close</button>
-            </div>
-            <div class="debug-controls">
-                <button class="debug-control-btn" id="debugClearBtn">Clear</button>
-                <button class="debug-control-btn" id="debugCopyBtn">Copy All</button>
-                <span style="color: var(--fg-secondary); font-size: 12px; margin-left: auto;">
-                    <span id="debugLogCount">0</span> logs
-                </span>
-            </div>
-            <div class="debug-logs" id="debugLogs"></div>
-        </div>
-    </div>
     <div class="container">
         <!-- Top: Voronoi Visualization -->
         <div class="bins-panel">
@@ -721,101 +596,6 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-        // ==========================================
-        // DEBUG CONSOLE SYSTEM
-        // ==========================================
-
-        const debugLogs = [];
-        const debugLogsElement = document.getElementById('debugLogs');
-        const debugLogCount = document.getElementById('debugLogCount');
-        const debugModal = document.getElementById('debugModal');
-        const debugBtn = document.getElementById('debugBtn');
-        const debugCloseBtn = document.getElementById('debugCloseBtn');
-        const debugClearBtn = document.getElementById('debugClearBtn');
-        const debugCopyBtn = document.getElementById('debugCopyBtn');
-
-        function addDebugLog(type, args) {
-            const timestamp = new Date().toLocaleTimeString();
-            const message = args.map(arg => {
-                if (typeof arg === 'object') {
-                    try {
-                        return JSON.stringify(arg, null, 2);
-                    } catch (e) {
-                        return String(arg);
-                    }
-                }
-                return String(arg);
-            }).join(' ');
-
-            debugLogs.push({ type, timestamp, message });
-
-            // Update UI - prepend instead of append
-            const entry = document.createElement('div');
-            entry.className = `debug-log-entry ${type}`;
-            entry.innerHTML = `<span class="debug-log-time">[${timestamp}]</span>${message}`;
-            debugLogsElement.insertBefore(entry, debugLogsElement.firstChild);
-
-            debugLogCount.textContent = debugLogs.length;
-        }
-
-        // Intercept console methods
-        const originalLog = console.log;
-        const originalWarn = console.warn;
-        const originalError = console.error;
-
-        console.log = function(...args) {
-            originalLog.apply(console, args);
-            addDebugLog('log', args);
-        };
-
-        console.warn = function(...args) {
-            originalWarn.apply(console, args);
-            addDebugLog('warn', args);
-        };
-
-        console.error = function(...args) {
-            originalError.apply(console, args);
-            addDebugLog('error', args);
-        };
-
-        // Window error handler
-        window.addEventListener('error', (event) => {
-            addDebugLog('error', [`${event.message} at ${event.filename}:${event.lineno}:${event.colno}`]);
-        });
-
-        // Debug modal controls
-        debugBtn.addEventListener('click', () => {
-            debugModal.classList.add('active');
-        });
-
-        debugCloseBtn.addEventListener('click', () => {
-            debugModal.classList.remove('active');
-        });
-
-        debugModal.addEventListener('click', (e) => {
-            if (e.target === debugModal) {
-                debugModal.classList.remove('active');
-            }
-        });
-
-        debugClearBtn.addEventListener('click', () => {
-            debugLogs.length = 0;
-            debugLogsElement.innerHTML = '';
-            debugLogCount.textContent = '0';
-        });
-
-        debugCopyBtn.addEventListener('click', () => {
-            const text = debugLogs.map(log => `[${log.timestamp}] [${log.type.toUpperCase()}] ${log.message}`).join('\n');
-            navigator.clipboard.writeText(text).then(() => {
-                debugCopyBtn.textContent = 'Copied!';
-                setTimeout(() => {
-                    debugCopyBtn.textContent = 'Copy All';
-                }, 2000);
-            });
-        });
-
-        console.log('Debug console initialized');
 
         // ==========================================
         // ENLARGED VIEW SYSTEM

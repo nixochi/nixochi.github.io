@@ -325,6 +325,134 @@ function create3DVisualization(canvas, cell, idx) {
     console.log(`Cell ${idx} 3D scene created (extent: ${maxExtent.toFixed(1)})`);
 }
 
+// ==========================================
+// 2D GRID RENDERING (STREAMED)
+// ==========================================
+
+async function create2DGrid(idx) {
+    const cell = voronoiCells[idx];
+    if (!cell || !cell.points) return;
+
+    const gridContainer = document.getElementById(`grid-${idx}`);
+    if (!gridContainer) return;
+
+    // Check if we have cached voronoi data
+    if (!cachedVoronoiPixels) {
+        console.warn(`Cell ${idx}: No cached voronoi data available`);
+        return;
+    }
+
+    console.log(`Cell ${idx}: Building 2D grid from cached data...`);
+
+    // Get ALL points from full resolution (not downsampled)
+    const computeResolution = 256;
+    const slicesPerRow = Math.ceil(Math.sqrt(computeResolution));
+    const textureSize = slicesPerRow * computeResolution;
+
+    const allColors = [];
+
+    // STREAM: Process one slice at a time to avoid blocking
+    for (let bi = 0; bi < computeResolution; bi++) {
+        // Yield to browser after each slice
+        if (bi % 16 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+            console.log(`Cell ${idx}: Processing slice ${bi}/${computeResolution}`);
+        }
+
+        for (let ri = 0; ri < computeResolution; ri++) {
+            for (let gi = 0; gi < computeResolution; gi++) {
+                const sliceIdx = bi;
+                const sliceY = Math.floor(sliceIdx / slicesPerRow);
+                const sliceX = sliceIdx % slicesPerRow;
+
+                const texX = sliceX * computeResolution + ri;
+                const texY = sliceY * computeResolution + gi;
+
+                const pixelIdx = (texY * textureSize + texX) * 4;
+                const paletteIdx = cachedVoronoiPixels[pixelIdx];
+
+                if (paletteIdx === idx) {
+                    const r = Math.round(ri * 255 / (computeResolution - 1));
+                    const g = Math.round(gi * 255 / (computeResolution - 1));
+                    const b = Math.round(bi * 255 / (computeResolution - 1));
+
+                    // Calculate luminance for sorting
+                    const [L] = rgb2lab(r / 255, g / 255, b / 255);
+                    allColors.push({ r, g, b, L });
+                }
+            }
+        }
+    }
+
+    console.log(`Cell ${idx}: Collected ${allColors.length} colors, sorting by luminance...`);
+
+    // Sort by luminance (L value from Lab color space)
+    allColors.sort((a, b) => b.L - a.L); // Descending (bright to dark)
+
+    console.log(`Cell ${idx}: Rendering ${allColors.length} colors in 2D grid (canvas)`);
+
+    // Use canvas for efficient rendering
+    const swatchSize = 8;
+    const containerWidth = gridContainer.parentElement.clientWidth - 16; // Account for padding
+    const cols = Math.floor(containerWidth / swatchSize);
+    const rows = Math.ceil(allColors.length / cols);
+
+    const canvas = document.createElement('canvas');
+    canvas.className = 'cell-2d-canvas';
+    canvas.width = cols * swatchSize;
+    canvas.height = rows * swatchSize;
+
+    const ctx = canvas.getContext('2d');
+
+    // Draw all color swatches (now sorted by luminance)
+    let colorIdx = 0;
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            if (colorIdx >= allColors.length) break;
+            const { r, g, b } = allColors[colorIdx];
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.fillRect(col * swatchSize, row * swatchSize, swatchSize, swatchSize);
+            colorIdx++;
+        }
+        if (colorIdx >= allColors.length) break;
+    }
+
+    gridContainer.appendChild(canvas);
+    console.log(`Cell ${idx}: 2D grid rendered successfully`);
+}
+
+function toggleCellMode(idx, mode) {
+    cellModes.set(idx, mode);
+
+    // Update button states
+    const cell = document.querySelector(`.voronoi-cell[data-cell-idx="${idx}"]`);
+    if (!cell) return;
+
+    const btn3d = cell.querySelector('.mode-3d');
+    const btn2d = cell.querySelector('.mode-2d');
+    const canvasContainer = document.getElementById(`canvas-container-${idx}`);
+    const gridContainer = document.getElementById(`grid-${idx}`);
+
+    if (mode === '3d') {
+        btn3d.classList.add('active');
+        btn2d.classList.remove('active');
+        canvasContainer.style.display = 'block';
+        gridContainer.classList.remove('active');
+    } else {
+        btn3d.classList.remove('active');
+        btn2d.classList.add('active');
+        canvasContainer.style.display = 'none';
+        gridContainer.classList.add('active');
+
+        // Build 2D grid if not already built
+        if (!gridContainer.hasChildNodes()) {
+            create2DGrid(idx);
+        }
+    }
+
+    console.log(`Cell ${idx} switched to ${mode} mode`);
+}
+
 function startSharedAnimationLoop() {
     function animate() {
         animationFrameId = requestAnimationFrame(animate);
@@ -404,16 +532,14 @@ export function updateVoronoiUI(cells, voronoiGrid) {
     voronoiGrid.innerHTML = cells.map((cell, idx) => {
         return `
             <div class="voronoi-cell" style="border-color: ${cell.seed.hex}; background: ${cell.seed.hex};" data-cell-idx="${idx}">
-                <!-- Per-cell 2D/3D toggle hidden - keeping 3D only for now -->
-                <!-- <div class="cell-mode-toggle">
+                <div class="cell-mode-toggle">
                     <button class="mode-btn mode-3d active" data-cell-idx="${idx}">3D</button>
                     <button class="mode-btn mode-2d" data-cell-idx="${idx}">2D</button>
-                </div> -->
+                </div>
                 <div class="cell-canvas-container" id="canvas-container-${idx}">
                     <canvas class="cell-canvas" id="canvas-${idx}"></canvas>
                 </div>
-                <!-- 2D grid container hidden -->
-                <!-- <div class="cell-2d-grid" id="grid-${idx}"></div> -->
+                <div class="cell-2d-grid" id="grid-${idx}"></div>
             </div>
         `;
     }).join('');
@@ -429,6 +555,15 @@ export function updateVoronoiUI(cells, voronoiGrid) {
         if (canvas) {
             create3DVisualization(canvas, cell, idx);
         }
+    });
+
+    // Setup mode toggle handlers
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const idx = parseInt(btn.dataset.cellIdx);
+            const is3D = btn.classList.contains('mode-3d');
+            toggleCellMode(idx, is3D ? '3d' : '2d');
+        });
     });
 
     // Set up intersection observer

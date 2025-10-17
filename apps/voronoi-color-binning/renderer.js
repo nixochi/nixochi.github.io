@@ -253,7 +253,7 @@ function create3DVisualization(canvas, cell, idx) {
     const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.target.set(0, 0, 0);
+    controls.target.set(0.5, 0.5, 0.5);  // Center of RGB cube
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -262,45 +262,37 @@ function create3DVisualization(canvas, cell, idx) {
     directionalLight.position.set(1, 1, 1);
     scene.add(directionalLight);
 
-    // Calculate center of mass and bounds in Lab space
-    let sumA = 0, sumL = 0, sumB = 0;
-    let minA = Infinity, maxA = -Infinity;
-    let minL = Infinity, maxL = -Infinity;
-    let minB = Infinity, maxB = -Infinity;
+    // Draw RGB cube wireframe as reference
+    const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const cubeEdges = new THREE.EdgesGeometry(cubeGeometry);
+    const cubeLine = new THREE.LineSegments(
+        cubeEdges,
+        new THREE.LineBasicMaterial({ color: 0x444444 })
+    );
+    cubeLine.position.set(0.5, 0.5, 0.5);
+    scene.add(cubeLine);
 
-    cell.points.forEach(point => {
-        const [L, a, b] = point.lab;
-        sumA += a; sumL += L; sumB += b;
-        minA = Math.min(minA, a); maxA = Math.max(maxA, a);
-        minL = Math.min(minL, L); maxL = Math.max(maxL, L);
-        minB = Math.min(minB, b); maxB = Math.max(maxB, b);
-    });
-
-    const centerA = sumA / cell.points.length;
-    const centerL = sumL / cell.points.length;
-    const centerB = sumB / cell.points.length;
-
-    const extentA = maxA - minA;
-    const extentL = maxL - minL;
-    const extentB = maxB - minB;
-    const maxExtent = Math.max(extentA, extentL, extentB, 10);
-
-    // Create point cloud positioned in Lab space
+    // Downsample points for performance (use every Nth point)
+    const downsampleFactor = 4; // Only render every 4th point
     const positions = [];
     const colors = [];
 
-    cell.points.forEach(point => {
-        const [L, a, b] = point.lab;
-        // Position: X=a, Y=L, Z=b, centered at origin
-        positions.push(a - centerA, L - centerL, b - centerB);
-        colors.push(...point.rgb);
+    cell.points.forEach((point, i) => {
+        if (i % downsampleFactor !== 0) return; // Skip this point
+
+        const [r, g, b] = point.rgb;
+        // Position in RGB cube: X=R, Y=G, Z=B (absolute position in [0,1]³)
+        positions.push(r, g, b);
+        colors.push(r, g, b);
     });
+
+    console.log(`Cell ${idx}: Downsampled from ${cell.points.length} to ${positions.length / 3} points`);
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
-    const pointSize = Math.max(3, maxExtent / 15);
+    const pointSize = 0.012; // Fixed size relative to cube
     const material = new THREE.PointsMaterial({
         size: pointSize,
         vertexColors: true,
@@ -310,8 +302,8 @@ function create3DVisualization(canvas, cell, idx) {
     const pointCloud = new THREE.Points(geometry, material);
     scene.add(pointCloud);
 
-    // Position camera
-    const cameraDistance = maxExtent * 2.5;
+    // Position camera to see the whole cube
+    const cameraDistance = 2;
     camera.position.set(cameraDistance, cameraDistance * 0.8, cameraDistance);
 
     // Store scene data
@@ -322,7 +314,7 @@ function create3DVisualization(canvas, cell, idx) {
         controls
     });
 
-    console.log(`Cell ${idx} 3D scene created (extent: ${maxExtent.toFixed(1)})`);
+    console.log(`Cell ${idx} 3D scene created in RGB cube`);
 }
 
 // ==========================================
@@ -385,6 +377,16 @@ async function create2DGrid(idx) {
     }
 
     console.log(`Cell ${idx}: Collected ${allColors.length} colors, sorting by luminance...`);
+
+    // Check if cell has no colors
+    if (allColors.length === 0) {
+        console.warn(`Cell ${idx}: No colors assigned to this palette color`);
+        const message = document.createElement('div');
+        message.style.cssText = 'padding: 20px; text-align: center; color: var(--fg-secondary); font-size: 14px;';
+        message.textContent = 'No colors assigned to this palette color';
+        gridContainer.appendChild(message);
+        return;
+    }
 
     // Sort by luminance (L value from Lab color space)
     allColors.sort((a, b) => b.L - a.L); // Descending (bright to dark)

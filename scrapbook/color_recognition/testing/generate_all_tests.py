@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate test suite by:
-1. Downloading 100 random images from Lorem Picsum
+1. Downloading 15 random images from Lorem Picsum
 2. Recoloring each with recolor_image.py
 3. Creating comparison images with compare_images.py
 4. Compiling all comparisons into a single PDF document
@@ -20,7 +20,7 @@ COMPARISONS_DIR = 'comparisons'
 OUTPUT_PDF = 'all_comparisons.pdf'
 
 # Image settings
-NUM_IMAGES = 100
+NUM_IMAGES = 15
 IMAGE_WIDTH = 1920
 IMAGE_HEIGHT = 1080
 
@@ -77,7 +77,7 @@ def recolor_image(input_path):
 
     try:
         result = subprocess.run(
-            ['python3', 'recolor_image.py', input_path],
+            ['python3', '../recolor_image.py', input_path],
             capture_output=True,
             text=True,
             check=True
@@ -190,9 +190,9 @@ def main():
     os.makedirs(COMPARISONS_DIR, exist_ok=True)
 
     # Check dependencies
-    if not os.path.exists('texture/color_texture_256.npy'):
+    if not os.path.exists('../texture/color_texture_256.npy'):
         print("Error: Color lookup table not found!")
-        print("Please run 'python3 build_texture.py' first.")
+        print("Please run 'python3 texture/build_texture.py' first.")
         sys.exit(1)
 
     comparison_paths = []

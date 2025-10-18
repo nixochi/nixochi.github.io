@@ -190,7 +190,7 @@ def main():
     os.makedirs(COMPARISONS_DIR, exist_ok=True)
 
     # Check dependencies
-    if not os.path.exists('../texture/color_texture_256.npy'):
+    if not os.path.exists('../texture/39extended/color_texture_256.npy'):
         print("Error: Color lookup table not found!")
         print("Please run 'python3 texture/build_texture.py' first.")
         sys.exit(1)

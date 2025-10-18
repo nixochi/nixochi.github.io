@@ -82,7 +82,7 @@ COLOR_RGB_VALUES = {
 print("Loading color data...")
 # Load w2c39.txt
 color_data = {}
-with open('../color-matrices/w2c39.txt', 'r') as f:
+with open('../color-matrices/generation/w2c39.txt', 'r') as f:
     for line in f:
         values = line.strip().split()
         index = int(values[0])
@@ -93,7 +93,7 @@ print(f"Loaded {len(color_data)} LAB bin entries")
 
 # Load color names
 color_names = []
-with open('../color-matrices/cn39.txt', 'r') as f:
+with open('../color-matrices/39/cn39.txt', 'r') as f:
     for line in f:
         line = line.strip()
         if line:
@@ -165,13 +165,13 @@ for r_batch in range(0, 256, batch_size):
 print("\nSaving texture...")
 
 # Save as numpy binary (efficient for later use)
-np.save('color_texture_256.npy', texture)
-print(f"Saved as 'color_texture_256.npy' ({texture.nbytes / (1024**2):.1f} MB)")
+np.save('39extended/color_texture_256.npy', texture)
+print(f"Saved as '39extended/color_texture_256.npy' ({texture.nbytes / (1024**2):.1f} MB)")
 
 # Also save a smaller preview (every 4th value = 64x64x64)
 texture_small = texture[::4, ::4, ::4]
-np.save('color_texture_64.npy', texture_small)
-print(f"Saved downsampled as 'color_texture_64.npy' ({texture_small.nbytes / (1024**2):.1f} MB)")
+np.save('39extended/color_texture_64.npy', texture_small)
+print(f"Saved downsampled as '39extended/color_texture_64.npy' ({texture_small.nbytes / (1024**2):.1f} MB)")
 
 # Generate texture atlas - all 256 R-slices in a 16x16 grid
 try:
@@ -200,16 +200,16 @@ try:
         atlas[y_offset:y_offset+slice_size, x_offset:x_offset+slice_size] = texture[r, :, :]
 
     # Save the atlas
-    Image.fromarray(atlas, 'RGB').save('color_lut_atlas.png')
-    print(f"Saved 'color_lut_atlas.png' ({atlas_width}x{atlas_height} - {atlas.nbytes / (1024**2):.1f} MB)")
+    Image.fromarray(atlas, 'RGB').save('generation/color_lut_atlas.png')
+    print(f"Saved 'generation/color_lut_atlas.png' ({atlas_width}x{atlas_height} - {atlas.nbytes / (1024**2):.1f} MB)")
     print(f"Layout: 16x16 grid, each cell is 256x256 (one R-slice)")
     print(f"To sample: R-slice index = r_value, position in grid = (r%16, r//16)")
 
     # Save some test slices as images for visualization
     slice_r128 = texture[128, :, :]
-    Image.fromarray(slice_r128, 'RGB').save('slice_r128.png')
+    Image.fromarray(slice_r128, 'RGB').save('generation/slice_r128.png')
     print("\nSaved test slices:")
-    print("  'slice_r128.png' (G-B plane at R=128)")
+    print("  'generation/slice_r128.png' (G-B plane at R=128)")
 
 except ImportError:
     print("PIL not available, skipping image export")

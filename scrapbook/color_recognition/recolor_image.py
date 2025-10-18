@@ -13,7 +13,7 @@ import os
 import numpy as np
 from PIL import Image
 
-def recolor_image(input_path, lut_path='texture/color_texture_256.npy'):
+def recolor_image(input_path, lut_path='texture/39extended/color_texture_256.npy'):
     """
     Recolor an image using the 3D color lookup table.
 

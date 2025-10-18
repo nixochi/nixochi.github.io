@@ -43,7 +43,7 @@ def rgb_to_lab(r, g, b):
     return xyz_to_lab(x, y, z)
 
 # Load the MATLAB file
-mat_data = scipy.io.loadmat('w2c39.mat')
+mat_data = scipy.io.loadmat('../39/w2c39.mat')
 
 # Print keys to see what's in the file
 print("Keys in mat file:", mat_data.keys())

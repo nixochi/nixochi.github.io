@@ -164,33 +164,55 @@ for r_batch in range(0, 256, batch_size):
 
 print("\nSaving texture...")
 
+# Create texture directory
+os.makedirs('texture', exist_ok=True)
+
 # Save as numpy binary (efficient for later use)
-np.save('color_texture_256.npy', texture)
-print(f"Saved as 'color_texture_256.npy' ({texture.nbytes / (1024**2):.1f} MB)")
+np.save('texture/color_texture_256.npy', texture)
+print(f"Saved as 'texture/color_texture_256.npy' ({texture.nbytes / (1024**2):.1f} MB)")
 
 # Also save a smaller preview (every 4th value = 64x64x64)
 texture_small = texture[::4, ::4, ::4]
-np.save('color_texture_64.npy', texture_small)
-print(f"Saved downsampled as 'color_texture_64.npy' ({texture_small.nbytes / (1024**2):.1f} MB)")
+np.save('texture/color_texture_64.npy', texture_small)
+print(f"Saved downsampled as 'texture/color_texture_64.npy' ({texture_small.nbytes / (1024**2):.1f} MB)")
 
-# Save some test slices as images for visualization
+# Generate texture atlas - all 256 R-slices in a 16x16 grid
 try:
     from PIL import Image
 
-    # Save a slice at R=128
+    print("\nGenerating texture atlas (16x16 grid of 256 slices)...")
+
+    # Atlas will be 16x16 grid of 256x256 slices = 4096x4096 pixels
+    atlas_size = 16  # 16x16 grid = 256 slices
+    slice_size = 256
+    atlas_width = atlas_size * slice_size
+    atlas_height = atlas_size * slice_size
+
+    atlas = np.zeros((atlas_height, atlas_width, 3), dtype=np.uint8)
+
+    for r in range(256):
+        # Calculate position in 16x16 grid
+        grid_x = r % atlas_size
+        grid_y = r // atlas_size
+
+        # Calculate pixel position
+        x_offset = grid_x * slice_size
+        y_offset = grid_y * slice_size
+
+        # Copy the R-slice (G-B plane at this R value)
+        atlas[y_offset:y_offset+slice_size, x_offset:x_offset+slice_size] = texture[r, :, :]
+
+    # Save the atlas
+    Image.fromarray(atlas, 'RGB').save('texture/color_lut_atlas.png')
+    print(f"Saved 'texture/color_lut_atlas.png' ({atlas_width}x{atlas_height} - {atlas.nbytes / (1024**2):.1f} MB)")
+    print(f"Layout: 16x16 grid, each cell is 256x256 (one R-slice)")
+    print(f"To sample: R-slice index = r_value, position in grid = (r%16, r//16)")
+
+    # Save some test slices as images for visualization
     slice_r128 = texture[128, :, :]
-    Image.fromarray(slice_r128, 'RGB').save('texture_slice_r128.png')
-    print("Saved 'texture_slice_r128.png' (G-B plane at R=128)")
-
-    # Save a slice at G=128
-    slice_g128 = texture[:, 128, :]
-    Image.fromarray(slice_g128, 'RGB').save('texture_slice_g128.png')
-    print("Saved 'texture_slice_g128.png' (R-B plane at G=128)")
-
-    # Save a slice at B=128
-    slice_b128 = texture[:, :, 128]
-    Image.fromarray(slice_b128, 'RGB').save('texture_slice_b128.png')
-    print("Saved 'texture_slice_b128.png' (R-G plane at B=128)")
+    Image.fromarray(slice_r128, 'RGB').save('texture/slice_r128.png')
+    print("\nSaved test slices:")
+    print("  'texture/slice_r128.png' (G-B plane at R=128)")
 
 except ImportError:
     print("PIL not available, skipping image export")

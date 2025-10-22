@@ -9,10 +9,6 @@ export class PermutahedronRenderer {
 
         // ========== CONFIGURATION ==========
         this.config = {
-            // Rendering resolution (viewport-independent)
-            renderWidth: 120,                // Width in characters
-            renderHeight: 50,               // Height in characters
-
             // Character cell dimensions (in pixels)
             // These define the aspect ratio of terminal characters
             charPixelWidth: 9,              // Character width in pixels
@@ -32,12 +28,34 @@ export class PermutahedronRenderer {
             brightnessSensitivity: 0.05,     // Brightness curve: >1 more contrast, <1 less contrast
 
             // Performance
-            fps: 30,                        // Frames per second
-
-            // Terminal layout
-            centerHorizontally: true        // Center output in terminal width
+            fps: 30                         // Frames per second
         };
         // ===================================
+
+        // Calculate square render dimensions (dynamic)
+        // Terminal characters have aspect ratio = charPixelWidth / charPixelHeight
+        const CHAR_ASPECT = this.config.charPixelWidth / this.config.charPixelHeight; // ~0.53
+
+        // Find the largest visual square that fits in terminal
+        // For a visual square: renderWidth * charPixelWidth = renderHeight * charPixelHeight
+        // So: renderWidth = renderHeight / CHAR_ASPECT
+
+        // If we use all rows as height:
+        const squareColsFromRows = rows / CHAR_ASPECT;
+        // If we use all cols as width:
+        const squareRowsFromCols = cols * CHAR_ASPECT;
+
+        if (squareColsFromRows <= cols) {
+            // Limited by rows - use full height
+            this.renderHeight = rows;
+            this.renderWidth = Math.floor(squareColsFromRows);
+        } else {
+            // Limited by cols - use full width
+            this.renderWidth = cols;
+            this.renderHeight = Math.floor(squareRowsFromCols);
+        }
+
+        this.squareSize = Math.min(this.renderWidth, this.renderHeight);
 
         // Permutahedron data
         this.polytopeData = {
@@ -90,6 +108,29 @@ export class PermutahedronRenderer {
 
         this.gl.clearColor(0, 0, 0, 1);
         return true;
+    }
+
+    updateDimensions(cols, rows) {
+        this.cols = cols;
+        this.rows = rows;
+
+        // Recalculate square dimensions with proper aspect ratio
+        const CHAR_ASPECT = this.config.charPixelWidth / this.config.charPixelHeight;
+        const squareColsFromRows = rows / CHAR_ASPECT;
+        const squareRowsFromCols = cols * CHAR_ASPECT;
+
+        if (squareColsFromRows <= cols) {
+            // Limited by rows - use full height
+            this.renderHeight = rows;
+            this.renderWidth = Math.floor(squareColsFromRows);
+        } else {
+            // Limited by cols - use full width
+            this.renderWidth = cols;
+            this.renderHeight = Math.floor(squareRowsFromCols);
+        }
+
+        this.squareSize = Math.min(this.renderWidth, this.renderHeight);
+        this.resizeCanvas();
     }
 
 
@@ -238,8 +279,8 @@ export class PermutahedronRenderer {
     resizeCanvas() {
         // Calculate canvas pixel dimensions based on character dimensions
         // This ensures the rendered image has the correct aspect ratio
-        const charW = this.config.renderWidth;
-        const charH = this.config.renderHeight;
+        const charW = this.renderWidth;
+        const charH = this.renderHeight;
         const pixelW = charW * this.config.charPixelWidth;
         const pixelH = charH * this.config.charPixelHeight;
 
@@ -299,8 +340,8 @@ export class PermutahedronRenderer {
     }
 
     generateFrame() {
-        const charW = this.config.renderWidth;
-        const charH = this.config.renderHeight;
+        const charW = this.renderWidth;
+        const charH = this.renderHeight;
         const cellW = this.config.charPixelWidth;
         const cellH = this.config.charPixelHeight;
         const pixelW = charW * cellW;
@@ -342,20 +383,22 @@ export class PermutahedronRenderer {
 
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
 
-        // Sample pixels and convert to ASCII
-        // Each character represents a cellW × cellH pixel area
-        let leftPadding = '';
-        let rightPadding = '';
+        // Calculate padding to center the square in the terminal
+        const horizontalPad = Math.floor((this.cols - charW) / 2);
+        const verticalPad = Math.floor((this.rows - charH) / 2);
+        const leftPadding = ' '.repeat(horizontalPad);
+        const rightPadding = ' '.repeat(this.cols - charW - horizontalPad);
+        const emptyLine = ' '.repeat(this.cols);
 
-        if (this.config.centerHorizontally && charW < this.cols) {
-            const padSize = Math.floor((this.cols - charW) / 2);
-            leftPadding = ' '.repeat(padSize);
-            rightPadding = ' '.repeat(this.cols - charW - padSize);
-        } else if (!this.config.centerHorizontally) {
-            rightPadding = ' '.repeat(Math.max(0, this.cols - charW));
+        // Build the frame with vertical padding
+        let frame = '';
+
+        // Top padding (empty lines)
+        for (let i = 0; i < verticalPad; i++) {
+            frame += emptyLine;
         }
 
-        let frame = '';
+        // Square content (centered horizontally)
         for (let charY = charH - 1; charY >= 0; charY--) {  // Flip Y coordinate
             frame += leftPadding;
             for (let charX = 0; charX < charW; charX++) {
@@ -377,6 +420,11 @@ export class PermutahedronRenderer {
                 frame += this.brightnessToChar(avgBrightness);
             }
             frame += rightPadding;
+        }
+
+        // Bottom padding (empty lines)
+        for (let i = 0; i < this.rows - charH - verticalPad; i++) {
+            frame += emptyLine;
         }
 
         return frame;

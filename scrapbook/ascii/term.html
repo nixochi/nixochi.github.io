@@ -1,25 +1,50 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" rel="stylesheet">
     <style>
-      body {
+      * {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      html, body {
         margin: 0;
         padding: 0;
+        width: 100%;
+        height: 100%;
+        position: fixed;
         background-color: black;
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+
+      body {
+        width: 100vw;
         height: 100vh;
-        height: -webkit-fill-available;
+        width: 100svw;
         height: 100svh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        height: -webkit-fill-available;
       }
 
       #terminal {
-        display: inline-block;
-        position: relative;
-        z-index: 1;
+        width: 100vw;
+        height: 100vh;
+        width: 100svw;
+        height: 100svh;
+        height: -webkit-fill-available;
+        padding: 40px 60px;
+        box-sizing: border-box;
       }
 
       #glCanvas {
@@ -39,12 +64,42 @@
       import { commandHandler } from './commands.js';
       import { interactionStateMachine } from './interactionStateMachine.js';
 
+      // Calculate dynamic terminal dimensions
+      function calculateTerminalDimensions() {
+        const MIN_SQUARE_SIZE = 40;
+        const HORIZONTAL_PADDING = 120; // 60px on each side
+        const VERTICAL_PADDING = 80;    // 40px on top and bottom
+
+        // Get viewport dimensions accounting for padding
+        const viewportWidth = window.innerWidth - HORIZONTAL_PADDING;
+        const viewportHeight = window.innerHeight - VERTICAL_PADDING;
+
+        // Try different font sizes to find optimal one
+        for (let fontSize = 20; fontSize >= 6; fontSize--) {
+          // Estimate character dimensions (xterm.js uses ~0.6 width ratio and ~1.2 height ratio)
+          const charWidth = fontSize * 0.6;
+          const charHeight = fontSize * 1.2;
+
+          const cols = Math.floor(viewportWidth / charWidth);
+          const rows = Math.floor(viewportHeight / charHeight);
+          const minDim = Math.min(cols, rows);
+
+          if (minDim >= MIN_SQUARE_SIZE) {
+            return { fontSize, cols, rows };
+          }
+        }
+
+        // Fallback
+        return { fontSize: 6, cols: Math.floor(viewportWidth / 3.6), rows: Math.floor(viewportHeight / 7.2) };
+      }
+
+      const { fontSize, cols, rows } = calculateTerminalDimensions();
 
       var term = new Terminal({
         cursorBlink: true,
-        fontSize: 16,
-        cols: 120,
-        rows: 50
+        fontSize: fontSize,
+        cols: cols,
+        rows: rows
       });
       term.open(document.getElementById('terminal'));
 
@@ -61,42 +116,37 @@
       const commandExecutor = new commandHandler(term);
       const interactionHandler = new interactionStateMachine(term, commandExecutor);
 
-      // Make commandExecutor globally available for sliders
+      // Make commandExecutor globally available
       window.commandExecutor = commandExecutor;
 
       // Handle keyboard input
       term.onData(data => interactionHandler.handleInteraction(data));
+
+      // Handle window resize
+      let resizeTimeout;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+          const { fontSize, cols, rows } = calculateTerminalDimensions();
+
+          // Update terminal dimensions
+          term.options.fontSize = fontSize;
+          term.resize(cols, rows);
+
+          // Update permutahedron renderer dimensions
+          if (commandExecutor.permutahedronRenderer) {
+            commandExecutor.permutahedronRenderer.updateDimensions(cols, rows);
+          }
+
+          // Redraw if permutahedron is running
+          if (term.permutahedronInterval) {
+            term.clear();
+            const frame = commandExecutor.permutahedronRenderer.generateFrame();
+            term.write('\x1B[H' + frame);
+          }
+        }, 150);
+      });
     </script>
-
-    <!-- Permutahedron Controls -->
-    <div id="permutahedron-controls" style="position: fixed; top: 10px; right: 10px; width: 300px; background: rgba(0, 0, 0, 0.8); color: white; padding: 15px; font-family: monospace; font-size: 12px; border-radius: 5px; border: 1px solid rgba(255, 255, 255, 0.3); z-index: 9999; display: none;">
-      <div style="font-weight: bold; margin-bottom: 10px; text-align: center; border-bottom: 1px solid rgba(255, 255, 255, 0.3); padding-bottom: 5px;">Permutahedron Controls</div>
-
-      <div style="margin-bottom: 10px;">
-        <label style="display: block; margin-bottom: 3px;">Camera Distance: <span id="camera-radius-value">1.8</span></label>
-        <input type="range" id="camera-radius" min="0.5" max="5" step="0.1" value="1.8" style="width: 100%;">
-      </div>
-
-      <div style="margin-bottom: 10px;">
-        <label style="display: block; margin-bottom: 3px;">Field of View: <span id="camera-fov-value">70</span></label>
-        <input type="range" id="camera-fov" min="30" max="120" step="5" value="70" style="width: 100%;">
-      </div>
-
-      <div style="margin-bottom: 10px;">
-        <label style="display: block; margin-bottom: 3px;">Rotation Speed: <span id="rotation-step-value">0.2</span></label>
-        <input type="range" id="rotation-step" min="0.05" max="1" step="0.05" value="0.2" style="width: 100%;">
-      </div>
-
-      <div style="margin-bottom: 10px;">
-        <label style="display: block; margin-bottom: 3px;">Brightness Sens: <span id="brightness-value">0.2</span></label>
-        <input type="range" id="brightness-sensitivity" min="0.1" max="3" step="0.1" value="0.2" style="width: 100%;">
-      </div>
-
-      <div style="margin-bottom: 10px;">
-        <label style="display: block; margin-bottom: 3px;">FPS: <span id="fps-value">10</span></label>
-        <input type="range" id="fps" min="1" max="60" step="1" value="10" style="width: 100%;">
-      </div>
-    </div>
 
     <!-- Debug Screen -->
     <div id="debug-screen" style="position: fixed; bottom: 10px; right: 10px; width: 300px; max-height: 200px; overflow-y: auto; background: rgba(255, 0, 0, 0.9); color: white; padding: 10px; font-family: monospace; font-size: 10px; border-radius: 5px; z-index: 9999; display: none;">
@@ -128,95 +178,6 @@
 
       window.addEventListener('unhandledrejection', function(event) {
         logError('Promise rejection: ' + event.reason, '', '', '', event.reason);
-      });
-    </script>
-
-    <script type="module">
-      import { commandHandler } from './commands.js';
-
-      // Wait for the command handler to be created
-      window.addEventListener('load', () => {
-        setTimeout(() => {
-          // Get reference to the permutahedron renderer through the window-level commandExecutor
-          const getRenderer = () => {
-            // Access via global term object
-            return window.commandExecutor?.permutahedronRenderer;
-          };
-
-          // Store the commandExecutor globally for slider access
-          const originalHandler = commandHandler.prototype.constructor;
-
-          // Set up slider event listeners
-          const cameraRadiusSlider = document.getElementById('camera-radius');
-          const cameraRadiusValue = document.getElementById('camera-radius-value');
-          cameraRadiusSlider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            cameraRadiusValue.textContent = value.toFixed(1);
-            const renderer = getRenderer();
-            if (renderer) {
-              renderer.config.cameraRadius = value;
-              renderer.camera.radius = value;
-            }
-          });
-
-          const cameraFOVSlider = document.getElementById('camera-fov');
-          const cameraFOVValue = document.getElementById('camera-fov-value');
-          cameraFOVSlider.addEventListener('input', (e) => {
-            const value = parseInt(e.target.value);
-            cameraFOVValue.textContent = value;
-            const renderer = getRenderer();
-            if (renderer) {
-              renderer.config.cameraFOV = value;
-            }
-          });
-
-          const rotationStepSlider = document.getElementById('rotation-step');
-          const rotationStepValue = document.getElementById('rotation-step-value');
-          rotationStepSlider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            rotationStepValue.textContent = value.toFixed(2);
-            const renderer = getRenderer();
-            if (renderer) {
-              renderer.config.rotationStep = value;
-            }
-          });
-
-          const brightnessSensitivitySlider = document.getElementById('brightness-sensitivity');
-          const brightnessSensitivityValue = document.getElementById('brightness-value');
-          brightnessSensitivitySlider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            brightnessSensitivityValue.textContent = value.toFixed(1);
-            const renderer = getRenderer();
-            if (renderer) {
-              renderer.config.brightnessSensitivity = value;
-            }
-          });
-
-          const fpsSlider = document.getElementById('fps');
-          const fpsValue = document.getElementById('fps-value');
-          fpsSlider.addEventListener('input', (e) => {
-            const value = parseInt(e.target.value);
-            fpsValue.textContent = value;
-            const renderer = getRenderer();
-            if (renderer) {
-              renderer.config.fps = value;
-              renderer.frameInterval = 1000 / value;
-
-              // Restart the interval if permutahedron is running
-              const commandExecutor = window.commandExecutor;
-              if (commandExecutor && commandExecutor.term.permutahedronInterval) {
-                clearInterval(commandExecutor.term.permutahedronInterval);
-
-                const renderFrame = () => {
-                  const frame = renderer.generateFrame();
-                  commandExecutor.term.write('\x1B[H' + frame);
-                };
-
-                commandExecutor.term.permutahedronInterval = setInterval(renderFrame, 1000 / value);
-              }
-            }
-          });
-        }, 100);
       });
     </script>
   </body>

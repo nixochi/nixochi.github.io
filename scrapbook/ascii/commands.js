@@ -82,9 +82,6 @@ export class commandHandler{
                     this.term.write('\x1B[?25h'); // Show cursor
                     this.term.clear();
                     this.term.write('$ ');
-                    // Hide controls panel
-                    const controlsPanel = document.getElementById('permutahedron-controls');
-                    if (controlsPanel) controlsPanel.style.display = 'none';
                 } else {
                     // Start permutahedron
                     this.term.drawingState = "animation";
@@ -103,10 +100,6 @@ export class commandHandler{
                     this.term.clear();
                     const fps = this.permutahedronRenderer.config.fps;
                     this.term.permutahedronInterval = setInterval(renderFrame, 1000 / fps);
-
-                    // Show controls panel
-                    const controlsPanel = document.getElementById('permutahedron-controls');
-                    if (controlsPanel) controlsPanel.style.display = 'block';
                 }
                 break;
 

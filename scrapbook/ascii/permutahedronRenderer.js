@@ -9,6 +9,9 @@ export class PermutahedronRenderer {
 
         // ========== CONFIGURATION ==========
         this.config = {
+            // Canonical render size (fixed, viewport-independent)
+            canonicalSquareSize: 40,        // Always render permutahedron at this size
+
             // Character cell dimensions (in pixels)
             // These define the aspect ratio of terminal characters
             charPixelWidth: 9,              // Character width in pixels
@@ -27,34 +30,25 @@ export class PermutahedronRenderer {
             asciiChars: '@%#*+=-:. ',       // Characters from dark to light
             brightnessSensitivity: 0.05,     // Brightness curve: >1 more contrast, <1 less contrast
 
+            // Visual options
+            colorfulEdges: false,           // Use different colors for each edge
+            colorBrightness: 0.65,          // HSL lightness for edge colors (0.5-0.9)
+
             // Performance
             fps: 30                         // Frames per second
         };
         // ===================================
 
-        // Calculate square render dimensions (dynamic)
-        // Terminal characters have aspect ratio = charPixelWidth / charPixelHeight
+        // Calculate render dimensions for a visual square (viewport-independent)
+        // Terminal characters are not square, so we need to account for aspect ratio
         const CHAR_ASPECT = this.config.charPixelWidth / this.config.charPixelHeight; // ~0.53
 
-        // Find the largest visual square that fits in terminal
         // For a visual square: renderWidth * charPixelWidth = renderHeight * charPixelHeight
         // So: renderWidth = renderHeight / CHAR_ASPECT
 
-        // If we use all rows as height:
-        const squareColsFromRows = rows / CHAR_ASPECT;
-        // If we use all cols as width:
-        const squareRowsFromCols = cols * CHAR_ASPECT;
-
-        if (squareColsFromRows <= cols) {
-            // Limited by rows - use full height
-            this.renderHeight = rows;
-            this.renderWidth = Math.floor(squareColsFromRows);
-        } else {
-            // Limited by cols - use full width
-            this.renderWidth = cols;
-            this.renderHeight = Math.floor(squareRowsFromCols);
-        }
-
+        // Use canonicalSquareSize as the height (since chars are taller than wide)
+        this.renderHeight = this.config.canonicalSquareSize;
+        this.renderWidth = Math.floor(this.config.canonicalSquareSize / CHAR_ASPECT);
         this.squareSize = Math.min(this.renderWidth, this.renderHeight);
 
         // Permutahedron data
@@ -93,6 +87,7 @@ export class PermutahedronRenderer {
         this.charResolutionX = 0;
         this.charResolutionY = 0;
         this.edgeBuffer = null;
+        this.colorBuffer = null;
     }
 
     init() {
@@ -111,25 +106,17 @@ export class PermutahedronRenderer {
     }
 
     updateDimensions(cols, rows) {
+        // Only update terminal dimensions for padding calculation
         this.cols = cols;
         this.rows = rows;
 
-        // Recalculate square dimensions with proper aspect ratio
+        // Render dimensions remain constant (viewport-independent)
+        // But recalculate if char aspect ratio changed
         const CHAR_ASPECT = this.config.charPixelWidth / this.config.charPixelHeight;
-        const squareColsFromRows = rows / CHAR_ASPECT;
-        const squareRowsFromCols = cols * CHAR_ASPECT;
-
-        if (squareColsFromRows <= cols) {
-            // Limited by rows - use full height
-            this.renderHeight = rows;
-            this.renderWidth = Math.floor(squareColsFromRows);
-        } else {
-            // Limited by cols - use full width
-            this.renderWidth = cols;
-            this.renderHeight = Math.floor(squareRowsFromCols);
-        }
-
+        this.renderHeight = this.config.canonicalSquareSize;
+        this.renderWidth = Math.floor(this.config.canonicalSquareSize / CHAR_ASPECT);
         this.squareSize = Math.min(this.renderWidth, this.renderHeight);
+
         this.resizeCanvas();
     }
 
@@ -138,9 +125,12 @@ export class PermutahedronRenderer {
     vertexShader3D() {
         return `
             attribute vec3 aPos;
+            attribute vec3 aColor;
             uniform mat4 uMVP;
+            varying vec3 vColor;
             void main() {
                 gl_Position = uMVP * vec4(aPos, 1.0);
+                vColor = aColor;
             }
         `;
     }
@@ -148,8 +138,9 @@ export class PermutahedronRenderer {
     fragmentShader3D() {
         return `
             precision mediump float;
+            varying vec3 vColor;
             void main() {
-                gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+                gl_FragColor = vec4(vColor, 1.0);
             }
         `;
     }
@@ -211,13 +202,55 @@ export class PermutahedronRenderer {
 
     buildGeometry() {
         const positions = [];
-        this.polytopeData.edges.forEach(([a, b]) => {
+        const colors = [];
+
+        // Generate a unique color for each edge using HSL
+        const numEdges = this.polytopeData.edges.length;
+
+        this.polytopeData.edges.forEach(([a, b], edgeIndex) => {
             positions.push(...this.polytopeData.vertices[a], ...this.polytopeData.vertices[b]);
+
+            // Generate color based on edge index
+            // Use high saturation and configurable lightness for bright, vivid colors
+            const hue = (edgeIndex / numEdges) * 360;
+            const rgb = this.hslToRgb(hue, 1.0, this.config.colorBrightness);
+
+            // Both vertices of the edge get the same color
+            colors.push(...rgb, ...rgb);
         });
 
         this.edgeBuffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.edgeBuffer);
         this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
+
+        this.colorBuffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.colorBuffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(colors), this.gl.STATIC_DRAW);
+    }
+
+    // HSL to RGB conversion for vibrant colors
+    hslToRgb(h, s, l) {
+        h = h / 360;
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs((h * 6) % 2 - 1));
+        const m = l - c / 2;
+
+        let r, g, b;
+        if (h < 1/6) {
+            [r, g, b] = [c, x, 0];
+        } else if (h < 2/6) {
+            [r, g, b] = [x, c, 0];
+        } else if (h < 3/6) {
+            [r, g, b] = [0, c, x];
+        } else if (h < 4/6) {
+            [r, g, b] = [0, x, c];
+        } else if (h < 5/6) {
+            [r, g, b] = [x, 0, c];
+        } else {
+            [r, g, b] = [c, 0, x];
+        }
+
+        return [r + m, g + m, b + m];
     }
 
 
@@ -347,7 +380,9 @@ export class PermutahedronRenderer {
         const pixelW = charW * cellW;
         const pixelH = charH * cellH;
 
-        // Calculate aspect ratio from pixel dimensions (accounts for non-square chars)
+        // Calculate aspect ratio from pixel dimensions
+        // renderWidth and renderHeight are chosen to create a visual square
+        // accounting for non-square terminal characters
         const aspect = pixelW / pixelH;
         const P = this.mat4Perspective(this.config.cameraFOV * Math.PI / 180, aspect, 0.01, 100.0);
 
@@ -370,10 +405,24 @@ export class PermutahedronRenderer {
         this.gl.useProgram(this.program3D);
         this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program3D, 'uMVP'), false, MVP);
 
+        // Bind position attribute
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.edgeBuffer);
         const posLoc = this.gl.getAttribLocation(this.program3D, 'aPos');
         this.gl.enableVertexAttribArray(posLoc);
         this.gl.vertexAttribPointer(posLoc, 3, this.gl.FLOAT, false, 0, 0);
+
+        // Bind color attribute
+        const colorLoc = this.gl.getAttribLocation(this.program3D, 'aColor');
+        if (this.config.colorfulEdges) {
+            // Use colorful edges
+            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.colorBuffer);
+            this.gl.enableVertexAttribArray(colorLoc);
+            this.gl.vertexAttribPointer(colorLoc, 3, this.gl.FLOAT, false, 0, 0);
+        } else {
+            // Use white color for all edges
+            this.gl.disableVertexAttribArray(colorLoc);
+            this.gl.vertexAttrib3f(colorLoc, 1.0, 1.0, 1.0);
+        }
 
         this.gl.drawArrays(this.gl.LINES, 0, this.polytopeData.edges.length * 2);
 
@@ -403,21 +452,56 @@ export class PermutahedronRenderer {
             frame += leftPadding;
             for (let charX = 0; charX < charW; charX++) {
                 // Sample the pixel area for this character cell
-                let totalBrightness = 0;
+                let totalIntensity = 0; // Maximum of RGB = edge presence, not perceptual brightness
+                let totalR = 0;
+                let totalG = 0;
+                let totalB = 0;
                 let sampleCount = 0;
+                let colorSampleCount = 0; // Count only non-black pixels for color averaging
 
                 for (let py = 0; py < cellH; py++) {
                     for (let px = 0; px < cellW; px++) {
                         const pixelX = charX * cellW + px;
                         const pixelY = charY * cellH + py;
                         const i = (pixelY * pixelW + pixelX) * 4;
-                        totalBrightness += this.getBrightness(pixels[i], pixels[i + 1], pixels[i + 2]);
+                        const r = pixels[i];
+                        const g = pixels[i + 1];
+                        const b = pixels[i + 2];
+
+                        // Use max(r,g,b) as intensity - treats all colors as equally "bright"
+                        // This way red (255,0,0) has same intensity as white (255,255,255)
+                        const pixelIntensity = Math.max(r, g, b);
+                        totalIntensity += pixelIntensity;
+
+                        // Only average color from non-black pixels to preserve vibrancy
+                        if (pixelIntensity > 0) {
+                            totalR += r;
+                            totalG += g;
+                            totalB += b;
+                            colorSampleCount++;
+                        }
+
                         sampleCount++;
                     }
                 }
 
-                const avgBrightness = totalBrightness / sampleCount;
-                frame += this.brightnessToChar(avgBrightness);
+                const avgIntensity = totalIntensity / sampleCount;
+                // Use color average from only the colored pixels, not black background
+                const avgR = colorSampleCount > 0 ? Math.round(totalR / colorSampleCount) : 0;
+                const avgG = colorSampleCount > 0 ? Math.round(totalG / colorSampleCount) : 0;
+                const avgB = colorSampleCount > 0 ? Math.round(totalB / colorSampleCount) : 0;
+
+                // Add ANSI color code if colorful edges enabled and pixel has color
+                if (this.config.colorfulEdges && (avgR > 0 || avgG > 0 || avgB > 0)) {
+                    frame += `\x1b[38;2;${avgR};${avgG};${avgB}m`;
+                }
+
+                frame += this.brightnessToChar(avgIntensity);
+
+                // Reset color if colorful edges enabled
+                if (this.config.colorfulEdges && (avgR > 0 || avgG > 0 || avgB > 0)) {
+                    frame += '\x1b[0m';
+                }
             }
             frame += rightPadding;
         }

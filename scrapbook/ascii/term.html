@@ -50,12 +50,117 @@
       #glCanvas {
         display: none;
       }
+
+      #config-panel {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.9);
+        color: #0f0;
+        padding: 15px;
+        border: 1px solid #0f0;
+        border-radius: 5px;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        max-width: 300px;
+        max-height: 80vh;
+        overflow-y: auto;
+        z-index: 10000;
+        display: none;
+      }
+
+      #config-panel h3 {
+        margin: 0 0 10px 0;
+        font-size: 13px;
+        color: #0f0;
+        border-bottom: 1px solid #0f0;
+        padding-bottom: 5px;
+      }
+
+      #config-panel .config-item {
+        margin: 8px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      #config-panel .config-label {
+        color: #0a0;
+        margin-right: 10px;
+        flex: 1;
+      }
+
+      #config-panel .config-value {
+        color: #0f0;
+        font-weight: bold;
+        text-align: right;
+      }
+
+      #config-panel input {
+        background: #000;
+        color: #0f0;
+        border: 1px solid #0a0;
+        padding: 2px 5px;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        width: 80px;
+        text-align: right;
+      }
+
+      #config-panel input:focus {
+        outline: none;
+        border-color: #0f0;
+        box-shadow: 0 0 3px #0f0;
+      }
+
+      #config-panel input[type="checkbox"] {
+        width: auto;
+        accent-color: #0f0;
+        cursor: pointer;
+      }
+
+      #config-panel button {
+        background: #0f0;
+        color: #000;
+        border: none;
+        padding: 5px 10px;
+        margin: 5px 2px 0 2px;
+        cursor: pointer;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        border-radius: 3px;
+        font-weight: bold;
+      }
+
+      #config-panel button:hover {
+        background: #0d0;
+      }
+
+      #config-panel button:active {
+        background: #0b0;
+      }
+
+      #config-panel .button-group {
+        display: flex;
+        gap: 5px;
+        margin-top: 10px;
+      }
     </style>
   </head>
   <body>
     <canvas id="glCanvas"></canvas>
     <div id="terminal"></div>
 
+    <!-- Config Panel -->
+    <div id="config-panel">
+      <h3>Permutahedron Config</h3>
+      <div id="config-content"></div>
+      <div class="button-group">
+        <button id="copy-config">Copy Config</button>
+        <button id="refresh-render">Refresh</button>
+        <button id="close-config">Close</button>
+      </div>
+    </div>
 
     <script type="module" src="./commands.js"></script>
     <script type="module" src="./interactionStateMachine.js"></script>
@@ -66,7 +171,8 @@
 
       // Calculate dynamic terminal dimensions
       function calculateTerminalDimensions() {
-        const MIN_SQUARE_SIZE = 40;
+        const MIN_COLS = 40;
+        const MIN_ROWS = 40;
         const HORIZONTAL_PADDING = 120; // 60px on each side
         const VERTICAL_PADDING = 80;    // 40px on top and bottom
 
@@ -74,7 +180,7 @@
         const viewportWidth = window.innerWidth - HORIZONTAL_PADDING;
         const viewportHeight = window.innerHeight - VERTICAL_PADDING;
 
-        // Try different font sizes to find optimal one
+        // Try different font sizes to find optimal one that maximizes terminal area
         for (let fontSize = 20; fontSize >= 6; fontSize--) {
           // Estimate character dimensions (xterm.js uses ~0.6 width ratio and ~1.2 height ratio)
           const charWidth = fontSize * 0.6;
@@ -82,9 +188,8 @@
 
           const cols = Math.floor(viewportWidth / charWidth);
           const rows = Math.floor(viewportHeight / charHeight);
-          const minDim = Math.min(cols, rows);
 
-          if (minDim >= MIN_SQUARE_SIZE) {
+          if (cols >= MIN_COLS && rows >= MIN_ROWS) {
             return { fontSize, cols, rows };
           }
         }
@@ -146,6 +251,229 @@
           }
         }, 150);
       });
+
+      // Config Panel Functionality
+      const configPanel = document.getElementById('config-panel');
+      const configContent = document.getElementById('config-content');
+      const copyConfigBtn = document.getElementById('copy-config');
+      const refreshRenderBtn = document.getElementById('refresh-render');
+      const closeConfigBtn = document.getElementById('close-config');
+
+      let isUpdatingInputs = false;
+      let hasInitializedPanel = false;
+
+      function updateConfigPanel(forceRecreate = false) {
+        if (!commandExecutor.permutahedronRenderer) {
+          configContent.innerHTML = '<div style="color: #f00;">Permutahedron not initialized</div>';
+          return;
+        }
+
+        const config = commandExecutor.permutahedronRenderer.config;
+        const camera = commandExecutor.permutahedronRenderer.camera;
+        const renderInfo = {
+          renderWidth: commandExecutor.permutahedronRenderer.renderWidth,
+          renderHeight: commandExecutor.permutahedronRenderer.renderHeight,
+          cols: commandExecutor.permutahedronRenderer.cols,
+          rows: commandExecutor.permutahedronRenderer.rows
+        };
+
+        // Only recreate HTML if this is the first time or forced
+        if (!hasInitializedPanel || forceRecreate) {
+          isUpdatingInputs = true;
+
+          let html = '<div style="margin-bottom: 10px; color: #0a0; font-style: italic;">Render Info:</div>';
+          html += '<div id="render-info-container"></div>';
+
+          html += '<div style="margin: 15px 0 10px 0; color: #0a0; font-style: italic;">Config (editable):</div>';
+          Object.entries(config).forEach(([key, value]) => {
+            let displayValue = value;
+            let inputType = 'text';
+
+            if (typeof value === 'boolean') {
+              // Checkbox for boolean values
+              html += `<div class="config-item">
+                <span class="config-label">${key}:</span>
+                <input type="checkbox" class="config-checkbox" data-config-key="${key}" ${value ? 'checked' : ''}>
+              </div>`;
+              return;
+            }
+
+            if (typeof value === 'number') {
+              displayValue = value.toFixed(3).replace(/\.?0+$/, '');
+            }
+            if (typeof value === 'string') {
+              displayValue = `"${value}"`;
+            }
+            html += `<div class="config-item">
+              <span class="config-label">${key}:</span>
+              <input type="text" class="config-input" data-config-key="${key}" value="${displayValue}">
+            </div>`;
+          });
+
+          html += '<div style="margin: 15px 0 10px 0; color: #0a0; font-style: italic;">Camera (read-only):</div>';
+          html += '<div id="camera-info-container"></div>';
+
+          configContent.innerHTML = html;
+
+          // Add event listeners to config inputs (text inputs)
+          configContent.querySelectorAll('.config-input').forEach(input => {
+            input.addEventListener('change', (e) => {
+              if (isUpdatingInputs) return;
+              const key = e.target.dataset.configKey;
+              let value = e.target.value.trim();
+
+              // Parse value
+              if (value.startsWith('"') && value.endsWith('"')) {
+                // String value
+                value = value.slice(1, -1);
+              } else if (!isNaN(value)) {
+                // Number value
+                value = parseFloat(value);
+              }
+
+              // Update config
+              commandExecutor.permutahedronRenderer.config[key] = value;
+
+              // Update derived values if needed
+              if (key === 'fps') {
+                commandExecutor.permutahedronRenderer.frameInterval = 1000 / value;
+              } else if (key === 'charPixelWidth' || key === 'charPixelHeight' || key === 'canonicalSquareSize') {
+                // Recalculate render dimensions for visual square
+                const renderer = commandExecutor.permutahedronRenderer;
+                const CHAR_ASPECT = renderer.config.charPixelWidth / renderer.config.charPixelHeight;
+                renderer.renderHeight = renderer.config.canonicalSquareSize;
+                renderer.renderWidth = Math.floor(renderer.config.canonicalSquareSize / CHAR_ASPECT);
+                renderer.squareSize = Math.min(renderer.renderWidth, renderer.renderHeight);
+                renderer.resizeCanvas();
+              } else if (key === 'cameraRadius' || key === 'cameraInitialTheta' || key === 'cameraInitialPhi') {
+                // Update camera if camera settings change
+                if (key === 'cameraRadius') {
+                  commandExecutor.permutahedronRenderer.camera.radius = value;
+                } else if (key === 'cameraInitialTheta') {
+                  commandExecutor.permutahedronRenderer.camera.theta = value;
+                } else if (key === 'cameraInitialPhi') {
+                  commandExecutor.permutahedronRenderer.camera.phi = value;
+                }
+              } else if (key === 'colorBrightness') {
+                // Rebuild geometry with new colors
+                commandExecutor.permutahedronRenderer.buildGeometry();
+              }
+
+              console.log(`Updated ${key} to`, value);
+            });
+          });
+
+          // Add event listeners to config checkboxes (boolean inputs)
+          configContent.querySelectorAll('.config-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+              if (isUpdatingInputs) return;
+              const key = e.target.dataset.configKey;
+              const value = e.target.checked;
+
+              // Update config
+              commandExecutor.permutahedronRenderer.config[key] = value;
+
+              console.log(`Updated ${key} to`, value);
+            });
+          });
+
+          hasInitializedPanel = true;
+          isUpdatingInputs = false;
+        }
+
+        // Update read-only values (render info and camera)
+        const renderInfoContainer = document.getElementById('render-info-container');
+        if (renderInfoContainer) {
+          let renderInfoHTML = '';
+          Object.entries(renderInfo).forEach(([key, value]) => {
+            renderInfoHTML += `<div class="config-item">
+              <span class="config-label">${key}:</span>
+              <span class="config-value">${value}</span>
+            </div>`;
+          });
+          renderInfoContainer.innerHTML = renderInfoHTML;
+        }
+
+        const cameraInfoContainer = document.getElementById('camera-info-container');
+        if (cameraInfoContainer) {
+          let cameraHTML = '';
+          Object.entries(camera).forEach(([key, value]) => {
+            let displayValue = value;
+            if (typeof value === 'number') {
+              displayValue = value.toFixed(3).replace(/\.?0+$/, '');
+            }
+            cameraHTML += `<div class="config-item">
+              <span class="config-label">${key}:</span>
+              <span class="config-value">${displayValue}</span>
+            </div>`;
+          });
+          cameraInfoContainer.innerHTML = cameraHTML;
+        }
+      }
+
+      copyConfigBtn.addEventListener('click', () => {
+        if (!commandExecutor.permutahedronRenderer) {
+          alert('Permutahedron not initialized');
+          return;
+        }
+
+        const config = commandExecutor.permutahedronRenderer.config;
+        const configText = JSON.stringify(config, null, 2);
+
+        navigator.clipboard.writeText(configText).then(() => {
+          copyConfigBtn.textContent = 'Copied!';
+          setTimeout(() => {
+            copyConfigBtn.textContent = 'Copy Config';
+          }, 1500);
+        }).catch(err => {
+          console.error('Failed to copy:', err);
+          alert('Failed to copy to clipboard');
+        });
+      });
+
+      refreshRenderBtn.addEventListener('click', () => {
+        if (!commandExecutor.permutahedronRenderer) {
+          alert('Permutahedron not initialized');
+          return;
+        }
+
+        // Force a redraw
+        if (term.permutahedronInterval) {
+          term.clear();
+          const frame = commandExecutor.permutahedronRenderer.generateFrame();
+          term.write('\x1B[H' + frame);
+        }
+
+        refreshRenderBtn.textContent = 'Refreshed!';
+        setTimeout(() => {
+          refreshRenderBtn.textContent = 'Refresh';
+        }, 1000);
+      });
+
+      closeConfigBtn.addEventListener('click', () => {
+        configPanel.style.display = 'none';
+      });
+
+      // Toggle config panel with Ctrl+Shift+C
+      window.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+          e.preventDefault();
+          if (configPanel.style.display === 'none') {
+            configPanel.style.display = 'block';
+            updateConfigPanel();
+          } else {
+            configPanel.style.display = 'none';
+          }
+        }
+      });
+
+      // Update config panel every 500ms
+      setInterval(() => {
+        updateConfigPanel();
+      }, 500);
+
+      // Initial update
+      updateConfigPanel();
     </script>
 
     <!-- Debug Screen -->

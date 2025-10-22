@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Camera - Edge Detection</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #video {
+            display: none;
+        }
+
+        #glCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #error {
+            color: #f00;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="glCanvas"></canvas>
+    <div id="error"></div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('glCanvas');
+        const errorDiv = document.getElementById('error');
+
+        // ASCII characters
+        const BRIGHTNESS_CHARS = '@%#*+=-:. '; // Brightness-based
+        const EDGE_THRESHOLD = 0.3; // Threshold for edge detection
+
+        // Vertex shader - simple fullscreen quad
+        const vertexShaderSource = `
+            attribute vec2 a_position;
+            attribute vec2 a_texCoord;
+            varying vec2 v_texCoord;
+
+            void main() {
+                gl_Position = vec4(a_position, 0.0, 1.0);
+                v_texCoord = a_texCoord;
+            }
+        `;
+
+        // Edge detection shader (Pass 1)
+        const edgeShaderSource = `
+            precision mediump float;
+
+            uniform sampler2D u_videoTexture;
+            uniform vec2 u_charResolution;
+
+            varying vec2 v_texCoord;
+
+            float getBrightness(vec3 color) {
+                return 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+            }
+
+            void main() {
+                vec2 texelSize = 1.0 / u_charResolution;
+
+                // Sobel kernels for edge detection
+                float gx = 0.0;
+                float gy = 0.0;
+
+                // Sample 3x3 neighborhood
+                for (int y = -1; y <= 1; y++) {
+                    for (int x = -1; x <= 1; x++) {
+                        vec2 offset = vec2(float(x), float(y)) * texelSize;
+                        vec3 color = texture2D(u_videoTexture, v_texCoord + offset).rgb;
+                        float brightness = getBrightness(color);
+
+                        // Sobel X (vertical edges)
+                        float sobelX = 0.0;
+                        if (x == -1) sobelX = -1.0;
+                        else if (x == 1) sobelX = 1.0;
+                        if (y == -1) sobelX *= 1.0;
+                        else if (y == 0) sobelX *= 2.0;
+                        else if (y == 1) sobelX *= 1.0;
+                        gx += brightness * sobelX;
+
+                        // Sobel Y (horizontal edges)
+                        float sobelY = 0.0;
+                        if (y == -1) sobelY = -1.0;
+                        else if (y == 1) sobelY = 1.0;
+                        if (x == -1) sobelY *= 1.0;
+                        else if (x == 0) sobelY *= 2.0;
+                        else if (x == 1) sobelY *= 1.0;
+                        gy += brightness * sobelY;
+                    }
+                }
+
+                // Calculate edge magnitude and direction
+                float magnitude = sqrt(gx * gx + gy * gy);
+                float angle = atan(gy, gx); // -PI to PI
+
+                // Normalize angle to 0-1 range
+                float normalizedAngle = (angle + 3.14159265) / (2.0 * 3.14159265);
+
+                // Store magnitude in R, angle in G, original brightness in B
+                vec3 edgeData = vec3(magnitude, normalizedAngle, getBrightness(texture2D(u_videoTexture, v_texCoord).rgb));
+
+                gl_FragColor = vec4(edgeData, 1.0);
+            }
+        `;
+
+        // ASCII rendering shader (Pass 2) - OUTLINE ONLY
+        const asciiShaderSource = `
+            precision mediump float;
+
+            uniform sampler2D u_edgeTexture;
+            uniform sampler2D u_charTexture;
+            uniform vec2 u_charResolution;
+            uniform float u_numChars;
+            uniform float u_edgeThreshold;
+
+            varying vec2 v_texCoord;
+
+            void main() {
+                // Calculate which character cell we're in
+                vec2 charCoord = floor(v_texCoord * u_charResolution);
+                vec2 charUV = fract(v_texCoord * u_charResolution);
+
+                // Sample edge data at character cell center
+                // Flip Y because framebuffer texture has inverted Y
+                vec2 samplePos = (charCoord + 0.5) / u_charResolution;
+                samplePos.y = 1.0 - samplePos.y;
+                vec4 edgeData = texture2D(u_edgeTexture, samplePos);
+
+                float edgeMagnitude = edgeData.r;
+                float edgeAngle = edgeData.g;
+
+                // Only render if there's an edge
+                if (edgeMagnitude > u_edgeThreshold) {
+                    // Convert normalized angle (0-1) to degrees (0-360)
+                    float degrees = edgeAngle * 360.0;
+
+                    // Map angle to edge character index
+                    // 0: - (horizontal)
+                    // 1: / (diagonal)
+                    // 2: | (vertical)
+                    // 3: \\ (diagonal)
+                    // 4: (space - unused)
+
+                    float charIndex = 0.0;
+
+                    if (degrees < 22.5 || degrees >= 337.5) {
+                        charIndex = 0.0; // - (horizontal, pointing right)
+                    } else if (degrees < 67.5) {
+                        charIndex = 1.0; // / (diagonal)
+                    } else if (degrees < 112.5) {
+                        charIndex = 2.0; // | (vertical)
+                    } else if (degrees < 157.5) {
+                        charIndex = 3.0; // \\ (diagonal)
+                    } else if (degrees < 202.5) {
+                        charIndex = 0.0; // - (horizontal)
+                    } else if (degrees < 247.5) {
+                        charIndex = 1.0; // / (diagonal)
+                    } else if (degrees < 292.5) {
+                        charIndex = 2.0; // | (vertical)
+                    } else {
+                        charIndex = 3.0; // \\ (diagonal)
+                    }
+
+                    charIndex = clamp(charIndex, 0.0, 3.0);
+
+                    // Look up character from texture atlas
+                    vec2 atlasUV = vec2(
+                        (charIndex + charUV.x) / u_numChars,
+                        charUV.y
+                    );
+
+                    vec4 charColor = texture2D(u_charTexture, atlasUV);
+
+                    // Apply green terminal color
+                    gl_FragColor = vec4(0.0, charColor.r, 0.0, 1.0);
+                } else {
+                    // No edge - render black (empty)
+                    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                }
+            }
+        `;
+
+        let gl, edgeProgram, asciiProgram;
+        let videoTexture, edgeTexture, charTexture;
+        let framebuffer;
+        let charResolutionX, charResolutionY;
+        let positionBuffer, texCoordBuffer;
+
+        // Initialize WebGL
+        function initWebGL() {
+            gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (!gl) {
+                errorDiv.textContent = 'WebGL not supported';
+                return false;
+            }
+            return true;
+        }
+
+        // Compile shader
+        function compileShader(source, type) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        // Create shader program
+        function createProgram(vertexSource, fragmentSource) {
+            const vertexShader = compileShader(vertexSource, gl.VERTEX_SHADER);
+            const fragmentShader = compileShader(fragmentSource, gl.FRAGMENT_SHADER);
+
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('Program link error:', gl.getProgramInfoLog(program));
+                return null;
+            }
+
+            return program;
+        }
+
+        // Create ASCII character texture atlas (with edge characters first)
+        function createCharTexture() {
+            const charWidth = 4;
+            const charHeight = 8;
+            const edgeChars = '-/|\\ '; // Edge characters
+            const allChars = edgeChars + BRIGHTNESS_CHARS;
+
+            const canvas2d = document.createElement('canvas');
+            canvas2d.width = charWidth * allChars.length;
+            canvas2d.height = charHeight;
+            const ctx = canvas2d.getContext('2d');
+
+            // Fill black background
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
+
+            // Draw each character
+            ctx.fillStyle = '#fff';
+            ctx.font = `${charHeight}px "Courier New", monospace`;
+            ctx.textBaseline = 'top';
+            ctx.textAlign = 'left';
+
+            for (let i = 0; i < allChars.length; i++) {
+                ctx.fillText(allChars[i], i * charWidth, 0);
+            }
+
+            // Create WebGL texture from canvas
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas2d);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+            return texture;
+        }
+
+        // Create video texture
+        function createVideoTexture() {
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            return texture;
+        }
+
+        // Create edge detection texture and framebuffer
+        function createEdgeFramebuffer() {
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, charResolutionX, charResolutionY, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+            const fb = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+            return { texture, framebuffer: fb };
+        }
+
+        // Update video texture
+        function updateVideoTexture() {
+            gl.bindTexture(gl.TEXTURE_2D, videoTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+        }
+
+        // Setup geometry (fullscreen quad)
+        function setupGeometry(program) {
+            const positions = new Float32Array([
+                -1, -1,
+                 1, -1,
+                -1,  1,
+                 1,  1,
+            ]);
+
+            const texCoords = new Float32Array([
+                0, 1,  // vertex 0: screen bottom-left -> video bottom-left (0,1)
+                1, 1,  // vertex 1: screen bottom-right -> video bottom-right (1,1)
+                0, 0,  // vertex 2: screen top-left -> video top-left (0,0)
+                1, 0,  // vertex 3: screen top-right -> video top-right (1,0)
+            ]);
+
+            // Position buffer
+            if (!positionBuffer) {
+                positionBuffer = gl.createBuffer();
+            }
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+            const positionLocation = gl.getAttribLocation(program, 'a_position');
+            gl.enableVertexAttribArray(positionLocation);
+            gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+            // TexCoord buffer
+            if (!texCoordBuffer) {
+                texCoordBuffer = gl.createBuffer();
+            }
+            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
+
+            const texCoordLocation = gl.getAttribLocation(program, 'a_texCoord');
+            gl.enableVertexAttribArray(texCoordLocation);
+            gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+        }
+
+        // Resize canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+
+            // Calculate character grid resolution
+            const charWidth = 4;
+            const charHeight = 8;
+            charResolutionX = Math.floor(canvas.width / charWidth);
+            charResolutionY = Math.floor(canvas.height / charHeight);
+
+            // Recreate edge framebuffer with new size
+            if (framebuffer) {
+                gl.deleteFramebuffer(framebuffer);
+                gl.deleteTexture(edgeTexture);
+            }
+            const edgeFB = createEdgeFramebuffer();
+            edgeTexture = edgeFB.texture;
+            framebuffer = edgeFB.framebuffer;
+        }
+
+        // Render frame
+        function render() {
+            if (video.readyState >= video.HAVE_CURRENT_DATA) {
+                updateVideoTexture();
+
+                // PASS 1: Edge detection
+                gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+                gl.viewport(0, 0, charResolutionX, charResolutionY);
+                gl.useProgram(edgeProgram);
+                setupGeometry(edgeProgram);
+
+                gl.uniform2f(
+                    gl.getUniformLocation(edgeProgram, 'u_charResolution'),
+                    charResolutionX,
+                    charResolutionY
+                );
+
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, videoTexture);
+                gl.uniform1i(gl.getUniformLocation(edgeProgram, 'u_videoTexture'), 0);
+
+                gl.clear(gl.COLOR_BUFFER_BIT);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+                // PASS 2: ASCII rendering
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                gl.viewport(0, 0, canvas.width, canvas.height);
+                gl.useProgram(asciiProgram);
+                setupGeometry(asciiProgram);
+
+                gl.uniform2f(
+                    gl.getUniformLocation(asciiProgram, 'u_charResolution'),
+                    charResolutionX,
+                    charResolutionY
+                );
+                gl.uniform1f(
+                    gl.getUniformLocation(asciiProgram, 'u_numChars'),
+                    BRIGHTNESS_CHARS.length + 5 // 5 edge chars + brightness chars
+                );
+                gl.uniform1f(
+                    gl.getUniformLocation(asciiProgram, 'u_edgeThreshold'),
+                    EDGE_THRESHOLD
+                );
+
+                gl.activeTexture(gl.TEXTURE0);
+                gl.bindTexture(gl.TEXTURE_2D, edgeTexture);
+                gl.uniform1i(gl.getUniformLocation(asciiProgram, 'u_edgeTexture'), 0);
+
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, charTexture);
+                gl.uniform1i(gl.getUniformLocation(asciiProgram, 'u_charTexture'), 1);
+
+                gl.clear(gl.COLOR_BUFFER_BIT);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            }
+
+            requestAnimationFrame(render);
+        }
+
+        // Initialize camera
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user'
+                    }
+                });
+
+                video.srcObject = stream;
+
+                video.onloadedmetadata = async () => {
+                    try {
+                        await video.play();
+                    } catch (e) {
+                        console.error('Video play error:', e);
+                    }
+
+                    // Initialize WebGL
+                    if (!initWebGL()) return;
+
+                    // Create shader programs
+                    edgeProgram = createProgram(vertexShaderSource, edgeShaderSource);
+                    asciiProgram = createProgram(vertexShaderSource, asciiShaderSource);
+
+                    // Setup textures
+                    videoTexture = createVideoTexture();
+                    charTexture = createCharTexture();
+
+                    // Setup canvas
+                    resizeCanvas();
+
+                    // Set clear color
+                    gl.clearColor(0, 0, 0, 1);
+
+                    // Start rendering
+                    render();
+                };
+            } catch (err) {
+                console.error('Camera error:', err);
+                errorDiv.textContent = 'Failed to access camera.\n' + err.message;
+            }
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', resizeCanvas);
+
+        // Start
+        initCamera();
+    </script>
+</body>
+</html>

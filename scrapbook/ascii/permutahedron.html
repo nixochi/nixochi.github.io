@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>ASCII Permutahedron</title>
+    <style>
+        * {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: fixed;
+            background: #000;
+            font-family: monospace;
+            overscroll-behavior: none;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            width: 100svw;
+            height: 100svh;
+        }
+
+        #glCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            width: 100svw;
+            height: 100svh;
+            cursor: grab;
+            touch-action: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        #glCanvas:active {
+            cursor: grabbing;
+        }
+
+        #info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: #0f0;
+            font-size: 12px;
+            text-shadow: 0 0 5px #0f0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="glCanvas"></canvas>
+    <div id="info">Drag to rotate | Scroll to zoom</div>
+
+    <script>
+        const canvas = document.getElementById('glCanvas');
+        let gl;
+
+        // Permutahedron data
+        const polytopeData = {
+            vertices: [
+                [1,0.5,0], [1,-0.5,0], [-1,0.5,0], [-1,-0.5,0],
+                [1,0,0.5], [1,0,-0.5], [-1,0,0.5], [-1,0,-0.5],
+                [0.5,1,0], [0.5,-1,0], [-0.5,1,0], [-0.5,-1,0],
+                [0.5,0,1], [0.5,0,-1], [-0.5,0,1], [-0.5,0,-1],
+                [0,1,0.5], [0,1,-0.5], [0,-1,0.5], [0,-1,-0.5],
+                [0,0.5,1], [0,0.5,-1], [0,-0.5,1], [0,-0.5,-1]
+            ],
+            edges: [
+                [15,21], [13,21], [13,23], [15,23], [12,20], [14,20], [14,22], [12,22],
+                [1,5], [1,9], [9,19], [19,23], [5,13], [8,17], [0,8], [0,5], [17,21],
+                [3,11], [3,7], [7,15], [11,19], [9,18], [11,18], [3,6], [18,22], [6,14],
+                [2,6], [2,7], [4,12], [1,4], [0,4], [10,17], [2,10], [8,16], [10,16], [16,20]
+            ]
+        };
+
+        // Camera state
+        const camera = {
+            radius: 5,
+            theta: Math.PI / 4,
+            phi: Math.PI / 3,
+            isDragging: false,
+            lastX: 0,
+            lastY: 0,
+            velocityTheta: 0,
+            velocityPhi: 0
+        };
+
+        // ========== PARAMETERS ==========
+        const FPS = 10;  // Frame rate (frames per second)
+        const MOMENTUM_DAMPING = 0.92;  // Momentum decay (lower = faster stop)
+        const MOMENTUM_STOP_THRESHOLD = 0.002;  // Minimum velocity before stopping
+        const ZOOM_MIN = 0.1;  // Minimum zoom distance
+        const ZOOM_MAX = 50;   // Maximum zoom distance
+        // ================================
+
+        const frameInterval = 1000 / FPS;
+        let lastFrameTime = 0;
+
+        // ASCII rendering settings
+        const ASCII_CHARS = '@%#*+=-:. ';
+
+        // Shaders for 3D rendering
+        const vertexShader3D = `
+            attribute vec3 aPos;
+            uniform mat4 uMVP;
+            void main() {
+                gl_Position = uMVP * vec4(aPos, 1.0);
+            }
+        `;
+
+        const fragmentShader3D = `
+            precision mediump float;
+            void main() {
+                gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+            }
+        `;
+
+        // Vertex shader for fullscreen quad
+        const vertexShaderQuad = `
+            attribute vec2 a_position;
+            attribute vec2 a_texCoord;
+            varying vec2 v_texCoord;
+            void main() {
+                gl_Position = vec4(a_position, 0.0, 1.0);
+                v_texCoord = a_texCoord;
+            }
+        `;
+
+        // ASCII rendering shader (brightness-based)
+        const asciiShaderSource = `
+            precision mediump float;
+            uniform sampler2D u_sceneTexture;
+            uniform sampler2D u_charTexture;
+            uniform vec2 u_charResolution;
+            uniform float u_numChars;
+            varying vec2 v_texCoord;
+
+            float getBrightness(vec3 color) {
+                return 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+            }
+
+            void main() {
+                // Calculate which character cell we're in
+                vec2 charCoord = floor(v_texCoord * u_charResolution);
+                vec2 charUV = fract(v_texCoord * u_charResolution);
+
+                // Sample scene at character cell center
+                vec2 videoSamplePos = (charCoord + 0.5) / u_charResolution;
+                vec4 sceneColor = texture2D(u_sceneTexture, videoSamplePos);
+
+                // Calculate brightness and INVERT it
+                float brightness = 1.0 - getBrightness(sceneColor.rgb);
+
+                // Map brightness to character index
+                float charIndex = floor(brightness * u_numChars);
+                charIndex = clamp(charIndex, 0.0, u_numChars - 1.0);
+
+                // Look up character from texture atlas
+                vec2 atlasUV = vec2(
+                    (charIndex + charUV.x) / u_numChars,
+                    charUV.y
+                );
+
+                vec4 charColor = texture2D(u_charTexture, atlasUV);
+
+                // Apply green terminal color
+                gl_FragColor = vec4(0.0, charColor.r, 0.0, 1.0);
+            }
+        `;
+
+        let program3D, asciiProgram;
+        let sceneTexture, sceneFramebuffer;
+        let charTexture;
+        let charResolutionX, charResolutionY;
+        let positionBuffer, texCoordBuffer;
+        let edgeBuffer;
+
+        // Initialize WebGL
+        function initWebGL() {
+            gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+            if (!gl) {
+                alert('WebGL not supported');
+                return false;
+            }
+            return true;
+        }
+
+        // Compile shader
+        function compileShader(source, type) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        // Create shader program
+        function createProgram(vertexSource, fragmentSource) {
+            const vertexShader = compileShader(vertexSource, gl.VERTEX_SHADER);
+            const fragmentShader = compileShader(fragmentSource, gl.FRAGMENT_SHADER);
+
+            const program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('Program link error:', gl.getProgramInfoLog(program));
+                return null;
+            }
+
+            return program;
+        }
+
+        // Create ASCII character texture
+        function createCharTexture() {
+            const charWidth = 8;
+            const charHeight = 16;
+
+            const canvas2d = document.createElement('canvas');
+            canvas2d.width = charWidth * ASCII_CHARS.length;
+            canvas2d.height = charHeight;
+            const ctx = canvas2d.getContext('2d');
+
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas2d.width, canvas2d.height);
+
+            ctx.fillStyle = '#fff';
+            ctx.font = `${charHeight}px "Courier New", monospace`;
+            ctx.textBaseline = 'top';
+            ctx.textAlign = 'left';
+
+            for (let i = 0; i < ASCII_CHARS.length; i++) {
+                ctx.fillText(ASCII_CHARS[i], i * charWidth, 0);
+            }
+
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas2d);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+            return texture;
+        }
+
+        // Create framebuffer with texture
+        function createFramebuffer(width, height) {
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+            const fb = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+
+            const depthBuffer = gl.createRenderbuffer();
+            gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
+            gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+            gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
+
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+            return { texture, framebuffer: fb };
+        }
+
+        // Build geometry
+        function buildGeometry() {
+            const positions = [];
+            polytopeData.edges.forEach(([a, b]) => {
+                positions.push(...polytopeData.vertices[a], ...polytopeData.vertices[b]);
+            });
+
+            edgeBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, edgeBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+        }
+
+        // Setup fullscreen quad geometry
+        function setupQuadGeometry(program) {
+            const positions = new Float32Array([
+                -1, -1,  1, -1,  -1, 1,  1, 1
+            ]);
+
+            const texCoords = new Float32Array([
+                0, 1,  1, 1,  0, 0,  1, 0
+            ]);
+
+            if (!positionBuffer) {
+                positionBuffer = gl.createBuffer();
+            }
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+            const positionLocation = gl.getAttribLocation(program, 'a_position');
+            gl.enableVertexAttribArray(positionLocation);
+            gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+            if (!texCoordBuffer) {
+                texCoordBuffer = gl.createBuffer();
+            }
+            gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
+
+            const texCoordLocation = gl.getAttribLocation(program, 'a_texCoord');
+            gl.enableVertexAttribArray(texCoordLocation);
+            gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+        }
+
+        // Matrix helpers
+        function mat4Identity() {
+            return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+        }
+
+        function mat4Multiply(a, b) {
+            const o = new Float32Array(16);
+            for (let c = 0; c < 4; c++) {
+                for (let r = 0; r < 4; r++) {
+                    o[c * 4 + r] =
+                        a[0 * 4 + r] * b[c * 4 + 0] +
+                        a[1 * 4 + r] * b[c * 4 + 1] +
+                        a[2 * 4 + r] * b[c * 4 + 2] +
+                        a[3 * 4 + r] * b[c * 4 + 3];
+                }
+            }
+            return o;
+        }
+
+        function mat4Perspective(fovy, aspect, near, far) {
+            const f = 1 / Math.tan(fovy / 2);
+            const nf = 1 / (near - far);
+            const o = new Float32Array(16);
+            o[0] = f / aspect;
+            o[5] = f;
+            o[10] = (far + near) * nf;
+            o[11] = -1;
+            o[14] = (2 * far * near) * nf;
+            return o;
+        }
+
+        function mat4LookAt(eye, target, up) {
+            const subtract = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+            const cross = (a, b) => [
+                a[1] * b[2] - a[2] * b[1],
+                a[2] * b[0] - a[0] * b[2],
+                a[0] * b[1] - a[1] * b[0]
+            ];
+            const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+            const normalize = (v) => {
+                const len = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+                return len > 0 ? [v[0] / len, v[1] / len, v[2] / len] : [0, 0, 0];
+            };
+
+            const z = normalize(subtract(eye, target));
+            const x = normalize(cross(up, z));
+            const y = cross(z, x);
+
+            return new Float32Array([
+                x[0], y[0], z[0], 0,
+                x[1], y[1], z[1], 0,
+                x[2], y[2], z[2], 0,
+                -dot(x, eye), -dot(y, eye), -dot(z, eye), 1
+            ]);
+        }
+
+        // Resize canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+
+            const charWidth = 8;
+            const charHeight = 16;
+            charResolutionX = Math.floor(canvas.width / charWidth);
+            charResolutionY = Math.floor(canvas.height / charHeight);
+
+            // Recreate framebuffer
+            if (sceneFramebuffer) {
+                gl.deleteFramebuffer(sceneFramebuffer);
+                gl.deleteTexture(sceneTexture);
+            }
+            const sceneFB = createFramebuffer(charResolutionX, charResolutionY);
+            sceneTexture = sceneFB.texture;
+            sceneFramebuffer = sceneFB.framebuffer;
+        }
+
+        // Update camera
+        function updateCamera() {
+            if (!camera.isDragging) {
+                camera.theta += camera.velocityTheta;
+                camera.phi += camera.velocityPhi;
+                camera.phi = Math.max(0.01, Math.min(Math.PI - 0.01, camera.phi));
+
+                camera.velocityTheta *= MOMENTUM_DAMPING;
+                camera.velocityPhi *= MOMENTUM_DAMPING;
+
+                if (Math.abs(camera.velocityTheta) < MOMENTUM_STOP_THRESHOLD) camera.velocityTheta = 0;
+                if (Math.abs(camera.velocityPhi) < MOMENTUM_STOP_THRESHOLD) camera.velocityPhi = 0;
+            }
+        }
+
+        // Render
+        function render(currentTime) {
+            requestAnimationFrame(render);
+
+            // Frame rate limiting
+            const elapsed = currentTime - lastFrameTime;
+            if (elapsed < frameInterval) {
+                return;
+            }
+            lastFrameTime = currentTime - (elapsed % frameInterval);
+
+            updateCamera();
+
+            const aspect = canvas.width / canvas.height;
+            const P = mat4Perspective(60 * Math.PI / 180, aspect, 0.01, 100.0);
+
+            const camX = camera.radius * Math.sin(camera.phi) * Math.sin(camera.theta);
+            const camY = camera.radius * Math.cos(camera.phi);
+            const camZ = camera.radius * Math.sin(camera.phi) * Math.cos(camera.theta);
+            const camPos = [camX, camY, camZ];
+
+            const V = mat4LookAt(camPos, [0, 0, 0], [0, 1, 0]);
+            const M = mat4Identity();
+            const MVP = mat4Multiply(mat4Multiply(P, V), M);
+
+            // PASS 1: Render 3D permutahedron to texture
+            gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFramebuffer);
+            gl.viewport(0, 0, charResolutionX, charResolutionY);
+            gl.clearColor(0, 0, 0, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.enable(gl.DEPTH_TEST);
+
+            gl.useProgram(program3D);
+            gl.uniformMatrix4fv(gl.getUniformLocation(program3D, 'uMVP'), false, MVP);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, edgeBuffer);
+            const posLoc = gl.getAttribLocation(program3D, 'aPos');
+            gl.enableVertexAttribArray(posLoc);
+            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
+
+            gl.drawArrays(gl.LINES, 0, polytopeData.edges.length * 2);
+
+            // PASS 2: ASCII rendering
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            gl.disable(gl.DEPTH_TEST);
+            gl.useProgram(asciiProgram);
+            setupQuadGeometry(asciiProgram);
+
+            gl.uniform2f(
+                gl.getUniformLocation(asciiProgram, 'u_charResolution'),
+                charResolutionX,
+                charResolutionY
+            );
+            gl.uniform1f(
+                gl.getUniformLocation(asciiProgram, 'u_numChars'),
+                ASCII_CHARS.length
+            );
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, sceneTexture);
+            gl.uniform1i(gl.getUniformLocation(asciiProgram, 'u_sceneTexture'), 0);
+
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, charTexture);
+            gl.uniform1i(gl.getUniformLocation(asciiProgram, 'u_charTexture'), 1);
+
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
+
+        // Event listeners - Mouse
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            camera.isDragging = true;
+            camera.lastX = e.clientX;
+            camera.lastY = e.clientY;
+            camera.velocityTheta = 0;
+            camera.velocityPhi = 0;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!camera.isDragging) return;
+            e.preventDefault();
+
+            const deltaX = e.clientX - camera.lastX;
+            const deltaY = e.clientY - camera.lastY;
+
+            const sensitivity = Math.PI / 450;
+            camera.theta -= deltaX * sensitivity;
+            camera.phi -= deltaY * sensitivity;
+            camera.phi = Math.max(0.01, Math.min(Math.PI - 0.01, camera.phi));
+
+            camera.velocityTheta = -deltaX * sensitivity * 0.1;
+            camera.velocityPhi = -deltaY * sensitivity * 0.1;
+
+            camera.lastX = e.clientX;
+            camera.lastY = e.clientY;
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            camera.isDragging = false;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            camera.isDragging = false;
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const scale = Math.pow(0.95, Math.abs(e.deltaY * 0.01));
+            if (e.deltaY < 0) {
+                camera.radius /= scale;
+            } else {
+                camera.radius *= scale;
+            }
+            camera.radius = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, camera.radius));
+        }, { passive: false });
+
+        // Touch event listeners
+        let initialPinchDistance = 0;
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+
+            if (e.touches.length === 1) {
+                camera.isDragging = true;
+                camera.lastX = e.touches[0].clientX;
+                camera.lastY = e.touches[0].clientY;
+                camera.velocityTheta = 0;
+                camera.velocityPhi = 0;
+            } else if (e.touches.length === 2) {
+                // Pinch zoom
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+
+            if (e.touches.length === 1 && camera.isDragging) {
+                const deltaX = e.touches[0].clientX - camera.lastX;
+                const deltaY = e.touches[0].clientY - camera.lastY;
+
+                const sensitivity = Math.PI / 450;
+                camera.theta -= deltaX * sensitivity;
+                camera.phi -= deltaY * sensitivity;
+                camera.phi = Math.max(0.01, Math.min(Math.PI - 0.01, camera.phi));
+
+                camera.velocityTheta = -deltaX * sensitivity * 0.1;
+                camera.velocityPhi = -deltaY * sensitivity * 0.1;
+
+                camera.lastX = e.touches[0].clientX;
+                camera.lastY = e.touches[0].clientY;
+            } else if (e.touches.length === 2) {
+                // Pinch zoom
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (initialPinchDistance > 0) {
+                    const scale = distance / initialPinchDistance;
+                    camera.radius /= scale;
+                    camera.radius = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, camera.radius));
+                }
+
+                initialPinchDistance = distance;
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (e.touches.length === 0) {
+                camera.isDragging = false;
+                initialPinchDistance = 0;
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            camera.isDragging = false;
+            initialPinchDistance = 0;
+        }, { passive: false });
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // Initialize
+        if (initWebGL()) {
+            program3D = createProgram(vertexShader3D, fragmentShader3D);
+            asciiProgram = createProgram(vertexShaderQuad, asciiShaderSource);
+
+            charTexture = createCharTexture();
+            buildGeometry();
+            resizeCanvas();
+
+            gl.clearColor(0, 0, 0, 1);
+            render();
+        }
+    </script>
+</body>
+</html>

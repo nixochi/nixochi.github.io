@@ -76,9 +76,9 @@ export class World extends THREE.Group {
                 varying vec3 vPosition;
 
                 void main() {
-                    // Optimized: combine distance calculation with wave
-                    float dist = length(vPosition);
-                    float value = sin(uTime + dist * 0.1) * 0.5 + 0.5;
+                    // Radial wave equation: sin(t + sqrt(x^2+y^2+z^2)*10)*0.5 + 0.5
+                    // Where x,y,z are in [-1,1], so we normalize vPosition by 70.0
+                    float value = sin(uTime + length(vPosition) / 70.0 * 10.0) * 0.5 + 0.5;
 
                     // Interpolate between red (value=0) and blue (value=1)
                     gl_FragColor = vec4(1.0 - value, 0.0, value, 1.0);

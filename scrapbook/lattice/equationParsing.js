@@ -265,14 +265,14 @@ function addImplicitMultiplication(tokens) {
 }
 
 /**
- * Map user variables to GLSL code with normalization
+ * Map user variables to GLSL code with normalization to [-1, 1] range
  */
 function mapVariable(name) {
     const varMap = {
         't': 'uTime',
-        'x': '((vPosition.x + 70.0) / 140.0)',
-        'y': '((vPosition.y + 70.0) / 140.0)',
-        'z': '((vPosition.z + 70.0) / 140.0)',
+        'x': '(vPosition.x / 70.0)',
+        'y': '(vPosition.y / 70.0)',
+        'z': '(vPosition.z / 70.0)',
         'pi': '3.14159265359',
         'e': '2.71828182846'
     };
@@ -307,10 +307,6 @@ function mapFunction(name, args) {
         'exp': 'exp',
         'log': 'log',
         'sign': 'sign',
-        'clamp': 'clamp',
-        'mix': 'mix',
-        'step': 'step',
-        'smoothstep': 'smoothstep',
         'length': 'length'
     };
 

@@ -23,7 +23,8 @@ export class commandHandler{
                 this.term.write('  clear         - Clear the terminal\r\n');
                 this.term.write('  date          - Show current date and time\r\n');
                 this.term.write('  whoami        - Show current user\r\n');
-                this.term.write('  permutahedron - Toggle permutahedron (drag to rotate, ESC to exit)\r\n');
+                this.term.write('  permutahedron - Look at me\r\n');
+                this.term.write('  exit          - Exit the terminal\r\n');
                 break;
             case 'clear':
                 this.term.clear();
@@ -69,6 +70,9 @@ export class commandHandler{
                     this.term.permutahedronInterval = setInterval(renderFrame, 1000 / fps);
                     window.dispatchEvent(new Event('permutahedron-start'));
                 }
+                break;
+            case 'exit':
+                window.location.href = 'https://nixochi.github.io/scrapbook.html';
                 break;
 
             default:

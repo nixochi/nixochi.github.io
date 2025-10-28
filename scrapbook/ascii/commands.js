@@ -21,17 +21,12 @@ export class commandHandler{
                 this.term.write('Available commands:\r\n');
                 this.term.write('  help         - Show this help message\r\n');
                 this.term.write('  clear        - Clear the terminal\r\n');
-                this.term.write('  echo         - Echo text back\r\n');
                 this.term.write('  date         - Show current date and time\r\n');
                 this.term.write('  whoami       - Show current user\r\n');
-                this.term.write('  animation    - Show moving line animation\r\n');
                 this.term.write('  permutahedron - Toggle permutahedron background\r\n');
                 break;
             case 'clear':
                 this.term.clear();
-                break;
-            case 'echo':
-                this.term.write(args.join(' ') + '\r\n');
                 break;
             case 'date':
                 this.term.write(new Date().toString() + '\r\n');
@@ -43,36 +38,6 @@ export class commandHandler{
                 const color = colors[Math.floor(Math.random()* colors.length)];
                 this.term.write(`i don't know but not \x1B[38;5;${color}mxochi\x1B[0m\r\n`);
                 break;
-            case 'animation':
-                this.term.drawingState = "animation";
-                this.term.currentLine = '';
-                this.term.cursorPos = 0;
-                this.term.tempLine = '';
-
-                // Hide cursor during animation
-                this.term.write('\x1B[?25l');
-
-                // Generate frames with a vertical line moving across the screen
-                const frames = [];
-                for (let col = 0; col < this.term.cols; col++) {
-                    let frame = '';
-                    for (let row = 0; row < this.term.rows; row++) {
-                        for (let c = 0; c < this.term.cols; c++) {
-                            frame += (c === col) ? '|' : ' ';
-                        }
-                    }
-                    frames.push(frame);
-                }
-
-                // Create and start animator
-                this.term.animator = new Animator(frames, 15);
-                this.term.animator.onFrame((frame) => {
-                    this.term.clear();
-                    this.term.write(frame);
-                });
-                this.term.animator.start();
-                break;
-
             case 'permutahedron':
                 if (this.term.permutahedronInterval !== null) {
                     // Stop permutahedron

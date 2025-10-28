@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>BCC Lattice - Shader Version</title>
+    <link rel="stylesheet" href="./style.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+      }
+    </script>
+    <style>
+      * {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        -webkit-text-size-adjust: 100%;
+        touch-action: none;
+      }
+      #debug-console {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        width: 400px;
+        height: 200px;
+        background: rgba(0, 0, 0, 0.85);
+        color: #0f0;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        border: 1px solid #333;
+        border-radius: 5px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+      }
+      #debug-header {
+        padding: 5px 10px;
+        border-bottom: 1px solid #333;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.5);
+      }
+      #debug-fps {
+        color: #0ff;
+        font-weight: bold;
+      }
+      #debug-log {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+        user-select: text;
+        -webkit-user-select: text;
+        -moz-user-select: text;
+        -ms-user-select: text;
+      }
+      #debug-console .log {
+        color: #0f0;
+        margin: 2px 0;
+      }
+      #debug-console .error {
+        color: #f00;
+        margin: 2px 0;
+        font-weight: bold;
+      }
+      #debug-console .warn {
+        color: #ff0;
+        margin: 2px 0;
+      }
+
+      /* Top Left Buttons */
+      .top-left-buttons {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        display: flex;
+        gap: 8px;
+        z-index: 1001;
+      }
+
+      .equation-button {
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(16px);
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #f3f3f3;
+        cursor: pointer;
+        font-family: 'Courier New', monospace;
+        transition: all 0.2s ease;
+      }
+
+      .equation-button:hover {
+        background: rgba(0, 0, 0, 0.85);
+        border-color: #444;
+      }
+
+      /* Equation Panel */
+      .equation-panel {
+        position: absolute;
+        top: 68px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(16px);
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 12px;
+        z-index: 1000;
+        min-width: 300px;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: all 0.2s ease;
+      }
+
+      .equation-panel.active {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+      }
+
+      .equation-input-wrapper {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .equation-input {
+        flex: 1;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #444;
+        border-radius: 4px;
+        padding: 6px 8px;
+        font-size: 13px;
+        color: #0f0;
+        font-family: 'Courier New', monospace;
+        user-select: text;
+        -webkit-user-select: text;
+        -moz-user-select: text;
+        -ms-user-select: text;
+      }
+
+      .equation-input:focus {
+        outline: none;
+        border-color: #0f0;
+      }
+
+      .equation-set-btn {
+        background: rgba(0, 255, 0, 0.2);
+        border: 1px solid #0f0;
+        border-radius: 4px;
+        padding: 6px 12px;
+        font-size: 13px;
+        color: #0f0;
+        cursor: pointer;
+        font-family: 'Courier New', monospace;
+        transition: all 0.2s ease;
+      }
+
+      .equation-set-btn:hover {
+        background: rgba(0, 255, 0, 0.3);
+      }
+
+      .equation-error {
+        margin-top: 8px;
+        padding: 6px 8px;
+        background: rgba(255, 0, 0, 0.1);
+        border: 1px solid #f00;
+        border-radius: 4px;
+        font-size: 12px;
+        color: #f00;
+        font-family: 'Courier New', monospace;
+        display: none;
+      }
+
+      .equation-error.visible {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Top Left Buttons -->
+    <div class="top-left-buttons">
+      <button class="equation-button" id="equationBtn">Equation</button>
+    </div>
+
+    <!-- Equation Panel -->
+    <div class="equation-panel" id="equationPanel">
+      <div class="equation-input-wrapper">
+        <input type="text" class="equation-input" id="equationInput" placeholder="Enter equation..."
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button class="equation-set-btn" id="equationSetBtn">Set</button>
+      </div>
+      <div class="equation-error" id="equationError"></div>
+    </div>
+
+    <div id="debug-console">
+      <div id="debug-header">
+        <span id="debug-fps">FPS: --</span>
+        <span>Debug Console</span>
+      </div>
+      <div id="debug-log"></div>
+    </div>
+
+    <script>
+      // Debug console and FPS tracking
+      const debugLog = document.getElementById('debug-log');
+      const debugFps = document.getElementById('debug-fps');
+      const originalLog = console.log;
+      const originalError = console.error;
+      const originalWarn = console.warn;
+
+      // FPS tracking
+      let frameCount = 0;
+      let lastTime = performance.now();
+
+      function updateFPS() {
+        frameCount++;
+        const currentTime = performance.now();
+        const deltaTime = currentTime - lastTime;
+
+        if (deltaTime >= 1000) {
+          const fps = Math.round((frameCount * 1000) / deltaTime);
+          debugFps.textContent = `FPS: ${fps}`;
+          frameCount = 0;
+          lastTime = currentTime;
+        }
+
+        requestAnimationFrame(updateFPS);
+      }
+      updateFPS();
+
+      function addToDebug(message, type = 'log') {
+        const entry = document.createElement('div');
+        entry.className = type;
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        debugLog.appendChild(entry);
+        debugLog.scrollTop = debugLog.scrollHeight;
+      }
+
+      console.log = function(...args) {
+        originalLog.apply(console, args);
+        addToDebug(args.join(' '), 'log');
+      };
+
+      console.error = function(...args) {
+        originalError.apply(console, args);
+        addToDebug(args.join(' '), 'error');
+      };
+
+      console.warn = function(...args) {
+        originalWarn.apply(console, args);
+        addToDebug(args.join(' '), 'warn');
+      };
+
+      // Capture uncaught errors
+      window.addEventListener('error', (e) => {
+        addToDebug(`ERROR: ${e.message} at ${e.filename}:${e.lineno}`, 'error');
+      });
+
+      // Capture unhandled promise rejections
+      window.addEventListener('unhandledrejection', (e) => {
+        addToDebug(`PROMISE REJECTION: ${e.reason}`, 'error');
+      });
+
+      // Equation panel toggle
+      const equationBtn = document.getElementById('equationBtn');
+      const equationPanel = document.getElementById('equationPanel');
+      const equationSetBtn = document.getElementById('equationSetBtn');
+      const equationInput = document.getElementById('equationInput');
+      const equationError = document.getElementById('equationError');
+
+      let panelVisible = false;
+
+      equationBtn.addEventListener('click', () => {
+        panelVisible = !panelVisible;
+        if (panelVisible) {
+          equationPanel.classList.add('active');
+          equationBtn.textContent = 'Close';
+          equationInput.focus();
+        } else {
+          equationPanel.classList.remove('active');
+          equationBtn.textContent = 'Equation';
+        }
+      });
+
+      // Store last valid equation for error recovery
+      let lastValidEquation = '';
+
+      // Hide error message
+      function hideError() {
+        equationError.classList.remove('visible');
+        equationError.textContent = '';
+      }
+
+      // Show error message
+      function showError(message) {
+        equationError.textContent = message;
+        equationError.classList.add('visible');
+      }
+
+      // Clear error when user starts typing
+      equationInput.addEventListener('input', () => {
+        hideError();
+      });
+
+      // Allow Enter key to trigger Set button
+      equationInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          equationSetBtn.click();
+        }
+      });
+
+      // Export functions to be called from index.js module
+      window.equationHandlers = {
+        setEquation: (equation) => {
+          equationInput.value = equation;
+        },
+        applyEquation: async () => {
+          const equation = equationInput.value.trim();
+
+          if (!equation) {
+            showError('Equation cannot be empty');
+            return;
+          }
+
+          try {
+            // Import parser dynamically
+            const { parseEquationToGLSL } = await import('./equationParsing.js');
+
+            // Parse equation
+            const result = parseEquationToGLSL(equation);
+
+            if (!result.success) {
+              showError(result.error);
+              console.error('Parse error:', result.error);
+              return;
+            }
+
+            // Update shader
+            if (window.worldInstance) {
+              window.worldInstance.updateEquation(result.glslCode);
+              lastValidEquation = equation;
+              hideError();
+              console.log('Equation applied:', equation);
+            } else {
+              showError('World not initialized');
+            }
+          } catch (error) {
+            showError('Failed to parse equation');
+            console.error('Error:', error);
+          }
+        }
+      };
+
+      // Set button functionality
+      equationSetBtn.addEventListener('click', () => {
+        window.equationHandlers.applyEquation();
+      });
+    </script>
+
+    <script type="module" src="index.js"></script>
+  </body>
+</html>

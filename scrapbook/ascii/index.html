@@ -47,6 +47,30 @@
         box-sizing: border-box;
       }
 
+      #terminal.permutahedron-active {
+        cursor: grab;
+        touch-action: none;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+      }
+
+      #terminal.permutahedron-active:active {
+        cursor: grabbing;
+      }
+
+      /* Disable text selection and pointer events when permutahedron is active */
+      #terminal.permutahedron-active .xterm-screen,
+      #terminal.permutahedron-active .xterm-viewport,
+      #terminal.permutahedron-active .xterm {
+        user-select: none !important;
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        pointer-events: none !important;
+      }
+
       #glCanvas {
         display: none;
       }
@@ -224,6 +248,13 @@
       // Make commandExecutor globally available
       window.commandExecutor = commandExecutor;
 
+      // Prevent Tab from changing focus
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+        }
+      });
+
       // Handle keyboard input
       term.onData(data => interactionHandler.handleInteraction(data));
 
@@ -251,6 +282,80 @@
           }
         }, 150);
       });
+
+      // Mouse controls for permutahedron orbit
+      const terminalElement = document.getElementById('terminal');
+
+      terminalElement.addEventListener('mousedown', (e) => {
+        if (!term.permutahedronInterval || !commandExecutor.permutahedronRenderer) return;
+        e.preventDefault();
+        commandExecutor.permutahedronRenderer.startDrag(e.clientX, e.clientY);
+      });
+
+      terminalElement.addEventListener('mousemove', (e) => {
+        if (!term.permutahedronInterval || !commandExecutor.permutahedronRenderer) return;
+        commandExecutor.permutahedronRenderer.moveDrag(e.clientX, e.clientY);
+      });
+
+      terminalElement.addEventListener('mouseup', () => {
+        if (!commandExecutor.permutahedronRenderer) return;
+        commandExecutor.permutahedronRenderer.endDrag();
+      });
+
+      terminalElement.addEventListener('mouseleave', () => {
+        if (!commandExecutor.permutahedronRenderer) return;
+        commandExecutor.permutahedronRenderer.endDrag();
+      });
+
+      // Update cursor and disable text selection when permutahedron starts/stops
+      window.addEventListener('permutahedron-start', () => {
+        terminalElement.classList.add('permutahedron-active');
+      });
+      window.addEventListener('permutahedron-stop', () => {
+        terminalElement.classList.remove('permutahedron-active');
+      });
+
+      // Touch controls for permutahedron orbit
+      terminalElement.addEventListener('touchstart', (e) => {
+        if (!term.permutahedronInterval || !commandExecutor.permutahedronRenderer) return;
+        e.preventDefault();
+
+        if (e.touches.length === 1) {
+          // Single finger drag
+          commandExecutor.permutahedronRenderer.startDrag(
+            e.touches[0].clientX,
+            e.touches[0].clientY
+          );
+        }
+      }, { passive: false });
+
+      terminalElement.addEventListener('touchmove', (e) => {
+        if (!term.permutahedronInterval || !commandExecutor.permutahedronRenderer) return;
+        e.preventDefault();
+
+        if (e.touches.length === 1 && commandExecutor.permutahedronRenderer.camera.isDragging) {
+          // Single finger drag
+          commandExecutor.permutahedronRenderer.moveDrag(
+            e.touches[0].clientX,
+            e.touches[0].clientY
+          );
+        }
+      }, { passive: false });
+
+      terminalElement.addEventListener('touchend', (e) => {
+        if (!commandExecutor.permutahedronRenderer) return;
+        e.preventDefault();
+
+        if (e.touches.length === 0) {
+          commandExecutor.permutahedronRenderer.endDrag();
+        }
+      }, { passive: false });
+
+      terminalElement.addEventListener('touchcancel', (e) => {
+        if (!commandExecutor.permutahedronRenderer) return;
+        e.preventDefault();
+        commandExecutor.permutahedronRenderer.endDrag();
+      }, { passive: false });
 
       // Config Panel Functionality
       const configPanel = document.getElementById('config-panel');

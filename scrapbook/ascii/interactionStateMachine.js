@@ -15,6 +15,33 @@ export class interactionStateMachine{
         }
     }
 
+    // Exit animation mode
+    exitAnimation() {
+        // Stop the animator if it's running
+        if (this.term.animator) {
+            this.term.animator.stop();
+            this.term.animator = null;
+        }
+        // Stop the permutahedron display if it's running
+        // (The model keeps animating in the background)
+        if (this.term.permutahedronInterval) {
+            clearInterval(this.term.permutahedronInterval);
+            this.term.permutahedronInterval = null;
+            // Hide controls panel
+            const controlsPanel = document.getElementById('permutahedron-controls');
+            if (controlsPanel) controlsPanel.style.display = 'none';
+            // Dispatch stop event for cursor management
+            window.dispatchEvent(new Event('permutahedron-stop'));
+        }
+        this.term.reset();
+        this.term.currentLine = '';
+        this.term.cursorPos = 0;
+        // Show cursor again
+        this.term.write('\x1B[?25h');
+        this.term.write('$ ');
+        this.term.drawingState = "terminal";
+    }
+
     handleInteraction(data){
         if (this.term.drawingState == "animation"){
             // If permutahedron is running and arrow keys are pressed, rotate instead of exit
@@ -35,35 +62,44 @@ export class interactionStateMachine{
                     this.commandExecutor.permutahedronRenderer.rotateLeft();
                     return;
                 }
-            }
 
-            // For any other key, exit animation mode
-            // Stop the animator if it's running
-            if (this.term.animator) {
-                this.term.animator.stop();
-                this.term.animator = null;
+                // Any other key exits animation mode
+                this.exitAnimation();
+                return;
+            } else {
+                // For other animations (non-permutahedron), exit on any key
+                this.exitAnimation();
+                return;
             }
-            // Stop the permutahedron interval if it's running
-            if (this.term.permutahedronInterval) {
-                clearInterval(this.term.permutahedronInterval);
-                this.term.permutahedronInterval = null;
-                // Hide controls panel
-                const controlsPanel = document.getElementById('permutahedron-controls');
-                if (controlsPanel) controlsPanel.style.display = 'none';
-            }
-            this.term.reset();
-            this.term.currentLine = '';
-            this.term.cursorPos = 0;
-            // Show cursor again
-            this.term.write('\x1B[?25h');
-            this.term.write('$ ');
-            this.term.drawingState = "terminal";
-            return;
         }
 
         else if (this.term.drawingState == "terminal"){
 
             const code = data.charCodeAt(0);
+
+            // Handle Tab for autocomplete
+            if (code === 9) { // Tab
+                // Prevent default tab behavior (focus navigation)
+                // Note: preventDefault is not directly available here, but xterm handles this
+                if (this.term.currentLine.length > 0) {
+                    const availableCommands = ['help', 'clear', 'date', 'whoami', 'permutahedron'];
+                    const matches = availableCommands.filter(cmd => cmd.startsWith(this.term.currentLine));
+
+                    if (matches.length === 1) {
+                        // Autocomplete to the single match
+                        this.term.currentLine = matches[0];
+                        this.term.cursorPos = this.term.currentLine.length;
+                        this.redrawLine();
+                    } else if (matches.length > 1) {
+                        // Multiple matches - show them
+                        this.term.write('\r\n');
+                        this.term.write(matches.join('  ') + '\r\n');
+                        this.term.write('$ ' + this.term.currentLine);
+                        this.term.cursorPos = this.term.currentLine.length;
+                    }
+                }
+                return;
+            }
 
             // Handle arrow keys (escape sequences)
             if (data === '\x1B[A') { // Up arrow

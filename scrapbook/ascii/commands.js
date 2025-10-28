@@ -19,11 +19,11 @@ export class commandHandler{
         switch (cmd){
             case 'help':
                 this.term.write('Available commands:\r\n');
-                this.term.write('  help         - Show this help message\r\n');
-                this.term.write('  clear        - Clear the terminal\r\n');
-                this.term.write('  date         - Show current date and time\r\n');
-                this.term.write('  whoami       - Show current user\r\n');
-                this.term.write('  permutahedron - Toggle permutahedron background\r\n');
+                this.term.write('  help          - Show this help message\r\n');
+                this.term.write('  clear         - Clear the terminal\r\n');
+                this.term.write('  date          - Show current date and time\r\n');
+                this.term.write('  whoami        - Show current user\r\n');
+                this.term.write('  permutahedron - Toggle permutahedron (drag to rotate, ESC to exit)\r\n');
                 break;
             case 'clear':
                 this.term.clear();
@@ -40,15 +40,16 @@ export class commandHandler{
                 break;
             case 'permutahedron':
                 if (this.term.permutahedronInterval !== null) {
-                    // Stop permutahedron
+                    // Stop permutahedron display (model keeps animating)
                     clearInterval(this.term.permutahedronInterval);
                     this.term.permutahedronInterval = null;
                     this.term.drawingState = "terminal";
                     this.term.write('\x1B[?25h'); // Show cursor
                     this.term.clear();
                     this.term.write('$ ');
+                    window.dispatchEvent(new Event('permutahedron-stop'));
                 } else {
-                    // Start permutahedron
+                    // Start permutahedron display (model is already animating)
                     this.term.drawingState = "animation";
                     this.term.currentLine = '';
                     this.term.cursorPos = 0;
@@ -56,6 +57,7 @@ export class commandHandler{
                     this.term.write('\x1B[?25l'); // Hide cursor
 
                     const renderFrame = () => {
+                        // Just sample the current frame from the model
                         const frame = this.permutahedronRenderer.generateFrame();
                         // Move cursor to top-left without clearing (no flicker)
                         this.term.write('\x1B[H' + frame);
@@ -65,6 +67,7 @@ export class commandHandler{
                     this.term.clear();
                     const fps = this.permutahedronRenderer.config.fps;
                     this.term.permutahedronInterval = setInterval(renderFrame, 1000 / fps);
+                    window.dispatchEvent(new Event('permutahedron-start'));
                 }
                 break;
 

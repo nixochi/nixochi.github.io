@@ -73,8 +73,18 @@ export class PermutahedronRenderer {
         this.camera = {
             radius: this.config.cameraRadius,
             theta: this.config.cameraInitialTheta,
-            phi: this.config.cameraInitialPhi
+            phi: this.config.cameraInitialPhi,
+            isDragging: false,
+            lastX: 0,
+            lastY: 0,
+            velocityTheta: 0,
+            velocityPhi: 0
         };
+
+        // Camera control parameters
+        this.MOMENTUM_DAMPING = 0.92;
+        this.MOMENTUM_STOP_THRESHOLD = 0.002;
+        this.DRAG_SENSITIVITY = Math.PI / 800;  // Reduced from 450 to 800 for less sensitivity
 
         // Derived values
         this.frameInterval = 1000 / this.config.fps;
@@ -88,6 +98,10 @@ export class PermutahedronRenderer {
         this.charResolutionY = 0;
         this.edgeBuffer = null;
         this.colorBuffer = null;
+
+        // Animation loop (runs independently)
+        this.animationLoopId = null;
+        this.isAnimating = false;
     }
 
     init() {
@@ -102,6 +116,10 @@ export class PermutahedronRenderer {
         this.resizeCanvas();
 
         this.gl.clearColor(0, 0, 0, 1);
+
+        // Start the animation loop immediately
+        this.start();
+
         return true;
     }
 
@@ -352,6 +370,79 @@ export class PermutahedronRenderer {
         this.camera.phi = Math.max(0.01, Math.min(Math.PI - 0.01, this.camera.phi));
     }
 
+    // Mouse/touch drag controls
+    startDrag(x, y) {
+        this.camera.isDragging = true;
+        this.camera.lastX = x;
+        this.camera.lastY = y;
+        this.camera.velocityTheta = 0;
+        this.camera.velocityPhi = 0;
+    }
+
+    moveDrag(x, y) {
+        if (!this.camera.isDragging) return;
+
+        const deltaX = x - this.camera.lastX;
+        const deltaY = y - this.camera.lastY;
+
+        this.camera.theta -= deltaX * this.DRAG_SENSITIVITY;
+        this.camera.phi -= deltaY * this.DRAG_SENSITIVITY;
+        this.camera.phi = Math.max(0.01, Math.min(Math.PI - 0.01, this.camera.phi));
+
+        this.camera.velocityTheta = -deltaX * this.DRAG_SENSITIVITY * 0.1;
+        this.camera.velocityPhi = -deltaY * this.DRAG_SENSITIVITY * 0.1;
+
+        this.camera.lastX = x;
+        this.camera.lastY = y;
+    }
+
+    endDrag() {
+        this.camera.isDragging = false;
+    }
+
+    updateMomentum() {
+        if (!this.camera.isDragging) {
+            this.camera.theta += this.camera.velocityTheta;
+            this.camera.phi += this.camera.velocityPhi;
+            this.camera.phi = Math.max(0.01, Math.min(Math.PI - 0.01, this.camera.phi));
+
+            this.camera.velocityTheta *= this.MOMENTUM_DAMPING;
+            this.camera.velocityPhi *= this.MOMENTUM_DAMPING;
+
+            if (Math.abs(this.camera.velocityTheta) < this.MOMENTUM_STOP_THRESHOLD) {
+                this.camera.velocityTheta = 0;
+            }
+            if (Math.abs(this.camera.velocityPhi) < this.MOMENTUM_STOP_THRESHOLD) {
+                this.camera.velocityPhi = 0;
+            }
+        }
+    }
+
+    // Animation loop - runs continuously and independently
+    animationLoop() {
+        if (!this.isAnimating) return;
+
+        // Update camera physics
+        this.updateMomentum();
+
+        // Continue the loop
+        this.animationLoopId = requestAnimationFrame(() => this.animationLoop());
+    }
+
+    start() {
+        if (this.isAnimating) return;
+        this.isAnimating = true;
+        this.animationLoop();
+    }
+
+    stop() {
+        this.isAnimating = false;
+        if (this.animationLoopId !== null) {
+            cancelAnimationFrame(this.animationLoopId);
+            this.animationLoopId = null;
+        }
+    }
+
     getBrightness(r, g, b) {
         return 0.299 * r + 0.587 * g + 0.114 * b;
     }
@@ -373,6 +464,9 @@ export class PermutahedronRenderer {
     }
 
     generateFrame() {
+        // This function just samples the current camera state
+        // The animation loop continuously updates the camera independently
+
         const charW = this.renderWidth;
         const charH = this.renderHeight;
         const cellW = this.config.charPixelWidth;

@@ -1,0 +1,109 @@
+{
+  "examples": [
+    {
+      "name": "Wave Ripple",
+      "equation": "sin(t + sqrt(x^2+y^2+z^2)*10)*0.5 + 0.5",
+      "description": "Rippling wave emanating from center"
+    },
+    {
+      "name": "Pulsing Circles",
+      "equation": "sin((sqrt(x^2+y^2+z^2) - t)*10)*0.5 + 0.5",
+      "description": "Circles coming out of the cube"
+    },
+    {
+      "name": "Air Bubbles",
+      "equation": "sin(x*5 + t)*0.3 + sin(y*5 + t)*0.3 + sin(z*5 + t)*0.4",
+      "description": "Bubble float across the cube"
+    },
+    {
+      "name": "Oscillating Layers",
+      "equation": "sin(z*10 + t)*0.5 + 0.5",
+      "description": "Horizontal layers oscillating over time"
+    },
+    {
+      "name": "Breathing",
+      "equation": "(sin(t)*0.5 + 0.5) * (1 - sqrt(x^2+y^2+z^2)*0.6)",
+      "description": "Entire lattice breathes in unison"
+    },
+    {
+      "name": "Diagonal Sweep",
+      "equation": "sin((x+y+z)*3 + t)*0.5 + 0.5",
+      "description": "Diagonal wave sweeping through space"
+    },
+    {
+      "name": "Twisted Helix",
+      "equation": "sin(sqrt(x^2+y^2)*5 + z*5 + atan(y,x)*3 + t)*0.5 + 0.5",
+      "description": "Helical pattern twisting along Z axis"
+    },
+    {
+      "name": "Pulsing Core",
+      "equation": "sin(t*3)*0.3 + (1 - sqrt(x^2+y^2+z^2)*0.6)",
+      "description": "Pulsing bright core fading outward"
+    },
+    {
+      "name": "Checkered Cube",
+      "equation": "mod(floor(x*3) + floor(y*3) + floor(z*3), 2.0)",
+      "description": "3D checkered pattern"
+    },
+    {
+      "name": "XY Rings",
+      "equation": "sin(sqrt(x^2+y^2)*15)*0.5 + 0.5",
+      "description": "Concentric rings in XY plane"
+    },
+    {
+      "name": "Turbulence",
+      "equation": "sin(x*7 + sin(y*5 + t))*0.25 + sin(y*6 + sin(z*4 + t*0.7))*0.25 + sin(z*8 + sin(x*3 + t*1.3))*0.25 + 0.5",
+      "description": "Chaotic animated turbulent pattern"
+    },
+    {
+      "name": "Interference",
+      "equation": "sin(sqrt(x^2+y^2)*12 + t)*0.25 + sin(sqrt(y^2+z^2)*12 + t*1.4)*0.25 + sin(sqrt(x^2+z^2)*12 + t*0.8)*0.25 + 0.5",
+      "description": "Three overlapping animated wave patterns"
+    },
+    {
+      "name": "Diagonal Stripes 3D",
+      "equation": "mod(floor((x+y+z)*4 + t*2), 2.0)",
+      "description": "3D diagonal stripes sweeping through"
+    },
+    {
+      "name": "Stepping Sphere",
+      "equation": "floor(sqrt(x^2+y^2+z^2)*5 + t)*0.2",
+      "description": "Concentric spherical steps expanding"
+    },
+    {
+      "name": "Twisted Bands",
+      "equation": "mod(floor(z*5 + atan(y,x)*2 + t*3), 2.0)",
+      "description": "Bands twisting and spinning around Z axis"
+    },
+    {
+      "name": "Fractal Noise",
+      "equation": "sin(x*4 + t)*0.3 + sin(x*8 + y*2 + t*1.5)*0.2 + sin(x*16 + y*4 + z*2 + t*2)*0.15 + sin(z*12 + t*0.7)*0.15 + 0.5",
+      "description": "Multi-scale fractal-like noise pattern"
+    },
+    {
+      "name": "Wavy Grid",
+      "equation": "mod(floor(x*4 + sin(z*5 + t)*2) + floor(y*4 + sin(z*5 + t)*2), 2.0)",
+      "description": "Checkered pattern that waves along Z"
+    },
+    {
+      "name": "Plasma",
+      "equation": "sin(x*3 + t)*0.2 + sin(y*4 + t*1.3)*0.2 + sin(sqrt(x^2+y^2)*5 + t*0.7)*0.3 + sin(z*2.5)*0.3",
+      "description": "Plasma-like animated pattern"
+    },
+    {
+      "name": "XYZ Product",
+      "equation": "x * y * z * sin(t*2) + 0.5",
+      "description": "Tixy-style: product of coordinates pulsing"
+    },
+    {
+      "name": "Random Static",
+      "equation": "random(x*12.9898 + y*78.233 + z*45.164)",
+      "description": "Pseudo-random static pattern"
+    },
+    {
+      "name": "Random Flicker",
+      "equation": "random(x*12.9 + y*78.2 + z*45.1 + floor(t*5))",
+      "description": "Random pattern that changes over time"
+    }
+  ]
+}

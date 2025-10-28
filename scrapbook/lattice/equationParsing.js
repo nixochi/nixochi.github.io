@@ -307,13 +307,22 @@ function mapFunction(name, args) {
         'exp': 'exp',
         'log': 'log',
         'sign': 'sign',
-        'length': 'length'
+        'length': 'length',
+        'random': 'random'
     };
 
     const glslFunc = funcMap[name.toLowerCase()];
 
     if (!glslFunc) {
         throw new Error(`Unknown function: ${name}`);
+    }
+
+    // Special handling for random function (pseudo-random using sin/fract)
+    if (name.toLowerCase() === 'random') {
+        if (args.length !== 1) {
+            throw new Error(`Function random expects 1 argument, got ${args.length}`);
+        }
+        return `fract(sin(${args[0]}) * 43758.5453)`;
     }
 
     // Validate argument count for common functions

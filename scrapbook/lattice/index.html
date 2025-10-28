@@ -1,11 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background: #000;">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>BCC Lattice - Shader Version</title>
-    <link rel="stylesheet" href="./style.css">
     <script type="importmap">
       {
         "imports": {
@@ -31,6 +30,7 @@
         width: 100%;
         height: 100vh;
         height: 100dvh; /* Dynamic viewport height for mobile */
+        background: #000;
         -webkit-text-size-adjust: 100%;
         touch-action: none;
         position: fixed;
@@ -63,6 +63,16 @@
       .equation-button:hover {
         background: rgba(0, 0, 0, 0.85);
         border-color: #444;
+      }
+
+      .equation-button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .equation-button:disabled:hover {
+        background: rgba(0, 0, 0, 0.75);
+        border-color: #333;
       }
 
       /* Equation Panel */
@@ -147,6 +157,114 @@
         display: block;
       }
 
+      /* Library Modal */
+      .library-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px);
+        z-index: 2000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .library-modal.active {
+        display: flex;
+      }
+
+      .library-content {
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(16px);
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 16px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 70vh;
+        overflow-y: auto;
+      }
+
+      .library-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        border-bottom: 1px solid #333;
+        padding-bottom: 12px;
+      }
+
+      .library-header h3 {
+        margin: 0;
+        font-family: 'Courier New', monospace;
+        font-size: 16px;
+        font-weight: 500;
+        color: #0f0;
+      }
+
+      .library-close {
+        background: transparent;
+        border: none;
+        font-size: 28px;
+        color: #666;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s ease;
+      }
+
+      .library-close:hover {
+        color: #f00;
+      }
+
+      .library-examples {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .library-example {
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #444;
+        border-radius: 4px;
+        padding: 10px 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .library-example:hover {
+        background: rgba(0, 255, 0, 0.1);
+        border-color: #0f0;
+      }
+
+      .library-example-name {
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        font-weight: 500;
+        color: #0f0;
+        margin-bottom: 4px;
+      }
+
+      .library-example-equation {
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        color: #0ff;
+        margin-bottom: 4px;
+      }
+
+      .library-example-description {
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        color: #888;
+      }
+
       /* FPS Counter */
       #fps-counter {
         position: fixed;
@@ -220,6 +338,7 @@
     <!-- Top Left Buttons -->
     <div class="top-left-buttons">
       <button class="equation-button" id="equationBtn">Equation</button>
+      <button class="equation-button" id="libraryBtn" disabled>Library</button>
     </div>
 
     <!-- Equation Panel -->
@@ -232,6 +351,19 @@
         <button class="equation-set-btn" id="equationSetBtn">Set</button>
       </div>
       <div class="equation-error" id="equationError"></div>
+    </div>
+
+    <!-- Library Modal -->
+    <div class="library-modal" id="libraryModal">
+      <div class="library-content">
+        <div class="library-header">
+          <h3>Examples Library</h3>
+          <button class="library-close" id="libraryClose">&times;</button>
+        </div>
+        <div class="library-examples" id="libraryExamples">
+          <!-- Examples will be loaded here -->
+        </div>
+      </div>
     </div>
 
     <!-- FPS Counter -->
@@ -352,6 +484,101 @@
       // Set button functionality
       equationSetBtn.addEventListener('click', () => {
         window.equationHandlers.applyEquation();
+      });
+
+      // Library modal functionality
+      const libraryBtn = document.getElementById('libraryBtn');
+      const libraryModal = document.getElementById('libraryModal');
+      const libraryClose = document.getElementById('libraryClose');
+      const libraryExamples = document.getElementById('libraryExamples');
+
+      // Cache for loaded examples
+      let examplesData = null;
+      let examplesLoaded = false;
+
+      // Fetch examples JSON asynchronously
+      async function fetchExamples() {
+        try {
+          const response = await fetch('./examples.json');
+          examplesData = await response.json();
+          examplesLoaded = true;
+          libraryBtn.disabled = false;
+          console.log('Examples library loaded');
+        } catch (error) {
+          console.error('Failed to fetch examples:', error);
+          examplesLoaded = false;
+          libraryBtn.disabled = true;
+        }
+      }
+
+      // Render examples to the modal
+      function renderExamples() {
+        if (!examplesLoaded || !examplesData) {
+          libraryExamples.innerHTML = '<div style="color: #f00; font-family: monospace; padding: 10px;">Failed to load examples</div>';
+          return;
+        }
+
+        // Clear existing examples
+        libraryExamples.innerHTML = '';
+
+        // Create example elements
+        examplesData.examples.forEach(example => {
+          const exampleDiv = document.createElement('div');
+          exampleDiv.className = 'library-example';
+
+          const nameDiv = document.createElement('div');
+          nameDiv.className = 'library-example-name';
+          nameDiv.textContent = example.name;
+
+          const equationDiv = document.createElement('div');
+          equationDiv.className = 'library-example-equation';
+          equationDiv.textContent = example.equation;
+
+          const descDiv = document.createElement('div');
+          descDiv.className = 'library-example-description';
+          descDiv.textContent = example.description;
+
+          exampleDiv.appendChild(nameDiv);
+          exampleDiv.appendChild(equationDiv);
+          exampleDiv.appendChild(descDiv);
+
+          // Add click handler to apply example
+          exampleDiv.addEventListener('click', () => {
+            equationInput.value = example.equation;
+            window.equationHandlers.applyEquation();
+            libraryModal.classList.remove('active');
+          });
+
+          libraryExamples.appendChild(exampleDiv);
+        });
+      }
+
+      // Preload examples when page loads
+      fetchExamples();
+
+      // Open library modal
+      libraryBtn.addEventListener('click', () => {
+        libraryModal.classList.add('active');
+        renderExamples();
+      });
+
+      // Close library modal
+      libraryClose.addEventListener('click', () => {
+        libraryModal.classList.remove('active');
+      });
+
+      // Close on background click
+      libraryModal.addEventListener('click', (e) => {
+        if (e.target === libraryModal) {
+          libraryModal.classList.remove('active');
+        }
+      });
+
+      // Close on escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && libraryModal.classList.contains('active')) {
+          libraryModal.classList.remove('active');
+        }
       });
     </script>
 

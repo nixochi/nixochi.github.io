@@ -444,7 +444,7 @@ export class PermutahedronRenderer {
 
         // Top padding (empty lines)
         for (let i = 0; i < verticalPad; i++) {
-            frame += emptyLine;
+            frame += emptyLine + '\r\n';
         }
 
         // Square content (centered horizontally)
@@ -503,12 +503,12 @@ export class PermutahedronRenderer {
                     frame += '\x1b[0m';
                 }
             }
-            frame += rightPadding;
+            frame += rightPadding + '\r\n';
         }
 
         // Bottom padding (empty lines)
         for (let i = 0; i < this.rows - charH - verticalPad; i++) {
-            frame += emptyLine;
+            frame += emptyLine + '\r\n';
         }
 
         return frame;

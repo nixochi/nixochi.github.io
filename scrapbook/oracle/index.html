@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Oracle</title>
+    <style>
+      * {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+        box-sizing: border-box;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        background: #0a0e14;
+        -webkit-text-size-adjust: 100%;
+        touch-action: none;
+        position: fixed;
+      }
+
+      /* Search Container */
+      .search-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0a0e14;
+        padding: 20px;
+      }
+
+      /* Search Panel */
+      .search-panel {
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(16px);
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 12px;
+        width: 100%;
+        max-width: 600px;
+      }
+
+      /* Search Input Wrapper */
+      .search-input-wrapper {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      /* Search Input */
+      .search-input {
+        flex: 1;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #444;
+        border-radius: 4px;
+        padding: 12px 16px;
+        font-size: 16px;
+        color: #0f0;
+        font-family: 'Courier New', monospace;
+        user-select: text;
+        -webkit-user-select: text;
+        -moz-user-select: text;
+        -ms-user-select: text;
+      }
+
+      .search-input::placeholder {
+        color: #0f0;
+        opacity: 0.4;
+      }
+
+      .search-input:focus {
+        outline: none;
+      }
+
+      /* Search Button */
+      .search-btn {
+        background: rgba(0, 255, 0, 0.2);
+        border: 1px solid #0f0;
+        border-radius: 4px;
+        padding: 12px 20px;
+        font-size: 14px;
+        color: #0f0;
+        cursor: pointer;
+        font-family: 'Courier New', monospace;
+        flex-shrink: 0;
+      }
+
+      /* Results Area (optional) */
+      .search-results {
+        margin-top: 16px;
+        padding: 12px;
+        background: rgba(0, 0, 0, 0.5);
+        border: 1px solid #444;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        color: #0ff;
+        max-height: 300px;
+        overflow-y: auto;
+        display: none;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+
+      .search-results.visible {
+        display: block;
+      }
+
+      /* Scrollbar Styling */
+      .search-results::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .search-results::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+      }
+
+      .search-results::-webkit-scrollbar-thumb {
+        background: #0f0;
+        border-radius: 4px;
+      }
+
+      .search-results::-webkit-scrollbar-thumb:hover {
+        background: #0ff;
+      }
+
+      /* Mobile Layout */
+      @media (max-width: 768px) {
+        .search-panel {
+          padding: 16px;
+          margin: 0 10px;
+        }
+
+        .search-input {
+          padding: 10px 12px;
+          font-size: 14px;
+          -webkit-appearance: none;
+          appearance: none;
+        }
+
+        .search-btn {
+          padding: 10px 16px;
+          -webkit-appearance: none;
+          appearance: none;
+        }
+
+        .search-results {
+          max-height: 200px;
+          font-size: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Search Container -->
+    <div class="search-container">
+      <div class="search-panel">
+        <div class="search-input-wrapper">
+          <input
+            type="text"
+            class="search-input"
+            id="searchInput"
+            placeholder="Enter n for B_n (default: 6)"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            autofocus>
+          <button class="search-btn" id="searchBtn">Search</button>
+        </div>
+        <div class="search-results" id="searchResults"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      import init, { compute_boolean_lattice_polynomial } from './pkg/oracle_wasm.js';
+
+      const searchInput = document.getElementById('searchInput');
+      const searchBtn = document.getElementById('searchBtn');
+      const searchResults = document.getElementById('searchResults');
+
+      let wasmInitialized = false;
+
+      // Initialize WASM module
+      async function initWasm() {
+        try {
+          await init();
+          wasmInitialized = true;
+          console.log('WASM module initialized');
+        } catch (error) {
+          console.error('Failed to initialize WASM:', error);
+          searchResults.textContent = '> Error: Failed to initialize WASM module';
+          searchResults.classList.add('visible');
+        }
+      }
+
+      // Handle search
+      async function performSearch() {
+        const query = searchInput.value.trim();
+
+        if (!wasmInitialized) {
+          searchResults.textContent = '> Initializing oracle...';
+          searchResults.classList.add('visible');
+          await initWasm();
+          if (!wasmInitialized) return;
+        }
+
+        // Parse input as number, default to B_6 if empty or invalid
+        let n = 6;
+        if (query) {
+          const parsed = parseInt(query, 10);
+          if (!isNaN(parsed) && parsed > 0 && parsed <= 20) {
+            n = parsed;
+          } else if (!isNaN(parsed)) {
+            searchResults.textContent = `> Error: n must be between 1 and 20\n> (B_${parsed} would have ${Math.pow(2, parsed)} elements)`;
+            searchResults.classList.add('visible');
+            return;
+          } else {
+            searchResults.textContent = `> Error: Please enter a valid number\n> Example: Enter "6" for B_6`;
+            searchResults.classList.add('visible');
+            return;
+          }
+        }
+
+        const size = Math.pow(2, n);
+        searchResults.textContent = `> Computing characteristic polynomial of Boolean lattice B_${n}...\n> Processing ${size} elements...`;
+        searchResults.classList.add('visible');
+
+        try {
+          // All computation happens in WASM - just pass n, receive polynomial string
+          const startTime = performance.now();
+          const result = compute_boolean_lattice_polynomial(n);
+          const computeTime = (performance.now() - startTime).toFixed(2);
+
+          console.log(`B_${n}: Total time ${computeTime}ms`);
+
+          // Generate element set string
+          const elementSet = Array.from({length: n}, (_, i) => i + 1).join(',');
+
+          // Display results
+          let output = `> Boolean Lattice B_${n}\n`;
+          output += `> Elements: ${size} (all subsets of {${elementSet}})\n`;
+          output += `> Computation time: ${computeTime}ms\n\n`;
+          output += `> Characteristic Polynomial χ(x):\n`;
+          output += `> ${result}\n\n`;
+          output += `> Note: Matrix generation and all computation in WASM\n`;
+          output += `> Using general poset algorithm (no fast paths)`;
+
+          searchResults.textContent = output;
+          console.log('Result:', result);
+        } catch (error) {
+          searchResults.textContent = `> Error computing polynomial:\n> ${error.message}`;
+          console.error('Computation error:', error);
+        }
+      }
+
+      // Search button click
+      searchBtn.addEventListener('click', performSearch);
+
+      // Enter key to search
+      searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          performSearch();
+        }
+      });
+
+      // Clear results when input is empty
+      searchInput.addEventListener('input', () => {
+        if (!searchInput.value.trim()) {
+          searchResults.classList.remove('visible');
+        }
+      });
+
+      // Initialize WASM on page load
+      window.addEventListener('load', async () => {
+        searchInput.focus();
+        await initWasm();
+      });
+    </script>
+  </body>
+</html>

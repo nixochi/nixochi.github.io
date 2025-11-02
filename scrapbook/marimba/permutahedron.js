@@ -380,8 +380,10 @@ function updateFaceColors() {
 // No longer need custom playback - abcjs handles everything!
 
 // Camera state (spherical coordinates)
+// Zoom out 40% more on mobile (radius 40% larger)
+const isMobile = window.innerWidth <= 768;
 const spherical = {
-    radius: 8,
+    radius: isMobile ? 11.2 : 8,
     theta: Math.PI / 4,
     phi: Math.PI / 3
 };

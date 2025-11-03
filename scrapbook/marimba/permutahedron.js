@@ -35,22 +35,21 @@ const PERMUTAHEDRON_VERTICES = [
 
 // Faces reordered so that face indices follow the chromatic path
 // Face 0 = C4, Face 1 = C#4, Face 2 = D4, etc.
-// Original indices: [7, 11, 13, 12, 4, 2, 0, 1, 6, 3, 5, 9, 10, 8]
 const PERMUTAHEDRON_FACES = [
-    [4,0,2,8],              // Face 0 (was 7) - C4
-    [10,11,5,1,0,4],        // Face 1 (was 11) - C#4
-    [10,16,17,11],          // Face 2 (was 13) - D4
-    [10,4,8,14,20,16],      // Face 3 (was 12) - D#4
-    [20,14,18,22],          // Face 4 (was 4) - E4
-    [18,14,8,2,6,12],       // Face 5 (was 2) - F4
-    [7,13,12,6],            // Face 6 (was 0) - F#4
-    [2,0,1,3,7,6],          // Face 7 (was 1) - G4
-    [5,9,3,1],              // Face 8 (was 6) - G#4
-    [19,13,7,3,9,15],       // Face 9 (was 3) - A4
-    [23,22,18,12,13,19],    // Face 10 (was 5) - A#4
-    [21,23,19,15],          // Face 11 (was 9) - B4
-    [21,15,9,5,11,17],      // Face 12 (was 10) - C5
-    [21,17,16,20,22,23]     // Face 13 (was 8) - C#5
+    [4,0,2,8],              // Face 0 - C4
+    [10,11,5,1,0,4],        // Face 1 - C#4
+    [10,16,17,11],          // Face 2  - D4
+    [10,4,8,14,20,16],      // Face 3  - D#4
+    [20,14,18,22],          // Face 4  - E4
+    [18,14,8,2,6,12],       // Face 5  - F4
+    [7,13,12,6],            // Face 6  - F#4
+    [2,0,1,3,7,6],          // Face 7  - G4
+    [5,9,3,1],              // Face 8  - G#4
+    [19,13,7,3,9,15],       // Face 9  - A4
+    [23,22,18,12,13,19],    // Face 10  - A#4
+    [21,23,19,15],          // Face 11  - B4
+    [21,15,9,5,11,17],      // Face 12  - C5
+    [21,17,16,20,22,23]     // Face 13  - C#5
 ];
 
 const PERMUTAHEDRON_EDGES = [
@@ -62,7 +61,6 @@ const PERMUTAHEDRON_EDGES = [
 ];
 
 // Colors for each face (reordered to match new face ordering)
-// Original order: [7, 11, 13, 12, 4, 2, 0, 1, 6, 3, 5, 9, 10, 8]
 const FACE_COLORS = [
     [0.5, 0.0, 1.0],  // purple (was face 7) - C4
     [0.0, 0.5, 1.0],  // sky blue (was face 11) - C#4
@@ -80,11 +78,9 @@ const FACE_COLORS = [
     [0.0, 1.0, 0.5],  // spring green (was face 8) - C#5
 ];
 
-// Face state tracking
 const faceStates = new Array(PERMUTAHEDRON_FACES.length).fill(false);
 let lastToggleTime = 0;
 
-// abcjs synth setup
 let synthControl = null;
 let currentAbcString = '';
 
@@ -107,21 +103,12 @@ const CHROMATIC_FREQUENCIES = [
 ];
 
 // Path through adjacent faces - now simply sequential since faces are reordered
-// Face 0(C4) -> 1(C#4) -> 2(D4) -> 3(D#4) -> 4(E4) -> 5(F4) -> 6(F#4)
-// -> 7(G4) -> 8(G#4) -> 9(A4) -> 10(A#4) -> 11(B4) -> 12(C5) -> 13(C#5)
 const FACE_PATH = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
-// Note frequencies - will be dynamically set when song loads
 const NOTE_FREQUENCIES = new Array(14).fill(0);
-
-// Music code moved to music.js
-// Expose faceStates and updateFaceColors to music.js
 window.faceStates = faceStates;
 window.updateFaceColors = updateFaceColors;
 
-// This conversion now happens inside loadSong after parsing
-
-// Vertex shader
 const vertexShaderSource = `#version 300 es
 precision highp float;
 
@@ -146,7 +133,6 @@ void main() {
 }
 `;
 
-// Fragment shader
 const fragmentShaderSource = `#version 300 es
 precision highp float;
 
@@ -161,7 +147,6 @@ void main() {
     vec3 lightDir = normalize(vec3(1.0, 1.0, 2.0));
     float diff = max(dot(normal, lightDir), 0.0);
 
-    // Apply shading to the color
     vec3 color = vColor * (0.3 + 0.7 * diff);
 
     // Make faces semi-transparent
@@ -177,7 +162,6 @@ void main() {
 }
 `;
 
-// Edge shader
 const edgeVertexShaderSource = `#version 300 es
 precision highp float;
 
@@ -203,7 +187,6 @@ void main() {
 }
 `;
 
-// Compile shader
 function compileShader(source, type) {
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
@@ -218,7 +201,6 @@ function compileShader(source, type) {
     return shader;
 }
 
-// Create program
 function createProgram(vsSource, fsSource) {
     const vs = compileShader(vsSource, gl.VERTEX_SHADER);
     const fs = compileShader(fsSource, gl.FRAGMENT_SHADER);
@@ -239,7 +221,6 @@ function createProgram(vsSource, fsSource) {
 const program = createProgram(vertexShaderSource, fragmentShaderSource);
 const edgeProgram = createProgram(edgeVertexShaderSource, edgeFragmentShaderSource);
 
-// Build geometry
 function buildPermutahedron() {
     const positions = [];
     const normals = [];
@@ -251,7 +232,6 @@ function buildPermutahedron() {
         const baseIndex = positions.length / 3;
         const startVertex = positions.length / 3;
 
-        // Calculate face normal
         const v0 = PERMUTAHEDRON_VERTICES[face[0]];
         const v1 = PERMUTAHEDRON_VERTICES[face[1]];
         const v2 = PERMUTAHEDRON_VERTICES[face[2]];
@@ -266,7 +246,6 @@ function buildPermutahedron() {
         const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
         const normal = len > 0 ? [nx / len, ny / len, nz / len] : [0, 0, 1];
 
-        // Get face color (initially black - off state)
         const faceColor = [0, 0, 0];
 
         face.forEach(vertexIndex => {
@@ -280,7 +259,6 @@ function buildPermutahedron() {
             indices.push(baseIndex, baseIndex + i, baseIndex + i + 1);
         }
 
-        // Store face info for updating colors
         faceInfo.push({
             startVertex: startVertex,
             vertexCount: face.length
@@ -298,7 +276,6 @@ function buildPermutahedron() {
 
 const geometry = buildPermutahedron();
 
-// Create VAO for faces
 const vao = gl.createVertexArray();
 gl.bindVertexArray(vao);
 
@@ -326,7 +303,6 @@ gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geometry.indices, gl.STATIC_DRAW);
 
 gl.bindVertexArray(null);
 
-// Create edge geometry
 function buildEdges() {
     const positions = [];
 
@@ -356,7 +332,6 @@ gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
 
 gl.bindVertexArray(null);
 
-// Update face colors based on state
 function updateFaceColors() {
     const colors = new Float32Array(geometry.colors.length);
 
@@ -377,10 +352,6 @@ function updateFaceColors() {
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
 }
 
-// No longer need custom playback - abcjs handles everything!
-
-// Camera state (spherical coordinates)
-// Zoom out 40% more on mobile (radius 40% larger)
 const isMobile = window.innerWidth <= 768;
 const spherical = {
     radius: isMobile ? 11.2 : 8,
@@ -390,7 +361,6 @@ const spherical = {
 
 let sphericalDelta = { radius: 1 };
 
-// Mouse/touch interaction
 let isDragging = false;
 let lastX = 0;
 let lastY = 0;
@@ -399,7 +369,6 @@ let velocityTheta = 0;
 let velocityPhi = 0;
 let touchStartDist = 0;
 
-// Matrix math
 function mat4Perspective(fovy, aspect, near, far) {
     const f = 1 / Math.tan(fovy / 2);
     const nf = 1 / (near - far);
@@ -441,7 +410,6 @@ function mat4LookAt(eye, target, up) {
     ]);
 }
 
-// Event handlers
 canvas.addEventListener('mousedown', (e) => {
     isDragging = true;
     lastX = e.clientX;
@@ -494,7 +462,6 @@ canvas.addEventListener('wheel', (e) => {
     }
 }, { passive: false });
 
-// Touch events
 canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     const touches = Array.from(e.touches);
@@ -556,7 +523,6 @@ canvas.addEventListener('touchend', () => {
     touchStartDist = 0;
 });
 
-// Resize canvas
 function resizeCanvas() {
     const displayWidth = canvas.clientWidth;
     const displayHeight = canvas.clientHeight;
@@ -567,13 +533,9 @@ function resizeCanvas() {
     }
 }
 
-// Render loop
 function render(currentTime) {
     resizeCanvas();
 
-    // Visual rendering only - abcjs handles audio timing
-
-    // Update camera
     if (!isDragging) {
         spherical.theta += velocityTheta;
         spherical.phi += velocityPhi;
@@ -608,7 +570,6 @@ function render(currentTime) {
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    // Draw faces
     gl.useProgram(program);
 
     gl.uniformMatrix4fv(gl.getUniformLocation(program, 'uProjection'), false, projection);
@@ -619,7 +580,6 @@ function render(currentTime) {
     gl.drawElements(gl.TRIANGLES, geometry.indices.length, gl.UNSIGNED_SHORT, 0);
     gl.bindVertexArray(null);
 
-    // Draw edges
     gl.useProgram(edgeProgram);
 
     gl.uniformMatrix4fv(gl.getUniformLocation(edgeProgram, 'uProjection'), false, projection);

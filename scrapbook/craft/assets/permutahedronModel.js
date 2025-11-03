@@ -154,3 +154,33 @@ export function createPermutahedronEdges(options = {}) {
 
   return new THREE.LineSegments(geometry, material);
 }
+
+/**
+ * Create a complete permutahedron with mesh and edges in a group
+ * @param {Object} options - Options for the permutahedron
+ * @param {number} options.color - Hex color for the mesh material
+ * @param {number} options.edgeColor - Hex color for the edges
+ * @param {boolean} options.wireframe - Whether to render mesh as wireframe
+ * @returns {THREE.Group}
+ */
+export function createPermutahedron(options = {}) {
+  const {
+    color = 0x44aa88,
+    edgeColor = 0x000000,
+    wireframe = false
+  } = options;
+
+  const group = new THREE.Group();
+
+  // Create the solid mesh
+  const mesh = createPermutahedronMesh({ color, wireframe });
+
+  // Create the edges
+  const edges = createPermutahedronEdges({ color: edgeColor });
+
+  // Add both to the group
+  group.add(mesh);
+  group.add(edges);
+
+  return group;
+}

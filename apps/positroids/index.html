@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Planar Graph Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100svh;
+            height: -webkit-fill-available;
+            position: fixed;
+            overflow: hidden;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        #canvas {
+            display: block;
+            width: 100%;
+            height: 100svh;
+            height: -webkit-fill-available;
+            cursor: crosshair;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(30, 30, 30, 0.9);
+            padding: 15px 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            font-size: 14px;
+        }
+
+        .info h2 {
+            margin-bottom: 10px;
+            color: #4a9eff;
+        }
+
+        .info p {
+            margin: 5px 0;
+            color: #b0b0b0;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h2>Planar Graph Editor</h2>
+        <p>Click to add nodes</p>
+        <p id="nodeCount">Nodes: 0</p>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <script src="planarGraph.js"></script>
+    <script src="interaction.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+X:1241
+T:Praeludium (Single Voice)
+T:(Prelude) BWV 938
+C:Johann Sebastian Bach
+O:Germany
+M:C
+L:1/8
+K:Em
+% Combining both voices into chords where they play simultaneously
+% First section
+[E,E][E,G][E,,B][E,,G][z2E]|[E,e][G,2B2][B,e][E,2]|[B,,B][B,d][B,,f][z2d][B,B]|[B,b][^D2f2][FB][Db][B,2]|
+[Eg][Gf][Ee][G=d][Ec][EB]|[CA][Ac][A,e][Cg][Cf][Ce]|[Df][De][Fd][Fc][DB][FA]|[B,G][G,B][B,d][G,=f][B,e][B,d]|
+% Second section
+[Ce][CB,][PA,^f2][CG,][Cg2]|[F,d4][CE,][CD,][Cz2]|[B,g][CA,][MC,f2][CG,][Cg2]|[F,a][Cb][CE,][Cc'2][CD,][Cz2]|
+[G,b][B,2M][F,a2][B,g][E,2]|[F,a][B,2c2][E,B][B,2]|[E,g][B,2M][=D,f2][B,e][^C,2]|[D,f][B,2A2][^C,G][B,2][B,,2]|
+% Third section
+[^C,e][B,2f][D,e][B,d][E,^c]|[D,f][B,2g][E,f][B,e][F,d]|[G,^c][2e][E,d][2c][F,B][2^A]|[1[B,,B6]:|[2[B,,B6]|
+% Repeat section
+:[B,,z][B,^D][B,,F][B,=A][z2F][B,,^D]|[E,,=c2][E,B2][E,,A2-][z2]|[E,A][E,^G][^G,B][B,d][G,B][E,^G]|
+[E,,=f2][E,e2][E,,d2-][z2]|[A,,d][A,,c][B,,B][C,A][D,a2-][E,]|[=F,a][D,=f][E,g][F,a][G,d2-][A,]|
+[B,d][G,B][A,A][B,G][Cg2-][D]|[Eg][Ce][=D][Ef][=F][Gg]|[Ac2][G=f2][=FB2][Ee][EA][Ad]|[EG][Dc][E=F2][DB][CE][EA]|
+[D^G][EA][Ec][EB][E,A][2G]|[A,A4][=F,][E,z2][D,][C,][B,,]|
+% Fourth section
+[A,,z][B,,E][C,A][D,^G][E,A][^F,c]|[D,^F][E,c][^F,E][2c][D2c]|[=G,,B][A,,D][B,,=G][2F][G2B]|[C,E][D,B][E,D][2B][C2B]|
+[F,,A][G,,G][A,,F][2A][E2A]|[B,,^D][^C,A][^D,E][2A][F2A]|[E,G][=C,B][A,,e][2^d][e2f]|[B,,^d][z2B][B,^c][^C^d][^De][f]|
+% Final section
+[Eg][=Df][ge][2a][Ce2]|[Df][=c2F,][B2E,][AG][GB]|[Ce][=d2B,][e2A,][cf][c]|[B,d][E,A][2G][D,F][E2G][E,]|
+[A,c][B,E][A,^D][G,E][F,F][G2]|[E,A][^D,B][E,c][D,A][^C,f2-][B,,]|[E,f][G,,B][2e][B,,g][f2][^d]|[1[E,,e6]:|[2[E,,e6]|]

@@ -17,7 +17,7 @@
             overflow: hidden;
             background: #1a1a1a;
             touch-action: none;
-            font-family: monospace;
+            font-family: system-ui;
         }
 
         canvas {
@@ -59,7 +59,7 @@
             border: 1px solid #555;
             padding: 6px 10px;
             font-size: 13px;
-            font-family: monospace;
+            font-family: system-ui;
             border-radius: 4px;
             cursor: pointer;
             height: 29px;
@@ -80,7 +80,7 @@
             border: none;
             padding: 6px 10px;
             font-size: 13px;
-            font-family: monospace;
+            font-family: system-ui;
             border-radius: 4px;
             cursor: pointer;
             white-space: nowrap;
@@ -100,13 +100,52 @@
             background: #666;
             cursor: not-allowed;
         }
+
+        .start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            cursor: pointer;
+        }
+
+        .start-overlay h1 {
+            color: white;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-family: ui-serif, system-ui;
+        }
+
+        .start-overlay p {
+            color: #aaa;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .start-overlay.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
+    <div class="start-overlay" id="start-overlay">
+        <h1>Click to Start</h1>
+        <p>Click anywhere to begin</p>
+    </div>
     <div class="controls">
         <select id="song-select">
-            <option value="example.abc">Permutahedron Melody</option>
-            <option value="butterfly.abc">Butterfly</option>
+            <option value="cello-suite.abc">Cello Suite No.1</option>
+            <option value="prelude-938.abc">Prelude BWV 938 (2 Voices)</option>
+            <option value="prelude-938-melody.abc">Prelude BWV 938 (Melody)</option>
+            <option value="prelude-938-single.abc">Prelude BWV 938 (Combined)</option>
             <option value="saint-james.abc">Saint James Infirmary</option>
         </select>
         <button id="play-button" disabled>Loading...</button>

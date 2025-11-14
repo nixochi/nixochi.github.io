@@ -10,7 +10,9 @@
         isPlaying: false,
         currentAbcText: '',
         isLoading: false,
-        abortController: null
+        abortController: null,
+        currentNotes: new Set(),
+        updateTimeout: null
     };
 
     const state = window.musicState;
@@ -50,11 +52,10 @@
         const sortedMidiPitches = Array.from(uniqueMidiPitches).sort((a, b) => a - b);
 
         const midiToFace = {};
+        const numFaces = 14; // Number of faces on the permutahedron
 
         sortedMidiPitches.forEach((midiPitch, index) => {
-            if (index < 14) {
-                midiToFace[midiPitch] = index;
-            }
+            midiToFace[midiPitch] = index % numFaces;
         });
 
         state.charToNote = charToNote;
@@ -62,9 +63,31 @@
         return midiToFace;
     }
 
+    function updateDisplay() {
+        if (!window.faceStates) return;
+
+        // Clear all faces
+        window.faceStates.fill(false);
+
+        // Light up currently playing notes
+        state.currentNotes.forEach(midiPitch => {
+            const faceIndex = state.midiToFace[midiPitch];
+            if (faceIndex !== undefined) {
+                window.faceStates[faceIndex] = true;
+            }
+        });
+
+        window.updateFaceColors();
+    }
+
     function eventCallback(ev) {
         if (!ev) {
             // End of song - turn off all faces
+            if (state.updateTimeout) {
+                clearTimeout(state.updateTimeout);
+                state.updateTimeout = null;
+            }
+            state.currentNotes.clear();
             if (window.faceStates) {
                 window.faceStates.fill(false);
                 window.updateFaceColors();
@@ -72,31 +95,31 @@
             return;
         }
 
-        if (window.faceStates) {
-            window.faceStates.fill(false);
+        // Clear current notes - this event marks new notes starting
+        state.currentNotes.clear();
 
-            const currentPitches = [];
-
-            if (typeof ev.startChar === 'number' && state.charToNote) {
-                const noteElement = state.charToNote[ev.startChar];
-                if (noteElement && noteElement.pitches) {
-                    noteElement.pitches.forEach(pitch => {
-                        if (pitch && typeof pitch.pitch === 'number') {
-                            currentPitches.push(pitch.pitch);
-                        }
-                    });
-                }
+        // Add notes from this event
+        if (typeof ev.startChar === 'number' && state.charToNote) {
+            const noteElement = state.charToNote[ev.startChar];
+            if (noteElement && noteElement.pitches) {
+                noteElement.pitches.forEach(pitch => {
+                    if (pitch && typeof pitch.pitch === 'number') {
+                        state.currentNotes.add(pitch.pitch);
+                    }
+                });
             }
-
-            currentPitches.forEach(midiPitch => {
-                const faceIndex = state.midiToFace[midiPitch];
-                if (faceIndex !== undefined) {
-                    window.faceStates[faceIndex] = true;
-                }
-            });
-
-            window.updateFaceColors();
         }
+
+        // Clear existing timeout
+        if (state.updateTimeout) {
+            clearTimeout(state.updateTimeout);
+        }
+
+        // Wait a bit for simultaneous events from other voices
+        state.updateTimeout = setTimeout(() => {
+            updateDisplay();
+            state.updateTimeout = null;
+        }, 5);
     }
 
     async function loadSong(filename) {
@@ -197,6 +220,36 @@
         }
     }
 
+    function pauseMusic() {
+        if (state.synthControl) {
+            try {
+                state.synthControl.pause();
+            } catch (e) {}
+        }
+        if (state.timingCallbacks) {
+            try {
+                state.timingCallbacks.pause();
+            } catch (e) {}
+        }
+        state.isPlaying = false;
+
+        if (state.updateTimeout) {
+            clearTimeout(state.updateTimeout);
+            state.updateTimeout = null;
+        }
+        state.currentNotes.clear();
+
+        if (window.faceStates) {
+            window.faceStates.fill(false);
+            window.updateFaceColors();
+        }
+
+        const playButton = document.getElementById('play-button');
+        if (playButton) {
+            playButton.textContent = 'Play';
+        }
+    }
+
     function stopMusic() {
         if (state.synthControl) {
             try {
@@ -211,6 +264,12 @@
             state.timingCallbacks = null;
         }
         state.isPlaying = false;
+
+        if (state.updateTimeout) {
+            clearTimeout(state.updateTimeout);
+            state.updateTimeout = null;
+        }
+        state.currentNotes.clear();
 
         if (window.faceStates) {
             window.faceStates.fill(false);
@@ -227,7 +286,7 @@
         if (state.isLoading) return;
 
         if (state.isPlaying) {
-            stopMusic();
+            pauseMusic();
         } else {
             playMusic();
         }
@@ -244,26 +303,35 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        waitForABCJS(() => {
-            const songSelect = document.getElementById('song-select');
-            const playButton = document.getElementById('play-button');
+        const startOverlay = document.getElementById('start-overlay');
 
-            if (songSelect) {
-                songSelect.addEventListener('change', (e) => {
-                    loadSong(e.target.value);
+        if (startOverlay) {
+            startOverlay.addEventListener('click', () => {
+                startOverlay.classList.add('hidden');
+
+                waitForABCJS(() => {
+                    const songSelect = document.getElementById('song-select');
+                    const playButton = document.getElementById('play-button');
+
+                    if (songSelect) {
+                        songSelect.addEventListener('change', (e) => {
+                            loadSong(e.target.value);
+                        });
+                    }
+
+                    if (playButton) {
+                        playButton.addEventListener('click', togglePlayPause);
+                    }
+
+                    window.addEventListener('blur', () => {
+                        if (state.isPlaying) {
+                            stopMusic();
+                        }
+                    });
+
+                    loadSong('cello-suite.abc');
                 });
-            }
-
-            if (playButton) {
-                playButton.addEventListener('click', togglePlayPause);
-            }
-
-            window.addEventListener('blur', () => {
-                if (state.isPlaying) {
-                    stopMusic();
-                }
             });
-            loadSong('example.abc');
-        });
+        }
     });
 })();

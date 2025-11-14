@@ -7,64 +7,59 @@
         timingCallbacks: null,
         midiToFace: {},
         charToNote: {},
-        currentSongName: 'example.abc',
         isPlaying: false,
-        currentAbcText: ''
+        currentAbcText: '',
+        isLoading: false,
+        abortController: null
     };
 
     const state = window.musicState;
 
     function buildMidiToFaceMapping(abcString) {
-        try {
-            const tunes = ABCJS.parseOnly(abcString);
+        const tunes = ABCJS.parseOnly(abcString);
 
-            if (!tunes || tunes.length === 0) {
-                console.error('Failed to parse ABC notation');
-                return {};
-            }
+        if (!tunes || tunes.length === 0) {
+            return {};
+        }
 
-            const tune = tunes[0];
+        const tune = tunes[0];
 
-            const uniqueMidiPitches = new Set();
-            const charToNote = {};
+        const uniqueMidiPitches = new Set();
+        const charToNote = {};
 
-            tune.lines.forEach((line) => {
-                if (line.staff) {
-                    line.staff.forEach((staff) => {
-                        staff.voices.forEach((voice) => {
-                            voice.forEach((element) => {
-                                if (element.el_type === 'note' && element.pitches) {
-                                    if (typeof element.startChar === 'number') {
-                                        charToNote[element.startChar] = element;
-                                    }
-
-                                    element.pitches.forEach(pitch => {
-                                        uniqueMidiPitches.add(pitch.pitch);
-                                    });
+        tune.lines.forEach((line) => {
+            if (line.staff) {
+                line.staff.forEach((staff) => {
+                    staff.voices.forEach((voice) => {
+                        voice.forEach((element) => {
+                            if (element.el_type === 'note' && element.pitches) {
+                                if (typeof element.startChar === 'number') {
+                                    charToNote[element.startChar] = element;
                                 }
-                            });
+
+                                element.pitches.forEach(pitch => {
+                                    uniqueMidiPitches.add(pitch.pitch);
+                                });
+                            }
                         });
                     });
-                }
-            });
+                });
+            }
+        });
 
-            const sortedMidiPitches = Array.from(uniqueMidiPitches).sort((a, b) => a - b);
+        const sortedMidiPitches = Array.from(uniqueMidiPitches).sort((a, b) => a - b);
 
-            const midiToFace = {};
+        const midiToFace = {};
 
-            sortedMidiPitches.forEach((midiPitch, index) => {
-                if (index < 14) {
-                    midiToFace[midiPitch] = index;
-                }
-            });
+        sortedMidiPitches.forEach((midiPitch, index) => {
+            if (index < 14) {
+                midiToFace[midiPitch] = index;
+            }
+        });
 
-            state.charToNote = charToNote;
+        state.charToNote = charToNote;
 
-            return midiToFace;
-        } catch (e) {
-            console.error('Error building MIDI mapping:', e);
-            throw e;
-        }
+        return midiToFace;
     }
 
     function eventCallback(ev) {
@@ -93,24 +88,38 @@
                 }
             }
 
-            if (currentPitches.length > 0) {
-                currentPitches.forEach(midiPitch => {
-                    if (state.midiToFace.hasOwnProperty(midiPitch)) {
-                        const faceIndex = state.midiToFace[midiPitch];
-                        window.faceStates[faceIndex] = true;
-                    }
-                });
-            }
+            currentPitches.forEach(midiPitch => {
+                const faceIndex = state.midiToFace[midiPitch];
+                if (faceIndex !== undefined) {
+                    window.faceStates[faceIndex] = true;
+                }
+            });
 
             window.updateFaceColors();
         }
     }
 
     async function loadSong(filename) {
+        if (state.isLoading) {
+            state.abortController?.abort();
+        }
+
+        state.isLoading = true;
+        state.abortController = new AbortController();
+
+        const playButton = document.getElementById('play-button');
+
+        if (playButton) {
+            playButton.disabled = true;
+            playButton.textContent = 'Loading...';
+        }
+
         try {
             stopMusic();
 
-            const response = await fetch(`songs/${filename}`);
+            const response = await fetch(`songs/${filename}`, {
+                signal: state.abortController.signal
+            });
             if (!response.ok) {
                 throw new Error(`Failed to load song: ${response.statusText}`);
             }
@@ -124,38 +133,13 @@
                 window.updateFaceColors();
             }
 
-            state.visualObj = ABCJS.renderAbc("audio", abcText, {
-                add_classes: true
-            })[0];
+            state.visualObj = ABCJS.renderAbc("audio", abcText)[0];
 
-            state.currentSongName = filename;
-
-            const playButton = document.getElementById('play-button');
-            if (playButton) {
-                playButton.textContent = 'Play';
-                playButton.disabled = false;
-            }
-        } catch (error) {
-            console.error('Error loading song:', error);
-        }
-    }
-
-    async function playMusic() {
-        try {
-            if (!state.visualObj || !state.currentAbcText) {
-                console.error('No song loaded');
-                return;
-            }
-
-            if (state.isPlaying) {
-                return;
-            }
-
+            // Initialize and prime the synth immediately
             if (!ABCJS.synth.supportsAudio()) {
-                console.error('Audio not supported in this browser');
-                alert('Audio not supported in this browser');
-                return;
+                throw new Error('Audio not supported in this browser');
             }
+
             state.timingCallbacks = new ABCJS.TimingCallbacks(state.visualObj, {
                 eventCallback: eventCallback
             });
@@ -172,6 +156,33 @@
 
             await state.synthControl.prime();
 
+            if (playButton) {
+                playButton.textContent = 'Play';
+                playButton.disabled = false;
+            }
+        } catch (error) {
+            if (error.name === 'AbortError') return;
+
+            if (playButton) {
+                playButton.textContent = 'Load Failed';
+                playButton.disabled = true;
+            }
+            alert(`Failed to load song: ${error.message}`);
+        } finally {
+            state.isLoading = false;
+        }
+    }
+
+    async function playMusic() {
+        try {
+            if (!state.visualObj || !state.currentAbcText || !state.synthControl) {
+                return;
+            }
+
+            if (state.isPlaying) {
+                return;
+            }
+
             state.timingCallbacks.start();
             await state.synthControl.start();
 
@@ -182,7 +193,6 @@
                 playButton.textContent = 'Pause';
             }
         } catch (error) {
-            console.error('Error playing music:', error);
             alert('Error playing music: ' + error.message);
         }
     }
@@ -191,17 +201,13 @@
         if (state.synthControl) {
             try {
                 state.synthControl.stop();
-            } catch (e) {
-                console.error('Error stopping synth:', e);
-            }
+            } catch (e) {}
             state.synthControl = null;
         }
         if (state.timingCallbacks) {
             try {
                 state.timingCallbacks.stop();
-            } catch (e) {
-                console.error('Error stopping timing:', e);
-            }
+            } catch (e) {}
             state.timingCallbacks = null;
         }
         state.isPlaying = false;
@@ -218,6 +224,8 @@
     }
 
     function togglePlayPause() {
+        if (state.isLoading) return;
+
         if (state.isPlaying) {
             stopMusic();
         } else {
@@ -228,8 +236,7 @@
     function waitForABCJS(callback, attempts = 0) {
         if (typeof ABCJS !== 'undefined') {
             callback();
-        } else if (attempts > 50) { 
-            console.error('ABCJS failed to load after 5 seconds');
+        } else if (attempts > 50) {
             alert('Failed to load music library. Please refresh the page.');
         } else {
             setTimeout(() => waitForABCJS(callback, attempts + 1), 100);
@@ -243,7 +250,6 @@
 
             if (songSelect) {
                 songSelect.addEventListener('change', (e) => {
-                    stopMusic();
                     loadSong(e.target.value);
                 });
             }
@@ -252,18 +258,12 @@
                 playButton.addEventListener('click', togglePlayPause);
             }
 
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden && state.isPlaying) {
-                    stopMusic();
-                }
-            });
-
             window.addEventListener('blur', () => {
                 if (state.isPlaying) {
                     stopMusic();
                 }
             });
-            loadSong(state.currentSongName);
+            loadSong('example.abc');
         });
     });
 })();

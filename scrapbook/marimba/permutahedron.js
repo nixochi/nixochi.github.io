@@ -1,10 +1,6 @@
 const canvas = document.getElementById('canvas');
 const gl = canvas.getContext('webgl2');
 
-if (!gl) {
-    console.error('WebGL2 not supported');
-}
-
 // Permutahedron vertices (4D permutations projected to 3D)
 const PERMUTAHEDRON_VERTICES = [
     [-2.121320343559642,-0.408248290463863,0.577350269189626],
@@ -79,33 +75,6 @@ const FACE_COLORS = [
 ];
 
 const faceStates = new Array(PERMUTAHEDRON_FACES.length).fill(false);
-let lastToggleTime = 0;
-
-let synthControl = null;
-let currentAbcString = '';
-
-// Chromatic note frequencies (C4 to C#5)
-const CHROMATIC_FREQUENCIES = [
-    261.63, // C4
-    277.18, // C#4
-    293.66, // D4
-    311.13, // D#4
-    329.63, // E4
-    349.23, // F4
-    369.99, // F#4
-    392.00, // G4
-    415.30, // G#4
-    440.00, // A4
-    466.16, // A#4
-    493.88, // B4
-    523.25, // C5
-    554.37  // C#5
-];
-
-// Path through adjacent faces - now simply sequential since faces are reordered
-const FACE_PATH = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
-
-const NOTE_FREQUENCIES = new Array(14).fill(0);
 window.faceStates = faceStates;
 window.updateFaceColors = updateFaceColors;
 
@@ -193,7 +162,6 @@ function compileShader(source, type) {
     gl.compileShader(shader);
 
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error('Shader compile error:', gl.getShaderInfoLog(shader));
         gl.deleteShader(shader);
         return null;
     }
@@ -211,7 +179,6 @@ function createProgram(vsSource, fsSource) {
     gl.linkProgram(program);
 
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        console.error('Program link error:', gl.getProgramInfoLog(program));
         return null;
     }
 
@@ -533,7 +500,7 @@ function resizeCanvas() {
     }
 }
 
-function render(currentTime) {
+function render() {
     resizeCanvas();
 
     if (!isDragging) {

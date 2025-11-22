@@ -8,7 +8,8 @@ F:http://abc.musicaviva.com/tunes/bach-johann-sebastian/bwv0938/bwv0938.abc
 V:1 Program 1 6 %Harpsichord
 V:2 Program 1 6 bass %Harpsichord
 M:C
-L:1/8
+L:1/4
+Q: 1/4 = 320
 K:Em
 V:1
 zEGBGE|e2B2e2|^dBdfdB|b2f2b2|gfe=dcB|Acegfe|fedcBA|GBd=fed|

@@ -97,8 +97,10 @@
         }
 
         .controls button:disabled {
-            background: #666;
+            background: #999;
+            color: #ddd;
             cursor: not-allowed;
+            opacity: 0.7;
         }
 
         .start-overlay {
@@ -142,16 +144,16 @@
     </div>
     <div class="controls">
         <select id="song-select">
-            <option value="cello-suite.abc">Cello Suite No.1</option>
-            <option value="prelude-938.abc">Prelude BWV 938 (2 Voices)</option>
-            <option value="prelude-938-melody.abc">Prelude BWV 938 (Melody)</option>
-            <option value="prelude-938-single.abc">Prelude BWV 938 (Combined)</option>
-            <option value="saint-james.abc">Saint James Infirmary</option>
+            <option value="cello-suite.abc">Cello Suite No.1, BWV 1007 - Prelude</option>
+            <option value="prelude-938.abc">Prelude BWV 938</option>
+            <option value="little-figure-g-minor.abc">Little Fugue in G minor, BWV 578</option>
         </select>
-        <button id="play-button" disabled>Loading...</button>
+        <button id="play-button" disabled>Loading</button>
     </div>
     <div id="audio" style="display: none;"></div>
+    <div id="audio-controls" style="display: none;"></div>
     <canvas id="canvas"></canvas>
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/abcjs@6.5.2/abcjs-audio.css">
     <script src="https://cdn.jsdelivr.net/npm/abcjs@6.5.2/dist/abcjs-basic-min.js"></script>
     <script src="permutahedron.js"></script>

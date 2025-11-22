@@ -2,9 +2,8 @@ X:1
 T: Cello Suite No.1, BWV 1007, Prelude
 C: J.S. Bach
 M: 4/4
-L: 1/16
 K:D clef=treble-8
-Q: "Allegro"
+Q: 1/4=220
 (DAf)e fAfA (DAf)e fAfA | (DBg)f gBgB (DBg)f gBgB |
 (Dcg)f gcgc (Dcg)f gcgc | (Ddf)d fdfd (Ddf)d fdfd |
 (DBf)e fdcd Bdcd FA^GF  | (^Gde)d eded (^Gde)d eded |

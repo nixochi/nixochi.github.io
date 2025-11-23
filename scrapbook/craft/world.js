@@ -1,82 +1,171 @@
 import * as THREE from 'three';
-import { createPermutahedron } from './assets/permutahedronModel.js';
+import { PermutahedronGeometry, PermutahedronEdgesGeometry } from './geometry/permutahedronModel.js';
+import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
+import { latticeToPosition } from './utils.js';
+import { RNG } from './rng.js';
 
-/**
- * World class - manages permutahedra placement
- * Extends THREE.Group for easy scene integration
- */
 export class World extends THREE.Group {
-    constructor(size = 5) {
+    /**
+     * @type {{
+     * id: number,
+     * instanceId: number
+     * }[][][]}
+     */
+    data;
+
+
+    params = {
+        seed: 0,
+        terrain: {
+            scale: 30,
+            magnitude: 0.5,
+            offset: 0.2
+        }
+    };
+
+    constructor(width = 5, length = 5, height = 5) {
         super();
-        this.size = size;
-        this.permutahedra = [];
+        this.size = { width, length, height};
+        this.instancedMesh = null;
+        this.data = [];
     }
 
+    generate(){
+        this.generateTerrain();
+        this.generateMeshes();
+    }
+    
     /**
-     * Generate a floor of permutahedra in a BCC lattice pattern
+     * Initialize the world terrain data
      */
-    generate() {
-        // Clear existing permutahedra if any
-        this.permutahedra.forEach(item => {
-            this.remove(item);
-            if (item.geometry) item.geometry.dispose();
-            if (item.material) item.material.dispose();
+    initializeTerrain(){
+        this.data = [];
+        for (let x = 0; x < this.size.width; x++){
+            const slice = [];
+            for (let y = 0; y < this.size.height; y++){
+                const row = [];
+                for (let z = 0; z < this.size.length; z++){
+                    row.push({
+                        id: 0,
+                        instanceId: null
+                    });
+                }
+                slice.push(row);
+            }
+            this.data.push(slice);
+        }
+    }
+
+    generateTerrain(){
+        const rng = new RNG(this.params.seed);
+        this.initializeTerrain();
+        const simplex = new SimplexNoise(rng);
+
+        for (let x = 0; x < this.size.width; x++){
+            for (let z = 0; z < this.size.length; z++){
+                const value = simplex.noise(
+                    x / this.params.terrain.scale,
+                    z / this.params.terrain.scale
+                );
+
+                const scaledNoise = this.params.terrain.offset +
+                    this.params.terrain.magnitude * value;
+
+                let height = Math.floor(this.size.height * scaledNoise);
+                height = Math.max(0, Math.min(height, this.size.height - 1));
+
+                for (let y = 0; y <= height; y++){
+                    this.setBlockId(x, y, z, 1);
+                }
+            }
+        }
+    }
+
+    generateMeshes() {
+        if (this.instancedMesh) {
+            this.remove(this.instancedMesh);
+            this.instancedMesh.geometry.dispose();
+            this.instancedMesh.material.dispose();
+        }
+
+        const count = this.size.width * this.size.length * this.size.height;
+        const geometry = PermutahedronGeometry();
+        const material = new THREE.MeshPhongMaterial({
+            color: 0x44aa88,
+            flatShading: true,
+            side: THREE.DoubleSide
         });
-        this.permutahedra = [];
 
-        const positions = [];
-        const halfSize = this.size;
+        this.instancedMesh = new THREE.InstancedMesh(geometry, material, count);
 
-        // BCC lattice on a floor: single layer (z fixed), points where (x + y + z) is even
-        // We'll use z = 0, so we need x + y to be even
-        for (let xo = 0; xo < 2; xo++) {
-            for (let yo = 0; yo < 2; yo++) {
-                const zo = 0; // Floor layer
+        const matrix = new THREE.Matrix4();
+        let instanceId = 0;
 
-                // Only keep offsets where sum is even (BCC condition)
-                if ((xo + yo + zo) % 2 !== 0) continue;
+        for (let i = 0; i < this.size.width; i++) {
+            for (let j = 0; j < this.size.length; j++) {
+                for (let k = 0; k < this.size.height; k++) {
+                    const block = this.getBlock(i, j, k);
 
-                // Generate lattice points with this offset, stepping by 2
-                for (let x = -halfSize + xo; x <= halfSize; x += 2) {
-                    for (let y = -halfSize + yo; y <= halfSize; y += 2) {
-                        positions.push({ x, y, z: 0 });
+                    if (block && block.id !== 0) {
+                        const pos = latticeToPosition(i, j, k);
+                        matrix.setPosition(pos.x, pos.y, pos.z);
+                        this.instancedMesh.setMatrixAt(instanceId, matrix);
+                        this.setBlockInstanceId(i, j, k, instanceId);
+                        instanceId++;
                     }
                 }
             }
         }
 
-        // Create permutahedra at each position
-        positions.forEach((pos, index) => {
-            // Generate a unique color for each permutahedron using HSL
-            const hue = (index * 137.5) % 360; // Golden angle for nice distribution
-            const color = new THREE.Color().setHSL(hue / 360, 0.7, 0.5);
+        this.instancedMesh.count = instanceId;
 
-            const permutahedron = createPermutahedron({
-                color: color.getHex(),
-                edgeColor: 0x000000
-            });
+        this.instancedMesh.instanceMatrix.needsUpdate = true;
 
-            permutahedron.position.set(pos.x, pos.y, pos.z);
-            permutahedron.scale.setScalar(1.0);
-
-            this.add(permutahedron);
-            this.permutahedra.push(permutahedron);
-        });
-
-        console.log(`Generated floor with ${this.permutahedra.length} permutahedra (${this.size}x${this.size} BCC grid)`);
+        this.add(this.instancedMesh);
 
         return this;
     }
 
-    /**
-     * Clean up resources
-     */
     dispose() {
-        this.permutahedra.forEach(mesh => {
-            mesh.geometry.dispose();
-            mesh.material.dispose();
-            this.remove(mesh);
-        });
-        this.permutahedra = [];
+        if (this.instancedMesh) {
+            this.instancedMesh.geometry.dispose();
+            this.instancedMesh.material.dispose();
+            this.remove(this.instancedMesh);
+            this.instancedMesh = null;
+        }
+    }
+
+    getBlock(x,y,z){
+        if (this.inBounds(x,y,z)){
+            return this.data[x][y][z]
+        }
+        else{
+            return null;
+        }
+    }
+
+    inBounds(x,y,z){
+        if (x >= 0 && x < this.size.width &&
+            y >= 0 && y < this.size.height &&
+            z >= 0 && z < this.size.length){
+            return true;
+        }
+        else{
+            return false;
+        }
+    }
+
+    setBlockId(x,y,z,id){
+        if (this.inBounds(x,y,z)){
+            this.data[x][y][z].id = id;
+        }
+    }
+    
+    setBlockInstanceId(x,y,z,instanceId){
+        if (this.inBounds(x,y,z)){
+            this.data[x][y][z].instanceId = instanceId;
+        }
     }
 }
+
+

@@ -1,32 +1,33 @@
 import * as THREE from 'three';
+import { latticeToPosition } from '../utils.js';
 
-// Permutahedron polytope data
+// Truncated octahedron (BCC Voronoi cell) - all permutations of (±2, ±1, 0)
 const permutahedronData = {
   "vertices": [
-    [1,0.5,0],
-    [1,-0.5,0],
-    [-1,0.5,0],
-    [-1,-0.5,0],
-    [1,0,0.5],
-    [1,0,-0.5],
-    [-1,0,0.5],
-    [-1,0,-0.5],
-    [0.5,1,0],
-    [0.5,-1,0],
-    [-0.5,1,0],
-    [-0.5,-1,0],
-    [0.5,0,1],
-    [0.5,0,-1],
-    [-0.5,0,1],
-    [-0.5,0,-1],
-    [0,1,0.5],
-    [0,1,-0.5],
-    [0,-1,0.5],
-    [0,-1,-0.5],
-    [0,0.5,1],
-    [0,0.5,-1],
-    [0,-0.5,1],
-    [0,-0.5,-1]
+    [2,1,0],
+    [2,-1,0],
+    [-2,1,0],
+    [-2,-1,0],
+    [2,0,1],
+    [2,0,-1],
+    [-2,0,1],
+    [-2,0,-1],
+    [1,2,0],
+    [1,-2,0],
+    [-1,2,0],
+    [-1,-2,0],
+    [1,0,2],
+    [1,0,-2],
+    [-1,0,2],
+    [-1,0,-2],
+    [0,2,1],
+    [0,2,-1],
+    [0,-2,1],
+    [0,-2,-1],
+    [0,1,2],
+    [0,1,-2],
+    [0,-1,2],
+    [0,-1,-2]
   ],
   "faces": [
     [15,21,13,23],
@@ -121,24 +122,26 @@ export function createPermutahedronMesh(options = {}) {
 }
 
 /**
- * Create a wireframe representation of the permutahedron edges
- * @param {Object} options - Options for the edges
- * @param {number} options.color - Hex color for the edges
- * @returns {THREE.LineSegments}
+ * Create BufferGeometry for permutahedron edges
+ * Extracts edges from face data
+ * @returns {THREE.BufferGeometry}
  */
-export function createPermutahedronEdges(options = {}) {
-  const { color = 0x000000 } = options;
+export function PermutahedronEdgesGeometry() {
+  const edgeSet = new Set();
 
-  const edges = [
-    [15,21], [13,21], [13,23], [15,23],
-    [12,20], [14,20], [14,22], [12,22],
-    [1,5], [1,9], [9,19], [19,23], [5,13],
-    [8,17], [0,8], [0,5], [17,21],
-    [3,11], [3,7], [7,15], [11,19],
-    [9,18], [11,18], [3,6], [18,22], [6,14],
-    [2,6], [2,7], [4,12], [1,4], [0,4],
-    [10,17], [2,10], [8,16], [10,16], [16,20]
-  ];
+  // Extract edges from each face
+  for (const face of permutahedronData.faces) {
+    for (let i = 0; i < face.length; i++) {
+      const v1 = face[i];
+      const v2 = face[(i + 1) % face.length];
+      // Store edge with smaller index first for uniqueness
+      const edge = v1 < v2 ? `${v1},${v2}` : `${v2},${v1}`;
+      edgeSet.add(edge);
+    }
+  }
+
+  // Convert to array of [start, end] pairs
+  const edges = Array.from(edgeSet).map(e => e.split(',').map(Number));
 
   const positions = [];
   for (const [start, end] of edges) {
@@ -150,8 +153,19 @@ export function createPermutahedronEdges(options = {}) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
 
-  const material = new THREE.LineBasicMaterial({ color: color });
+  return geometry;
+}
 
+/**
+ * Create a wireframe representation of the permutahedron edges
+ * @param {Object} options - Options for the edges
+ * @param {number} options.color - Hex color for the edges
+ * @returns {THREE.LineSegments}
+ */
+export function createPermutahedronEdges(options = {}) {
+  const { color = 0x000000 } = options;
+  const geometry = PermutahedronEdgesGeometry();
+  const material = new THREE.LineBasicMaterial({ color: color });
   return new THREE.LineSegments(geometry, material);
 }
 
@@ -161,26 +175,32 @@ export function createPermutahedronEdges(options = {}) {
  * @param {number} options.color - Hex color for the mesh material
  * @param {number} options.edgeColor - Hex color for the edges
  * @param {boolean} options.wireframe - Whether to render mesh as wireframe
+ * @param {Object} options.latticePosition - BCC lattice coordinates {a, b, c}
  * @returns {THREE.Group}
  */
 export function createPermutahedron(options = {}) {
   const {
     color = 0x44aa88,
     edgeColor = 0x000000,
-    wireframe = false
+    wireframe = false,
+    latticePosition = { i: 0, j: 0, k: 0 }
   } = options;
 
   const group = new THREE.Group();
 
-  // Create the solid mesh
-  const mesh = createPermutahedronMesh({ color, wireframe });
-
-  // Create the edges
+  const mesh = createPermutahedronMesh({ color, wireframe: false });
   const edges = createPermutahedronEdges({ color: edgeColor });
 
-  // Add both to the group
+  if (wireframe) {
+    mesh.visible = false;
+  }
+
   group.add(mesh);
   group.add(edges);
+
+  const { i, j, k } = latticePosition;
+  const pos = latticeToPosition(i, j, k);
+  group.position.set(pos.x, pos.y, pos.z);
 
   return group;
 }

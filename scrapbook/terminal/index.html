@@ -47,6 +47,14 @@
         box-sizing: border-box;
       }
 
+      /* Hide xterm scrollbar */
+      .xterm-viewport {
+        overflow: hidden !important;
+      }
+      .xterm-viewport::-webkit-scrollbar {
+        display: none;
+      }
+
       #terminal.permutahedron-active {
         cursor: grab;
         touch-action: none;
@@ -228,7 +236,8 @@
         cursorBlink: true,
         fontSize: fontSize,
         cols: cols,
-        rows: rows
+        rows: rows,
+        scrollback: 0
       });
       term.open(document.getElementById('terminal'));
 

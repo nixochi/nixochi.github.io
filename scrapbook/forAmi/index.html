@@ -1,0 +1,62 @@
+<!--#set var="TITLE_SUFFIX" value=" — for Ami" -->
+<!--#set var="DESCRIPTION" value="Projects for Ami." -->
+<!--#set var="STYLES_PATH" value="../../styles.css" -->
+<!--#set var="SCRIPT_PATH" value="../../script.js" -->
+<!--#set var="HOME_PATH" value="../../index.html" -->
+<!--#set var="PROJECTS_PATH" value="../../projects.html" -->
+<!--#set var="APPLETS_PATH" value="../../applets.html" -->
+<!--#set var="SCRAPBOOK_PATH" value="../../scrapbook.html" -->
+<!--#set var="WRITINGS_PATH" value="../../writings.html" -->
+<!--#include virtual="../../shared/header.html" -->
+
+  <main id="main">
+    <div class="wrapper prose">
+      <h1>for Ami</h1>
+
+      <div class="applet-row">
+        <div class="applet-info">
+          <div class="applet-name"><a href="climate_showcase/climate_showcase.html">climate showcase</a></div>
+          <div class="applet-text">WebTeX climate visualization with before/after comparisons.</div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <style>
+    .applet-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .applet-row:last-child { border-bottom: none; }
+    .applet-info { flex: 1; }
+    .applet-name {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    .applet-name a {
+      color: #4a9eff;
+      text-decoration: none;
+    }
+    .applet-name a:hover {
+      text-decoration: underline;
+    }
+    .applet-text {
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .applet-link {
+      flex-shrink: 0;
+      margin-left: 16px;
+      font-size: 14px;
+      text-decoration: none;
+    }
+    .applet-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+
+<!--#include virtual="../../shared/footer.html" -->

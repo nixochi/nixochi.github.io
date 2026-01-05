@@ -1,19 +1,10 @@
-
-
-
-
-
-
-
-
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>xochi — scrapbook</title>
-  <meta name="description" content="Sketches and fragments." />
+  <meta name="description" content="sketches." />
   <style>
 :root {
   --bg:     #161617;  
@@ -137,27 +128,26 @@ footer small {
     </div>
   </header>
 
-  <main id="main">
-    <div class="wrapper prose">
-      <h2>sketches of a permutahedron</h2>
-      <div class="grid cols-3" style="margin-top: 16px;">
-        <div class="entry-name"><a href="scrapbook/nested/">nested</a></div>
-        <div class="entry-name"><a href="scrapbook/rain/">rain</a></div>
-        <div class="entry-name"><a href="scrapbook/life/">life</a></div>
-        <div class="entry-name"><a href="scrapbook/lattice/">lattice</a></div>
-        <div class="entry-name"><a href="scrapbook/terminal/">terminal</a></div>
-        <div class="entry-name"><a href="scrapbook/bach/">bach</a></div>
-      </div>
-
-
-      <hr>
-      <h2>client-side image processing</h2>
-      <div class="grid cols-2" style="margin-top: 16px;">
-          <div class="entry-name"><a href="scrapbook/binning-live/">live color binning</a></div>
-      </div>
-      <ht></ht>
+<main id="main">
+  <div class="wrapper prose">
+    <h2>sketches of a permutahedron</h2>
+    <div class="grid cols-3" style="margin-top: 16px;">
+      <div class="entry-name"><a href="scrapbook/nested/">nested</a></div>
+      <div class="entry-name"><a href="scrapbook/rain/">rain</a></div>
+      <div class="entry-name"><a href="scrapbook/life/">life</a></div>
+      <div class="entry-name"><a href="scrapbook/lattice/">lattice</a></div>
+      <div class="entry-name"><a href="scrapbook/terminal/">terminal</a></div>
+      <div class="entry-name"><a href="scrapbook/bach/">bach</a></div>
     </div>
-  </main>
+
+
+    <hr>
+    <h2>client-side image processing</h2>
+    <div class="grid cols-2" style="margin-top: 16px;">
+        <div class="entry-name"><a href="scrapbook/binning-live/">live color binning</a></div>
+    </div>
+  </div>
+</main>
 
   <footer>
     <div class="wrapper">
@@ -166,31 +156,22 @@ footer small {
   </footer>
 
   <script src="script.js" defer></script>
-</body><script>
+<script>
 document.addEventListener('DOMContentLoaded', function() {
-    const vibrantColors = [
-        '#0066ff', '#ff6b35', '#4ecdc4', '#ff0080', '#00ff80', '#8000ff',
-        '#ff4040', '#00bfff', '#ff8c00', '#32cd32', '#ff1493', '#00ced1',
-        '#ff6347', '#9370db', '#ff69b4', '#00ff7f', '#ffd700', '#ff4500',
-        '#7fff00', '#dc143c', '#00ffff', '#ff00ff', '#adff2f', '#ff7f50',
-        '#da70d6', '#40e0d0', '#ee82ee', '#ffa500', '#1e90ff', '#ff20b2',
-        '#39ff14', '#bf00ff', '#ff073a', '#ffff00', '#00e6ff'
-    ];
-
+    const vibrantColors = ["#0066ff", "#ff6b35", "#4ecdc4", "#ff0080", "#00ff80", "#8000ff", "#ff4040", "#00bfff", "#ff8c00", "#32cd32", "#ff1493", "#00ced1", "#ff6347", "#9370db", "#ff69b4", "#00ff7f", "#ffd700", "#ff4500", "#7fff00", "#dc143c", "#00ffff", "#ff00ff", "#adff2f", "#ff7f50", "#da70d6", "#40e0d0", "#ee82ee", "#ffa500", "#1e90ff", "#ff20b2", "#39ff14", "#bf00ff", "#ff073a", "#ffff00", "#00e6ff"];
     const xochiWords = document.querySelectorAll('.xochi-word');
     const usedColors = [];
-
     xochiWords.forEach(word => {
         let availableColors = vibrantColors.filter(c => !usedColors.slice(-5).includes(c));
         if (availableColors.length < 3) {
             usedColors.length = 0;
             availableColors = vibrantColors;
         }
-
         const color = availableColors[Math.floor(Math.random() * availableColors.length)];
         usedColors.push(color);
         word.style.color = color;
     });
 });
 </script>
+</body>
 </html>

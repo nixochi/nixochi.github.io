@@ -1,19 +1,10 @@
-
-
-
-
-
-
-
-
-
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>xochi — for Ami</title>
-  <meta name="description" content="Projects for Ami." />
+  <meta name="description" content="4444." />
   <style>
 :root {
   --bg:     #161617;  
@@ -127,7 +118,7 @@ footer small {
 
   <header class="header">
     <div class="wrapper nav" role="navigation" aria-label="primary">
-      <a href="../../index.html" class="xochi" data-nav>xochi</a>
+      <a href="../../index.html" class="xochi" data-nav><span class="xochi-word">xochi</span></a>
       <nav class="links">
         <a href="../../projects.html" data-nav>projects</a>
         <a href="../../applets.html" data-nav>applets</a>
@@ -137,73 +128,90 @@ footer small {
     </div>
   </header>
 
-  <main id="main">
-    <div class="wrapper prose">
-      <h1>4 Ami</h1>
+<main id="main">
+  <div class="wrapper prose">
+    <h1>4 Ami</h1>
 
-      <div class="applet-row">
-        <div class="applet-info">
-          <div class="applet-name"><a href="climate_showcase/climate_showcase.html">climate showcase</a></div>
-          <div class="applet-text">
-            the first component shows what an interactive chart could be like. try pressing the dots underneath the main chart and changing the endpoints of the line below the chart.
-            <br><br>
-            the final component is a proof-of-concept and should be awkwardly ignored.
-          </div>
+    <div class="applet-row">
+      <div class="applet-info">
+        <div class="applet-name"><a href="climate_showcase/climate_showcase.html">climate showcase</a></div>
+        <div class="applet-text">
+          the first component shows what an interactive chart could be like. try pressing the dots underneath the main chart and changing the endpoints of the line below the chart.
+          <br><br>
+          the final component is a proof-of-concept and should be awkwardly ignored.
         </div>
       </div>
-
-      <div class="applet-row">
-        <div class="applet-info">
-          <div class="applet-name"><a href="polytopes/polytopes.html">interactive polytopes</a></div>
-          <div class="applet-text">a simple typical example in math.</div>
-        </div>
-      </div>
-
     </div>
-  </main>
 
-  <style>
-    .applet-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 12px 0;
-      border-bottom: 1px solid var(--line);
-    }
-    .applet-row:last-child { border-bottom: none; }
-    .applet-info { flex: 1; }
-    .applet-name {
-      font-weight: 500;
-      margin-bottom: 2px;
-    }
-    .applet-name a {
-      color: #4a9eff;
-      text-decoration: none;
-    }
-    .applet-name a:hover {
-      text-decoration: underline;
-    }
-    .applet-text {
-      font-size: 14px;
-      color: var(--muted);
-    }
-    .applet-link {
-      flex-shrink: 0;
-      margin-left: 16px;
-      font-size: 14px;
-      text-decoration: none;
-    }
-    .applet-link:hover {
-      text-decoration: underline;
-    }
-  </style>
+    <div class="applet-row">
+      <div class="applet-info">
+        <div class="applet-name"><a href="polytopes/polytopes.html">interactive polytopes</a></div>
+        <div class="applet-text">a simple typical example in math.</div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<style>
+  .applet-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .applet-row:last-child { border-bottom: none; }
+  .applet-info { flex: 1; }
+  .applet-name {
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+  .applet-name a {
+    color: #4a9eff;
+    text-decoration: none;
+  }
+  .applet-name a:hover {
+    text-decoration: underline;
+  }
+  .applet-text {
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .applet-link {
+    flex-shrink: 0;
+    margin-left: 16px;
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .applet-link:hover {
+    text-decoration: underline;
+  }
+</style>
 
   <footer>
     <div class="wrapper">
-      <small>by xochi</small>
+      <small>by <span class="xochi-word">xochi</span></small>
     </div>
   </footer>
 
   <script src="../../script.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const vibrantColors = ["#0066ff", "#ff6b35", "#4ecdc4", "#ff0080", "#00ff80", "#8000ff", "#ff4040", "#00bfff", "#ff8c00", "#32cd32", "#ff1493", "#00ced1", "#ff6347", "#9370db", "#ff69b4", "#00ff7f", "#ffd700", "#ff4500", "#7fff00", "#dc143c", "#00ffff", "#ff00ff", "#adff2f", "#ff7f50", "#da70d6", "#40e0d0", "#ee82ee", "#ffa500", "#1e90ff", "#ff20b2", "#39ff14", "#bf00ff", "#ff073a", "#ffff00", "#00e6ff"];
+    const xochiWords = document.querySelectorAll('.xochi-word');
+    const usedColors = [];
+    xochiWords.forEach(word => {
+        let availableColors = vibrantColors.filter(c => !usedColors.slice(-5).includes(c));
+        if (availableColors.length < 3) {
+            usedColors.length = 0;
+            availableColors = vibrantColors;
+        }
+        const color = availableColors[Math.floor(Math.random() * availableColors.length)];
+        usedColors.push(color);
+        word.style.color = color;
+    });
+});
+</script>
 </body>
 </html>

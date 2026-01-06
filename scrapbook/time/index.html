@@ -1,103 +1,5 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
-  <title>Time - Hourglass</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html, body {
-      height: 100vh;
-      overflow: hidden;
-      background: #0a0a0a;
-    }
-
-    canvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-    }
-
-    .controls {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      z-index: 100;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    select {
-      background: rgba(20, 20, 20, 0.9);
-      color: #f0f0f0;
-      border: 1px solid #444;
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-size: 14px;
-      font-family: system-ui, -apple-system, sans-serif;
-      cursor: pointer;
-      outline: none;
-    }
-
-    select:hover {
-      border-color: #666;
-    }
-
-    select:focus {
-      border-color: #888;
-    }
-
-    .checkbox-label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: #f0f0f0;
-      font-size: 14px;
-      font-family: system-ui, -apple-system, sans-serif;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    input[type="checkbox"] {
-      cursor: pointer;
-      width: 16px;
-      height: 16px;
-    }
-  </style>
-</head>
-<body>
-  <canvas id="canvas"></canvas>
-
-  <div class="controls">
-    <select id="curveType">
-      <option value="0">Linear</option>
-      <option value="1">Ease In (Gravity)</option>
-      <option value="2">Ease Out</option>
-      <option value="3">Ease In-Out (S-Curve)</option>
-      <option value="4">Spiral Vortex</option>
-      <option value="5">Bounce</option>
-      <option value="6">Converge to Center</option>
-    </select>
-    <select id="colorScheme">
-      <option value="0">Rainbow Y-Gradient</option>
-      <option value="1">Face Colors</option>
-      <option value="2">Monochrome</option>
-      <option value="3">Hot/Cold Gradient</option>
-      <option value="4">Pastel Rainbow</option>
-    </select>
-    <label class="checkbox-label">
-      <input type="checkbox" id="showEdges" checked>
-      <span>Show Edges</span>
-    </label>
-  </div>
-
-  <script type="module">
+<!DOCTYPE html><html lang="en" data-astro-cid-bik3twpp> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"><title>Time - Hourglass</title><style>[data-astro-cid-bik3twpp]{margin:0;padding:0;box-sizing:border-box}html,body{height:100vh;overflow:hidden;background:#0a0a0a}canvas[data-astro-cid-bik3twpp]{display:block;width:100vw;height:100vh}.controls[data-astro-cid-bik3twpp]{position:absolute;top:20px;left:20px;z-index:100;display:flex;flex-direction:column;gap:10px}select[data-astro-cid-bik3twpp]{background:#141414e6;color:#f0f0f0;border:1px solid #444;border-radius:6px;padding:8px 12px;font-size:14px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer;outline:none}select[data-astro-cid-bik3twpp]:hover{border-color:#666}select[data-astro-cid-bik3twpp]:focus{border-color:#888}.checkbox-label[data-astro-cid-bik3twpp]{display:flex;align-items:center;gap:8px;color:#f0f0f0;font-size:14px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer;user-select:none}input[data-astro-cid-bik3twpp][type=checkbox]{cursor:pointer;width:16px;height:16px}
+</style></head> <body data-astro-cid-bik3twpp> <canvas id="canvas" data-astro-cid-bik3twpp></canvas> <div class="controls" data-astro-cid-bik3twpp> <select id="curveType" data-astro-cid-bik3twpp> <option value="0" data-astro-cid-bik3twpp>Linear</option> <option value="1" data-astro-cid-bik3twpp>Ease In (Gravity)</option> <option value="2" data-astro-cid-bik3twpp>Ease Out</option> <option value="3" data-astro-cid-bik3twpp>Ease In-Out (S-Curve)</option> <option value="4" data-astro-cid-bik3twpp>Spiral Vortex</option> <option value="5" data-astro-cid-bik3twpp>Bounce</option> <option value="6" data-astro-cid-bik3twpp>Converge to Center</option> </select> <select id="colorScheme" data-astro-cid-bik3twpp> <option value="0" data-astro-cid-bik3twpp>Rainbow Y-Gradient</option> <option value="1" data-astro-cid-bik3twpp>Face Colors</option> <option value="2" data-astro-cid-bik3twpp>Monochrome</option> <option value="3" data-astro-cid-bik3twpp>Hot/Cold Gradient</option> <option value="4" data-astro-cid-bik3twpp>Pastel Rainbow</option> </select> <label class="checkbox-label" data-astro-cid-bik3twpp> <input type="checkbox" id="showEdges" checked data-astro-cid-bik3twpp> <span data-astro-cid-bik3twpp>Show Edges</span> </label> </div> <script type="module">
     // === INLINE OBJ DATA ===
     const PERMUTAHEDRON_OBJ = `# Generated OBJ for Permutahedron (scaled by 15.0)
 o Permutahedron
@@ -1102,6 +1004,5 @@ f 17 21 13 5 1 9`;
     showEdgesCheckbox.addEventListener('change', (e) => {
       renderer.showEdges = e.target.checked;
     });
-  </script>
-</body>
-</html>
+  </script> <script>document.addEventListener('DOMContentLoaded',function(){const c=["#0066ff","#ff6b35","#4ecdc4","#ff0080","#00ff80","#8000ff","#ff4040","#00bfff","#ff8c00","#32cd32","#ff1493","#00ced1","#ff6347","#9370db","#ff69b4","#00ff7f","#ffd700","#ff4500","#7fff00","#dc143c","#00ffff","#ff00ff","#adff2f","#ff7f50","#da70d6","#40e0d0","#ee82ee","#ffa500","#1e90ff","#ff20b2","#39ff14","#bf00ff","#ff073a","#ffff00","#00e6ff"],u=[];document.querySelectorAll('.xochi-word').forEach(w=>{let a=c.filter(x=>!u.slice(-5).includes(x));if(a.length<3){u.length=0;a=c}const col=a[Math.floor(Math.random()*a.length)];u.push(col);w.style.color=col})})</script>
+</body> </html>

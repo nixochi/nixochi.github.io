@@ -1,29 +1,75 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>My Website</title>
-    <link rel="stylesheet" href="./style.css">
-    <link rel="icon" href="./favicon.ico" type="image/x-icon">
-    <script type="importmap">
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="X-UA-Compatible" content="ie=edge"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0"><title>My Website</title><script type="importmap">
       {
         "imports": {
           "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
           "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
         }
       }
-    </script>
-  </head>
-  <body>
-    <script type="module">
-      import { setupDebugConsole } from './console.js';
-      setupDebugConsole();
-    </script>
-    <script type="module" src="index.js"></script>
-  </body>
-</html>
+    </script><style>body{margin:0}
+</style></head> <body> <script type="module" src="/_astro/index.astro_astro_type_script_index_0_lang.CSTWxKYQ.js"></script> <script type="module">function s(){const i=document.createElement("style");i.textContent=`
+    #debug-console {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      width: 400px;
+      max-height: 300px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #0f0;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      padding: 10px;
+      overflow-y: auto;
+      border: 1px solid #333;
+      border-radius: 5px;
+      z-index: 10000;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    #debug-console .log {
+      color: #0f0;
+      margin: 2px 0;
+    }
+    #debug-console .error {
+      color: #f00;
+      margin: 2px 0;
+      font-weight: bold;
+    }
+    #debug-console .warn {
+      color: #ff0;
+      margin: 2px 0;
+    }
+    #debug-console .clear-btn {
+      position: absolute;
+      top: 5px;
+      right: 50px;
+      background: #333;
+      color: #fff;
+      border: none;
+      padding: 2px 8px;
+      cursor: pointer;
+      font-size: 10px;
+      border-radius: 3px;
+    }
+    #debug-console .clear-btn:hover {
+      background: #555;
+    }
+    #debug-console .copy-btn {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: #333;
+      color: #fff;
+      border: none;
+      padding: 2px 8px;
+      cursor: pointer;
+      font-size: 10px;
+      border-radius: 3px;
+    }
+    #debug-console .copy-btn:hover {
+      background: #555;
+    }
+  `,document.head.appendChild(i);const c=document.createElement("div");c.id="debug-console",c.innerHTML=`
+    <button class="clear-btn" onclick="document.getElementById('debug-log').innerHTML = ''">Clear</button>
+    <button class="copy-btn" onclick="copyDebugLog()">Copy</button>
+    <div id="debug-log"></div>
+  `,document.body.appendChild(c);const r=document.getElementById("debug-log"),d=console.log,l=console.error,a=console.warn;function e(o,n="log"){const t=document.createElement("div");t.className=n,t.textContent=`[${new Date().toLocaleTimeString()}] ${o}`,r.appendChild(t),r.scrollTop=r.scrollHeight}window.copyDebugLog=function(){const o=r.innerText;navigator.clipboard.writeText(o).then(()=>{const n=document.querySelector(".copy-btn"),t=n.textContent;n.textContent="Copied!",setTimeout(()=>{n.textContent=t},1e3)})},console.log=function(...o){d.apply(console,o),e(o.join(" "),"log")},console.error=function(...o){l.apply(console,o),e(o.join(" "),"error")},console.warn=function(...o){a.apply(console,o),e(o.join(" "),"warn")},window.addEventListener("error",o=>{e(`ERROR: ${o.message} at ${o.filename}:${o.lineno}`,"error")}),window.addEventListener("unhandledrejection",o=>{e(`PROMISE REJECTION: ${o.reason}`,"error")})}s();</script> <script>document.addEventListener('DOMContentLoaded',function(){const c=["#0066ff","#ff6b35","#4ecdc4","#ff0080","#00ff80","#8000ff","#ff4040","#00bfff","#ff8c00","#32cd32","#ff1493","#00ced1","#ff6347","#9370db","#ff69b4","#00ff7f","#ffd700","#ff4500","#7fff00","#dc143c","#00ffff","#ff00ff","#adff2f","#ff7f50","#da70d6","#40e0d0","#ee82ee","#ffa500","#1e90ff","#ff20b2","#39ff14","#bf00ff","#ff073a","#ffff00","#00e6ff"],u=[];document.querySelectorAll('.xochi-word').forEach(w=>{let a=c.filter(x=>!u.slice(-5).includes(x));if(a.length<3){u.length=0;a=c}const col=a[Math.floor(Math.random()*a.length)];u.push(col);w.style.color=col})})</script>
+</body> </html>

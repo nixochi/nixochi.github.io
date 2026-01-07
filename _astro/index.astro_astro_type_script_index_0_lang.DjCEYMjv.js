@@ -1,0 +1,193 @@
+function X(i,t){for(i=Math.abs(i),t=Math.abs(t);t!==0;)[i,t]=[t,i%t];return i}class Y{constructor(t){this.gl=t,this.program=null,this.transformFeedback=null,this.indexBuffer=null,this.outBuffer=null,this.maxD=8192,this.normalize=!1}init(){const t=this.gl,e=`#version 300 es
+precision highp float;
+precision highp int;
+
+in uint index;
+
+uniform uint n;
+uniform uint w;
+uniform int d;
+uniform int normalize; // 0 or 1
+
+out vec2 position;
+
+const float TWO_PI = 6.283185307179586;
+const int MAX_D = ${this.maxD};
+
+// Modular multiplication: (a * b) mod n without overflow for n up to ~2^24.
+// 7-bit chunk decomposition (safe for n <= 10,000,000).
+uint modmul(uint a, uint b, uint nn) {
+  uint a0 = a & 127u;
+  uint a1 = (a >> 7) & 127u;
+  uint a2 = (a >> 14) & 127u;
+  uint a3 = a >> 21;
+
+  uint t0 = (a0 * b) % nn;
+
+  uint t1 = ((a1 * b) % nn * 128u) % nn;
+
+  uint t2 = ((a2 * b) % nn * 128u) % nn;
+       t2 = (t2 * 128u) % nn;
+
+  uint t3 = ((a3 * b) % nn * 128u) % nn;
+       t3 = (t3 * 128u) % nn;
+       t3 = (t3 * 128u) % nn;
+
+  return ((t0 + t1) % nn + (t2 + t3) % nn) % nn;
+}
+
+void main() {
+  uint k = index;
+
+  // wj = w^j mod n, starting with w^0 = 1
+  uint wj = 1u;
+
+  float sumX = 0.0;
+  float sumY = 0.0;
+
+  // Bounded loop for WebGL2 driver compatibility
+  for (int j = 0; j < MAX_D; j++) {
+    if (j >= d) break;
+
+    // idx = (w^j * k) mod n
+    uint idx = modmul(wj, k, n);
+
+    // angle in [0, 2pi)
+    float angle = TWO_PI * (float(idx) / float(n));
+    sumX += cos(angle);
+    sumY += sin(angle);
+
+    // advance wj <- (wj * w) mod n
+    wj = modmul(wj, w, n);
+  }
+
+  if (normalize != 0 && d > 0) {
+    float invd = 1.0 / float(d);
+    sumX *= invd;
+    sumY *= invd;
+  }
+
+  position = vec2(sumX, sumY);
+
+  // Rasterization is discarded; gl_Position is irrelevant but required.
+  gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+}
+`,n=`#version 300 es
+precision mediump float;
+out vec4 fragColor;
+void main() { fragColor = vec4(0.0); }
+`,s=(c,r)=>{const u=t.createShader(c);if(t.shaderSource(u,r),t.compileShader(u),!t.getShaderParameter(u,t.COMPILE_STATUS)){const l=t.getShaderInfoLog(u)||"(no log)";throw t.deleteShader(u),new Error(`Shader compile error: ${l}`)}return u},a=s(t.VERTEX_SHADER,e),d=s(t.FRAGMENT_SHADER,n);if(this.program=t.createProgram(),t.attachShader(this.program,a),t.attachShader(this.program,d),t.transformFeedbackVaryings(this.program,["position"],t.SEPARATE_ATTRIBS),t.linkProgram(this.program),t.deleteShader(a),t.deleteShader(d),!t.getProgramParameter(this.program,t.LINK_STATUS)){const c=t.getProgramInfoLog(this.program)||"(no log)";throw t.deleteProgram(this.program),this.program=null,new Error(`Program link error: ${c}`)}return this.transformFeedback=t.createTransformFeedback(),this}run(t,o){if(X(t,o)!==1)throw new Error("n and w are not coprime");const e=this.gl,n=this.computeOrder(t,o);if(n>this.maxD)throw new Error(`d=${n} exceeds MAX_D=${this.maxD}. Increase maxD (and re-init) or use chunked accumulation.`);this.indexBuffer&&e.deleteBuffer(this.indexBuffer);const s=new Uint32Array(t);for(let g=0;g<t;g++)s[g]=g;this.indexBuffer=e.createBuffer(),e.bindBuffer(e.ARRAY_BUFFER,this.indexBuffer),e.bufferData(e.ARRAY_BUFFER,s,e.STATIC_DRAW),this.outBuffer&&e.deleteBuffer(this.outBuffer),this.outBuffer=e.createBuffer(),e.bindBuffer(e.ARRAY_BUFFER,this.outBuffer),e.bufferData(e.ARRAY_BUFFER,t*2*4,e.STATIC_DRAW),e.useProgram(this.program);const a=e.getUniformLocation(this.program,"n"),d=e.getUniformLocation(this.program,"w"),c=e.getUniformLocation(this.program,"d"),r=e.getUniformLocation(this.program,"normalize");e.uniform1ui(a,t>>>0),e.uniform1ui(d,o>>>0),e.uniform1i(c,n|0),e.uniform1i(r,this.normalize?1:0);const u=e.getAttribLocation(this.program,"index");if(u<0)throw new Error("Attribute 'index' not found (optimized out?)");e.bindBuffer(e.ARRAY_BUFFER,this.indexBuffer),e.enableVertexAttribArray(u),e.vertexAttribIPointer(u,1,e.UNSIGNED_INT,0,0),e.bindTransformFeedback(e.TRANSFORM_FEEDBACK,this.transformFeedback),e.bindBufferBase(e.TRANSFORM_FEEDBACK_BUFFER,0,this.outBuffer),e.enable(e.RASTERIZER_DISCARD),e.beginTransformFeedback(e.POINTS),e.drawArrays(e.POINTS,0,t),e.endTransformFeedback(),e.disable(e.RASTERIZER_DISCARD),e.bindTransformFeedback(e.TRANSFORM_FEEDBACK,null);const m=(this.normalize?1:n)*1.05;return{buffer:this.outBuffer,numPoints:t,bounds:{minX:-m,maxX:m,minY:-m,maxY:m},d:n}}computeOrder(t,o){let e=1;for(let n=1;n<t;n++)if(e=e*o%t,e===1)return n;return t}dispose(){const t=this.gl;this.indexBuffer&&t.deleteBuffer(this.indexBuffer),this.outBuffer&&t.deleteBuffer(this.outBuffer),this.program&&t.deleteProgram(this.program),this.transformFeedback&&t.deleteTransformFeedback(this.transformFeedback),this.indexBuffer=null,this.outBuffer=null,this.program=null,this.transformFeedback=null}}class ${constructor(t){this.canvas=t,this.target=[0,0],this.distance=1,this.rotation=0,this.isDragging=!1,this.mouseX=0,this.mouseY=0,this.prevMouseX=0,this.prevMouseY=0,this.scrollDelta=0,this.scrollMouseX=0,this.scrollMouseY=0,this.onChange=null,this.bindEvents(),this.startLoop()}lookAt(t,o,e=0){this.target=[...t],this.distance=o,this.rotation=e}pan(t,o){const e=this.canvas.width/this.canvas.height;this.target[0]-=t*e*this.distance,this.target[1]-=o*this.distance}zoom(t,o,e){const n=this.canvas.width/this.canvas.height,s=this.target[0]+o*n*this.distance,a=this.target[1]+e*this.distance,d=this.distance*t;this.distance=Math.max(.001,d),this.target[0]=s-o*n*this.distance,this.target[1]=a-e*this.distance}screenToNDC(t,o){const e=this.canvas.getBoundingClientRect();if(e.width===0||e.height===0)return[0,0];const n=(t-e.left)/e.width*2-1,s=-((o-e.top)/e.height*2-1);return[n,s]}tick(){let t=!1;const o=this.canvas.getBoundingClientRect();if(o.width===0||o.height===0)return!1;if(this.isDragging){const e=this.mouseX-this.prevMouseX,n=this.mouseY-this.prevMouseY;if(e!==0||n!==0){const s=e/o.width*2,a=-(n/o.height)*2;this.pan(s,a),t=!0}}if(this.scrollDelta!==0){const[e,n]=this.screenToNDC(this.scrollMouseX,this.scrollMouseY),s=Math.exp(this.scrollDelta/o.height);this.zoom(s,e,n),this.scrollDelta=0,t=!0}return this.prevMouseX=this.mouseX,this.prevMouseY=this.mouseY,t}startLoop(){const t=()=>{this.tick()&&this.onChange&&this.onChange(),this.frameId=requestAnimationFrame(t)};this.frameId=requestAnimationFrame(t)}bindEvents(){this.canvas.addEventListener("mousedown",t=>{t.button===0&&(this.isDragging=!0,this.mouseX=t.clientX,this.mouseY=t.clientY,this.prevMouseX=t.clientX,this.prevMouseY=t.clientY)}),window.addEventListener("mouseup",()=>{this.isDragging=!1}),window.addEventListener("mousemove",t=>{this.mouseX=t.clientX,this.mouseY=t.clientY}),this.canvas.addEventListener("wheel",t=>{t.preventDefault(),this.scrollDelta+=t.deltaY,this.scrollMouseX=t.clientX,this.scrollMouseY=t.clientY},{passive:!1})}getMVP(){const t=this.canvas.width/this.canvas.height,o=1/this.distance,e=-this.target[0],n=-this.target[1],s=Math.cos(this.rotation),a=Math.sin(this.rotation),d=o/t,c=o,r=new Float32Array(16);return r[0]=d*s,r[1]=c*a,r[2]=0,r[3]=0,r[4]=d*-a,r[5]=c*s,r[6]=0,r[7]=0,r[8]=0,r[9]=0,r[10]=1,r[11]=0,r[12]=d*(s*e-a*n),r[13]=c*(a*e+s*n),r[14]=0,r[15]=1,r}dispose(){this.frameId&&cancelAnimationFrame(this.frameId)}}const O=`#version 300 es
+in vec2 position;
+uniform mat4 mvp;
+uniform float pointSize;
+
+void main() {
+  gl_Position = mvp * vec4(position, 0.0, 1.0);
+  gl_PointSize = pointSize;
+}
+`,W=`#version 300 es
+precision mediump float;
+uniform vec3 pointColor;
+out vec4 fragColor;
+
+void main() {
+  vec2 c = gl_PointCoord * 2.0 - 1.0;
+  float dist = length(c);
+  if (dist > 1.0) discard;
+
+  float alpha = 1.0 - smoothstep(0.8, 1.0, dist);
+  fragColor = vec4(pointColor, alpha);
+}
+`,j=`#version 300 es
+in vec2 position;
+uniform mat4 mvp;
+uniform float pointSize;
+uniform int numPoints;
+uniform vec3 colorFirst;
+uniform vec3 colorLast;
+
+out vec3 vColor;
+
+void main() {
+  gl_Position = mvp * vec4(position, 0.0, 1.0);
+  gl_PointSize = pointSize;
+
+  // Interpolate color based on vertex index
+  float t = float(gl_VertexID) / float(max(1, numPoints - 1));
+  vColor = mix(colorFirst, colorLast, t);
+}
+`,V=`#version 300 es
+precision mediump float;
+in vec3 vColor;
+out vec4 fragColor;
+
+void main() {
+  vec2 c = gl_PointCoord * 2.0 - 1.0;
+  float dist = length(c);
+  if (dist > 1.0) discard;
+
+  float alpha = 1.0 - smoothstep(0.8, 1.0, dist);
+  fragColor = vec4(vColor, alpha);
+}
+`,H=`#version 300 es
+precision highp float;
+precision highp int;
+
+in vec2 position;
+uniform mat4 mvp;
+uniform float pointSize;
+
+// Lutz parameters
+uniform int c;
+uniform int bucketToClass[256];  // LUT from CPU (orbit-merged classes)
+
+flat out int vColorClass;
+
+void main() {
+  gl_Position = mvp * vec4(position, 0.0, 1.0);
+  gl_PointSize = pointSize;
+
+  // Color by k mod c, look up merged class from LUT
+  int bucket = gl_VertexID % c;
+  vColorClass = bucketToClass[bucket];
+}
+`,q=`#version 300 es
+precision mediump float;
+precision highp int;
+
+flat in int vColorClass;
+uniform int numClasses;
+
+out vec4 fragColor;
+
+// HSV to RGB conversion
+vec3 hsv2rgb(float h, float s, float v) {
+  float c = v * s;
+  float x = c * (1.0 - abs(mod(h / 60.0, 2.0) - 1.0));
+  float m = v - c;
+
+  vec3 rgb;
+  if (h < 60.0) rgb = vec3(c, x, 0.0);
+  else if (h < 120.0) rgb = vec3(x, c, 0.0);
+  else if (h < 180.0) rgb = vec3(0.0, c, x);
+  else if (h < 240.0) rgb = vec3(0.0, x, c);
+  else if (h < 300.0) rgb = vec3(x, 0.0, c);
+  else rgb = vec3(c, 0.0, x);
+
+  return rgb + m;
+}
+
+void main() {
+  vec2 coord = gl_PointCoord * 2.0 - 1.0;
+  float dist = length(coord);
+  if (dist > 1.0) discard;
+
+  float alpha = 1.0 - smoothstep(0.8, 1.0, dist);
+
+  // Compute hue from color class
+  float hue = float(vColorClass) / float(max(1, numClasses)) * 360.0;
+  vec3 color = hsv2rgb(hue, 0.8, 0.9);
+
+  fragColor = vec4(color, alpha);
+}
+`;class G{constructor(t,o){this.canvas=t,this.gl=o,this.buffer=null,this.numPoints=0,this.bounds=null,this.camera=null,this.pointSize=1.5,this.programs={},this.activeProgram="mono",this.monoColor=[.502,.941,.753],this.colorFirst=[0,0,1],this.colorLast=[0,1,0],this.lutzN=0,this.lutzW=0,this.lutzD=0,this.lutzC=12,this.lutzNumClasses=0,this.lutzBucketToClass=new Int32Array(256),this.animationId=null,this.visiblePoints=0,this.animating=!1}compileProgram(t,o){const e=this.gl,n=e.createShader(e.VERTEX_SHADER);if(e.shaderSource(n,t),e.compileShader(n),!e.getShaderParameter(n,e.COMPILE_STATUS))throw new Error("Vertex shader error: "+e.getShaderInfoLog(n));const s=e.createShader(e.FRAGMENT_SHADER);if(e.shaderSource(s,o),e.compileShader(s),!e.getShaderParameter(s,e.COMPILE_STATUS))throw new Error("Fragment shader error: "+e.getShaderInfoLog(s));const a=e.createProgram();if(e.attachShader(a,n),e.attachShader(a,s),e.linkProgram(a),e.deleteShader(n),e.deleteShader(s),!e.getProgramParameter(a,e.LINK_STATUS))throw new Error("Program link error: "+e.getProgramInfoLog(a));return a}init(){const t=this.gl,o=this.compileProgram(O,W);this.programs.mono={program:o,position:t.getAttribLocation(o,"position"),mvp:t.getUniformLocation(o,"mvp"),pointSize:t.getUniformLocation(o,"pointSize"),pointColor:t.getUniformLocation(o,"pointColor")};const e=this.compileProgram(j,V);this.programs.time={program:e,position:t.getAttribLocation(e,"position"),mvp:t.getUniformLocation(e,"mvp"),pointSize:t.getUniformLocation(e,"pointSize"),numPoints:t.getUniformLocation(e,"numPoints"),colorFirst:t.getUniformLocation(e,"colorFirst"),colorLast:t.getUniformLocation(e,"colorLast")};const n=this.compileProgram(H,q);return this.programs.lutz={program:n,position:t.getAttribLocation(n,"position"),mvp:t.getUniformLocation(n,"mvp"),pointSize:t.getUniformLocation(n,"pointSize"),c:t.getUniformLocation(n,"c"),numClasses:t.getUniformLocation(n,"numClasses"),bucketToClass:t.getUniformLocation(n,"bucketToClass")},t.enable(t.BLEND),t.blendFunc(t.SRC_ALPHA,t.ONE_MINUS_SRC_ALPHA),this.camera=new $(this.canvas),this.camera.onChange=()=>this.draw(),this.resize(),window.addEventListener("resize",()=>this.resize()),this}resize(){this.canvas.width=window.innerWidth,this.canvas.height=window.innerHeight,this.gl.viewport(0,0,this.canvas.width,this.canvas.height),this.draw()}setPointBuffer(t,o){this.stopAnimation(),this.buffer=t,this.numPoints=o,this.visiblePoints=o}setBounds(t){this.bounds=t}setPointSize(t){this.pointSize=t}setColorScheme(t){this.programs[t]&&(this.activeProgram=t)}setMonoColor(t){this.monoColor=t}setMonoColorHex(t){this.monoColor=this.hexToRgb(t)}setTimeColors(t,o){this.colorFirst=t,this.colorLast=o}hexToRgb(t){const o=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(t);return o?[parseInt(o[1],16)/255,parseInt(o[2],16)/255,parseInt(o[3],16)/255]:[1,1,1]}setTimeColorsHex(t,o){this.colorFirst=this.hexToRgb(t),this.colorLast=this.hexToRgb(o)}setLutzParams(t,o,e){this.lutzN=t,this.lutzW=o,this.lutzD=e}setLutzLUT(t){this.lutzC=t.c,this.lutzNumClasses=t.numClasses;for(let o=0;o<t.c&&o<256;o++)this.lutzBucketToClass[o]=t.bucketToClass[o]}stopAnimation(){this.animationId!==null&&(cancelAnimationFrame(this.animationId),this.animationId=null),this.animating=!1}animateIn(t=2e3,o="easeOut"){if(this.stopAnimation(),this.numPoints===0)return;console.log("animateIn called, numPoints:",this.numPoints,"duration:",t),this.animating=!0,this.visiblePoints=0;const e=performance.now(),n=this.numPoints,s={linear:c=>c,easeOut:c=>1-Math.pow(1-c,3),easeInOut:c=>c<.5?4*c*c*c:1-Math.pow(-2*c+2,3)/2},a=s[o]||s.easeOut,d=()=>{if(!this.animating)return;const c=performance.now()-e,r=Math.min(c/t,1),u=a(r);this.visiblePoints=Math.floor(u*n),this.draw(),r<1?this.animationId=requestAnimationFrame(d):(this.visiblePoints=n,this.animating=!1,this.animationId=null)};this.animationId=requestAnimationFrame(d)}zoomToFit(){if(!this.camera||!this.bounds)return;const{minX:t,maxX:o,minY:e,maxY:n}=this.bounds,s=(t+o)/2,a=(e+n)/2,d=o-t||1,c=n-e||1,r=Math.max(d,c)*.6;this.camera.lookAt([s,a],r),this.draw()}draw(){if(!this.gl||this.numPoints===0)return;const t=this.gl,o=this.programs[this.activeProgram];t.viewport(0,0,this.canvas.width,this.canvas.height),t.clearColor(0,0,0,0),t.clear(t.COLOR_BUFFER_BIT),t.useProgram(o.program),t.uniformMatrix4fv(o.mvp,!1,this.camera.getMVP()),t.uniform1f(o.pointSize,this.pointSize),this.activeProgram==="mono"&&t.uniform3fv(o.pointColor,this.monoColor),this.activeProgram==="time"&&(t.uniform1i(o.numPoints,this.numPoints),t.uniform3fv(o.colorFirst,this.colorFirst),t.uniform3fv(o.colorLast,this.colorLast)),this.activeProgram==="lutz"&&(t.uniform1i(o.c,this.lutzC),t.uniform1i(o.numClasses,this.lutzNumClasses),t.uniform1iv(o.bucketToClass,this.lutzBucketToClass)),t.bindBuffer(t.ARRAY_BUFFER,this.buffer),t.enableVertexAttribArray(o.position),t.vertexAttribPointer(o.position,2,t.FLOAT,!1,0,0);const e=this.animating?this.visiblePoints:this.numPoints;t.drawArrays(t.POINTS,0,e)}dispose(){this.stopAnimation(),this.camera&&this.camera.dispose(),this.buffer&&this.gl.deleteBuffer(this.buffer);for(const t in this.programs)this.gl.deleteProgram(this.programs[t].program)}}class K{constructor(){this.bucketToClass=null,this.numClasses=0,this.c=12,this._cachedN=null,this._cachedW=null,this._cachedC=null}compute(t,o,e){if(t===this._cachedN&&o===this._cachedW&&e===this._cachedC)return;this.c=e;const n=new Int32Array(e);for(let l=0;l<e;l++)n[l]=l;const s=l=>(n[l]!==l&&(n[l]=s(n[l])),n[l]),a=(l,m)=>{const g=s(l),S=s(m);g!==S&&(n[g]=S)},d=new Array(e).fill(!1),c=new Uint8Array(t);for(let l=0;l<t;l++){if(c[l])continue;let m=l,g=m;const S=new Set;do c[m]=1,m<g&&(g=m),S.add(m%e),m=m*o%t;while(m!==l&&!c[m]);const N=g%e,B=Array.from(S);for(let x=1;x<B.length;x++)a(B[0],B[x]);d[N]=!0}const r=new Map;let u=0;this.bucketToClass=new Int32Array(e);for(let l=0;l<e;l++){const m=s(l);r.has(m)||r.set(m,u++),this.bucketToClass[l]=r.get(m)}this.numClasses=u,this._cachedN=t,this._cachedW=o,this._cachedC=e,console.log(`LutzColorer: c=${e}, numClasses=${this.numClasses}`)}getLUT(){return{bucketToClass:this.bucketToClass,numClasses:this.numClasses,c:this.c}}}const y=document.getElementById("canvas"),L=y.getContext("webgl2",{alpha:!0,antialias:!1,preserveDrawingBuffer:!0,premultipliedAlpha:!1});if(!L)throw new Error("WebGL2 not supported");const z=new Y(L);z.init();const f=new G(y,L);f.init();const I=new K;function T(i,t){for(;t!==0;)[i,t]=[t,i%t];return i}function F(i,t){let o=t+1;for(;T(i,o)!==1;)o++;return o}function R(i,t){let o=t-1;for(;o>1&&T(i,o)!==1;)o--;return o>0?o:1}function _(i,t){let o=1;for(let e=1;e<i;e++)if(o=o*t%i,o===1)return e;return i}let w=255255,v=254,D=12,M=!1,A=2e3;function U(i,t){w=i,v=t,window.dispatchEvent(new CustomEvent("gp-values-changed",{detail:{n:i,w:t}})),console.log(`n: ${i.toLocaleString()} | w: ${t} | computing d...`);const o=_(i,t);console.log(`d: ${o.toLocaleString()}`);const e=performance.now(),n=z.run(i,t),s=performance.now();f.setPointBuffer(n.buffer,n.numPoints),f.setBounds(n.bounds),f.setLutzParams(i,t,o),f.activeProgram==="lutz"&&k(),f.zoomToFit(),M&&(console.log("Starting animation, duration:",A),f.animateIn(A));const a=performance.now();L.finish();const d=performance.now();console.log(`compute: ${(s-e).toFixed(2)}ms | draw: ${(a-s).toFixed(2)}ms | gpu sync: ${(d-a).toFixed(2)}ms | total: ${(d-e).toFixed(2)}ms`)}function k(){if(w===0||v===0)return;const i=performance.now();I.compute(w,v,D),f.setLutzLUT(I.getLUT());const t=performance.now();console.log(`Lutz LUT: ${(t-i).toFixed(2)}ms`)}function Z(i){D=i,f.activeProgram==="lutz"&&(k(),f.draw())}function J(i){M=i,console.log("Animation enabled:",i)}function Q(i){A=i}function tt(){f.animateIn(A)}U(255255,254);window.dispatchEvent(new Event("app-ready"));window.renderPoints=U;window.computer=z;window.renderer=f;window.lutzColorer=I;window.gcd=T;window.nextCoprime=F;window.prevCoprime=R;window.order=_;window.updateLutzColoring=k;window.setLutzC=Z;window.setAnimateEnabled=J;window.setAnimationDuration=Q;window.triggerAnimation=tt;window.addEventListener("keydown",i=>{if(!(i.target.tagName==="INPUT"||i.target.tagName==="TEXTAREA")){if(i.key==="n"&&w>0&&v>0){const t=F(w,v);window.renderPoints(w,t)}else if(i.key==="p"&&w>0&&v>1){const t=R(w,v);window.renderPoints(w,t)}}});function h(i){return i&&parseInt(i.getAttribute("data-value")||"0")||0}const P=document.getElementById("nInput"),p=document.getElementById("wInput"),et=document.getElementById("renderBtn"),ot=document.getElementById("prevCoprimeBtn"),it=document.getElementById("nextCoprimeBtn"),E=document.getElementById("keyNInput"),b=document.getElementById("keyWInput"),nt=document.getElementById("keyComputeBtn"),st=document.getElementById("keyPrevBtn"),rt=document.getElementById("keyNextBtn"),at=document.getElementById("pointSizeSlider"),ct=document.getElementById("lutzCSlider"),lt=document.getElementById("colorSchemeSelect"),dt=document.getElementById("monoColorSwap"),mt=document.getElementById("animateToggle"),ut=document.getElementById("animDurationSlider"),ht=document.getElementById("exportBtn");et?.addEventListener("click",()=>{const i=h(P),t=h(p);i>0&&t>0&&window.renderPoints&&window.renderPoints(i,t)});ot?.addEventListener("click",()=>{const i=h(P),t=h(p);if(window.prevCoprime&&window.renderPoints){const o=window.prevCoprime(i,t);if(window.renderPoints(i,o),p){p.setAttribute("data-value",o.toString());const e=p.querySelector(".text-number-value");e&&(e.textContent=o.toString())}}});it?.addEventListener("click",()=>{const i=h(P),t=h(p);if(window.nextCoprime&&window.renderPoints){const o=window.nextCoprime(i,t);if(window.renderPoints(i,o),p){p.setAttribute("data-value",o.toString());const e=p.querySelector(".text-number-value");e&&(e.textContent=o.toString())}}});nt?.addEventListener("click",()=>{const i=h(E),t=h(b);i>0&&t>0&&window.renderPoints&&window.renderPoints(i,t)});st?.addEventListener("click",()=>{const i=h(E),t=h(b);if(window.prevCoprime&&window.renderPoints){const o=window.prevCoprime(i,t);window.renderPoints(i,o),C(b,o)}});rt?.addEventListener("click",()=>{const i=h(E),t=h(b);if(window.nextCoprime&&window.renderPoints){const o=window.nextCoprime(i,t);window.renderPoints(i,o),C(b,o)}});at?.addEventListener("change",i=>{const o=(i.detail?.value??15)/10;window.renderer&&(window.renderer.setPointSize(o),window.renderer.draw())});ct?.addEventListener("change",i=>{const o=i.detail?.value??12;window.setLutzC&&window.setLutzC(o)});const ft=["mono","time","lutz"];lt?.addEventListener("change",i=>{const t=i.detail,o=ft[t?.value??0];window.renderer&&(window.renderer.setColorScheme(o),o==="lutz"&&window.updateLutzColoring&&window.updateLutzColoring(),window.renderer.draw())});const gt={mint:"#80f0c0",sky:"#90d0ff",lavender:"#c5a0f5",coral:"#f0a090",peach:"#e8c4a0",yellow:"#f0e080",white:"#ffffff"};dt?.addEventListener("change",i=>{const o=i.detail?.option??"mint",e=gt[o]||"#80f0c0";window.renderer&&(window.renderer.setMonoColorHex(e),window.renderer.draw())});mt?.addEventListener("change",i=>{const o=i.detail?.checked??!1;window.setAnimateEnabled&&window.setAnimateEnabled(o)});ut?.addEventListener("change",i=>{const o=i.detail?.value??2;window.setAnimationDuration&&window.setAnimationDuration(o*1e3)});ht?.addEventListener("click",()=>{const i=document.getElementById("canvas"),t=h(P),o=h(p),e=document.createElement("a"),n=new Date().toISOString().replace(/[:.]/g,"-").slice(0,-5);e.download=`gp-${t}-${o}-${n}.png`,e.href=i.toDataURL("image/png"),e.click()});function C(i,t){if(!i)return;i.setAttribute("data-value",t.toString());const o=i.querySelector(".text-number-value");o&&(o.textContent=t.toString())}window.addEventListener("gp-values-changed",(i=>{const{n:t,w:o}=i.detail;C(P,t),C(p,o),C(E,t),C(b,o)}));
